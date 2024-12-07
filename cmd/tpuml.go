@@ -3,8 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/vincedupuis/transplantUML/internal"
 	"os"
-	"transplant-scxml/internal"
 )
 
 func main() {

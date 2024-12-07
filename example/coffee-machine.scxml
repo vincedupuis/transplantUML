@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="idle">
+    <!-- Idle State: Coffee machine is off -->
+    <state id="idle">
+        <transition event="power_on" target="ready"/>
+    </state>
+
+    <!-- Ready State: Machine is on and waiting for input -->
+    <state id="ready">
+        <transition event="select_coffee" target="select_type"/>
+        <transition event="power_off" target="idle"/>
+    </state>
+
+    <!-- Select Coffee Type: User selects the type of coffee to brew -->
+    <state id="select_type">
+        <transition event="espresso" target="brewing"/>
+        <transition event="latte" target="brewing"/>
+        <transition event="cappuccino" target="brewing"/>
+        <transition event="cancel" target="ready"/>
+    </state>
+
+    <!-- Brewing State: The machine is brewing the selected coffee -->
+    <state id="brewing">
+        <transition event="cancel" target="ready"/>
+        <transition event="error" target="error"/>
+        <transition event="coffee_ready" target="coffee_served"/>
+    </state>
+
+    <!-- Error State: Something went wrong during brewing -->
+    <state id="error">
+        <transition event="reset" target="ready"/>
+        <transition event="power_off" target="idle"/>
+    </state>
+
+    <!-- State for coffee being served -->
+    <state id="coffee_served">
+        <transition event="power_off" target="idle"/>
+        <transition event="reset" target="ready"/>
+    </state>
+
+
+</scxml>
