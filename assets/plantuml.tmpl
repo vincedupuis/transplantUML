@@ -1,0 +1,57 @@
+{{- "" -}}
+@startuml
+{{ template "outputTransitions" "" }}
+{{- template "outputInnerStates" "" }}
+@enduml
+{{ "" -}}
+
+{{- define "outputInnerStates" -}}
+{{- range GetInnerStates . -}}
+{{- template "outputState" . }}
+{{- end -}}
+{{- end -}}
+
+{{- define "outputState" -}}
+{{- $innerStates := GetInnerStates .Name -}}
+{{- if gt (len $innerStates) 0 }}
+state {{ .Name }} {
+{{ include "outputTransitions" .Name | indent 4 -}}
+{{- include "outputInnerStates" .Name | indent 4 }}
+}
+{{- else }}
+state {{ .Name -}}
+{{ template "outputTransitions" .Name -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "outputTransitions" -}}
+{{ range (GetOutgoingTransitions . "I" "N") -}}
+[*] --> {{ .Target -}}
+{{- end -}}
+{{- range GetOutgoingTransitions . "N" "N" }}
+{{ .Source }} --> {{ .Target -}}
+{{- template "outputTransitionParameters" . -}}
+{{- end -}}
+{{- range GetOutgoingTransitions . "H" "N" }}
+[H] --> {{ .Target -}}
+{{- template "outputTransitionParameters" . -}}
+{{- end -}}
+{{- range GetOutgoingTransitions . "H" "N" }}
+[H] --> {{ .Target -}}
+{{- template "outputTransitionParameters" . -}}
+{{- end -}}
+{{- range GetIncomingTransitions . "N" "H" }}
+{{ .Source }} --> [H]
+{{- template "outputTransitionParameters" . -}}
+{{- end -}}
+{{- range GetIncomingTransitions . "N" "F" }}
+{{ .Source }} --> [*]
+{{- template "outputTransitionParameters" . -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "outputTransitionParameters" -}}
+{{- $text := join (toSlice .Event (surround "[ " .Cond " ]") (prefix "/ " .Action)) "\\n" -}}
+{{- if not (empty $text) -}}: {{ $text -}}
+{{- end -}}
+{{- end -}}
