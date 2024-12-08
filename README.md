@@ -49,3 +49,45 @@ To convert an SCXML file into a plantUML diagram:
 
 The resulting `coffee.puml` file will contain a structured plantUML that can be visualized with [PlantUML Online](https://plantuml.online).
 
+## Model
+
+The following model is used to represent a state machine and it is injected into the go template engine
+
+```go
+type StateType string
+
+const (
+    Normal      = "N"
+    InitialType = "I"
+    HistoryType = "H"
+    FinalType   = "F"
+)
+
+type StateMachine struct {
+    Name        string
+    States      []*State
+    Transitions []*Transition
+}
+
+type State struct {
+    Name   string
+    Parent string
+}
+
+type Transition struct {
+    Source     string
+    SourceType StateType
+    Event      string
+    Cond       string
+    Action     string
+    Target     string
+    DestType   StateType
+}
+```
+The following functions to access the state machine model are also injected in the template engine and available
+
+```go
+func GetInnerStates(name) []State
+func GetOutgoingTransitions(name, sourceType, destType) []Transition
+func GetIncomingTransitions(name, sourceType, destType) []Transition
+```
