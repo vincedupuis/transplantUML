@@ -10,24 +10,24 @@ const (
 )
 
 type StateMachine struct {
-	Name        string
-	States      []*State
-	Transitions []*Transition
+	Name        string        `json:"name"`
+	States      []*State      `json:"states"`
+	Transitions []*Transition `json:"transitions"`
 }
 
 type State struct {
-	Name   string
-	Parent string
+	Name   string `json:"name"`
+	Parent string `json:"parent"`
 }
 
 type Transition struct {
-	Source     string
-	SourceType StateType
-	Event      string
-	Cond       string
-	Action     string
-	Target     string
-	DestType   StateType
+	Source     string    `json:"source"`
+	SourceType StateType `json:"sourceType"`
+	Event      string    `json:"event"`
+	Cond       string    `json:"cond"`
+	Action     string    `json:"action"`
+	Target     string    `json:"target"`
+	DestType   StateType `json:"destType"`
 }
 
 func (sm *StateMachine) GetInnerStates(name string) []*State {
