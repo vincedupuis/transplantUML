@@ -44,7 +44,7 @@
 To convert an SCXML file into a plantUML diagram:
 
 ```bash
-./tpuml -i example/coffee-machine.scxml -t assets/plantuml.tmpl -o coffee.puml
+./tpuml -i example/coffee-machine.scxml -t assets/puml.tmpl -o coffee.puml
 ```
 
 The resulting `coffee.puml` file will contain a structured plantUML that can be visualized with [PlantUML Online](https://plantuml.online).
