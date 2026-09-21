@@ -10,6 +10,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"slices"
 )
 
 // StateKind classifies a State.
@@ -123,11 +124,8 @@ func (sm *StateMachine) OutgoingTransitions(source string) []*Transition {
 func (sm *StateMachine) IncomingTransitions(target string) []*Transition {
 	out := make([]*Transition, 0)
 	for _, t := range sm.Transitions {
-		for _, tg := range t.Targets {
-			if tg == target {
-				out = append(out, t)
-				break
-			}
+		if slices.Contains(t.Targets, target) {
+			out = append(out, t)
 		}
 	}
 	return out
