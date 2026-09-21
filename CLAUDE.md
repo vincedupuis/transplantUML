@@ -12,6 +12,7 @@ the binary, used when `-t` is omitted) produces PlantUML.
 ## Commands
 
 ```bash
+make build                          # produces ./bin/tpuml (see the Makefile for run/test/fmt/vet/clean)
 go build ./...
 go build ./cmd/tpuml                # produces ./tpuml
 go vet ./...
@@ -22,7 +23,6 @@ go test ./internal/render -run TestPlantUMLGolden/edge
 # End-to-end
 ./tpuml -i example/coffee-machine.scxml                 # PlantUML to stdout
 ./tpuml -i example/coffee-machine.scxml -F json         # model as JSON
-./tpuml -i example/coffee-machine.scxml -e model.json   # PlantUML + dump the model (debugging a template)
 ```
 
 Golden files for the PlantUML template live in `internal/render/testdata/*.puml`; regenerate one with

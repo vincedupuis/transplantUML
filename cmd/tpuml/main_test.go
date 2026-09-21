@@ -45,21 +45,29 @@ func TestJSONRoundTripThroughFiles(t *testing.T) {
 	}
 }
 
-func TestCustomTemplateAndExport(t *testing.T) {
+func TestCustomTemplate(t *testing.T) {
 	dir := t.TempDir()
 	tmpl := filepath.Join(dir, "t.tmpl")
 	os.WriteFile(tmpl, []byte(`{{ .Initial }}:{{ len .States }}`), 0o644)
-	export := filepath.Join(dir, "e.json")
 
-	out, _, err := runCLI(t, "-i", example, "-t", tmpl, "-e", export)
+	out, _, err := runCLI(t, "-i", example, "-t", tmpl)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if out != "idle:6" {
 		t.Errorf("template output = %q", out)
 	}
-	if _, err := os.Stat(export); err != nil {
-		t.Errorf("export not written: %v", err)
+}
+
+func TestNoArgsPrintsUsage(t *testing.T) {
+	out, _, err := runCLI(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"Usage:", "-i, --input", "-F, --output-format", "-h, --help"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("usage output missing %q:\n%s", want, out)
+		}
 	}
 }
 
@@ -74,8 +82,7 @@ func TestErrors(t *testing.T) {
 		args []string
 		want string
 	}{
-		{[]string{}, "-i is required"},
-		{[]string{"-i", example, "-t", "x", "-F", "json"}, "mutually exclusive"},
+		{[]string{"-i", example, "-t", "x", "-F", "json"}, "none of the others can be"},
 		{[]string{"-i", noext}, "cannot infer the format"},
 		{[]string{"-i", noext, "-f", "yaml"}, `unknown input format "yaml"`},
 		{[]string{"-i", example, "-F", "yaml"}, `unknown output format "yaml"`},

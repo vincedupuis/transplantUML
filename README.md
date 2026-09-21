@@ -17,7 +17,7 @@ PlantUML, source code, documentation, or any other text — or with a built-in e
 
 ## Requirements
 
-- Go 1.23 or later (see `go.mod`).
+- Go 1.26 or later (see `go.mod`).
 
 ## Installation
 
@@ -30,23 +30,27 @@ or from a clone:
 ```bash
 git clone https://github.com/vincedupuis/transplantUML.git
 cd transplantUML
-go build ./cmd/tpuml
+make build          # produces ./bin/tpuml, or: go build ./cmd/tpuml
 ```
+
+The Makefile also has `run` (`make run ARGS="-i example/coffee-machine.scxml"`), `test`, `fmt`, `vet` and `clean`.
 
 ## Usage
 
 ```
-tpuml -i input [-f format] [-t template.tmpl | -F format] [-o output] [-e model.json]
+tpuml -i input [-f format] [-t template.tmpl | -F format] [-o output]
 ```
 
 | Flag | Meaning |
 |------|---------|
-| `-i` | Input file (required). |
-| `-f` | Input format: `scxml`, `json`. Default: inferred from the extension (`.scxml`/`.xml`, `.json`). |
-| `-t` | Go template file to render with. Default: the built-in PlantUML template (`assets/puml.tmpl`). |
-| `-F` | Emit a built-in structured format instead of running a template: `json`. Mutually exclusive with `-t`. |
-| `-o` | Output file. Default: stdout. |
-| `-e` | Also write the parsed model as JSON to this file (handy while writing a template). |
+| `-i`, `--input` | Input file (required). |
+| `-f`, `--input-format` | Input format: `scxml`, `json`. Default: inferred from the extension (`.scxml`/`.xml`, `.json`). |
+| `-t`, `--template` | Go template file to render with. Default: the built-in PlantUML template (`assets/puml.tmpl`). |
+| `-F`, `--output-format` | Emit a built-in structured format instead of running a template: `json`. Mutually exclusive with `-t`. |
+| `-o`, `--output` | Output file. Default: stdout. |
+| `-h`, `--help` | Show usage. |
+
+Each flag has a long form; `-F`/`--output-format` is distinct from `-f`/`--input-format` (flags are case-sensitive).
 
 ### Examples
 
