@@ -1,8 +1,9 @@
 # transplantUML
 
-**transplantUML** (`tpuml`) converts state machine documents. It parses an input file (SCXML today, more formats
-planned) into a format-neutral model, then renders that model either through a Go template — so you can produce
-PlantUML, source code, documentation, or any other text — or with a built-in emitter for structured formats such as JSON.
+**transplantUML** (`tpuml`) converts state machine documents. It parses an input file into a format-neutral model,
+then writes that model back out: with a built-in emitter, in any of the supported document formats (SCXML, JSON —
+every format `tpuml` reads it can also write), or through a Go template — so you can produce PlantUML, source code,
+documentation, or any other text. Template rendering is the only one-way direction.
 
 ## Features
 
@@ -10,8 +11,8 @@ PlantUML, source code, documentation, or any other text — or with a built-in e
   transition guards/actions, internal and multi-target transitions are all preserved.
 - **Any text output** through the Go templating engine plus the [sprig](https://masterminds.github.io/sprig/) function
   library, with a built-in PlantUML template.
-- **Structured output** with built-in emitters (JSON), and JSON is also accepted as input so it doubles as an
-  interchange format.
+- **Every format both ways**: `scxml` and `json` are each accepted as input (`-f`) and produced as output (`-F`),
+  so `tpuml` converts between them in either direction.
 - **Validation**: dangling targets, unknown parents, duplicate ids and similar mistakes are reported before anything
   is rendered.
 
@@ -46,7 +47,7 @@ tpuml -i input [-f format] [-t template.tmpl | -F format] [-o output]
 | `-i`, `--input` | Input file (required). |
 | `-f`, `--input-format` | Input format: `scxml`, `json`. Default: inferred from the extension (`.scxml`/`.xml`, `.json`). |
 | `-t`, `--template` | Go template file to render with. Default: the built-in PlantUML template (`assets/puml.tmpl`). |
-| `-F`, `--output-format` | Emit a built-in structured format instead of running a template: `json`. Mutually exclusive with `-t`. |
+| `-F`, `--output-format` | Write a document format instead of running a template: `scxml`, `json`. Mutually exclusive with `-t`. |
 | `-o`, `--output` | Output file. Default: stdout. |
 | `-h`, `--help` | Show usage. |
 
@@ -64,6 +65,10 @@ tpuml -i example/coffee-machine.scxml -t my-template.tmpl -o coffee.md
 # SCXML -> JSON model, then JSON -> PlantUML (round trip)
 tpuml -i example/coffee-machine.scxml -F json -o coffee.json
 tpuml -i coffee.json -o coffee.puml
+
+# JSON -> SCXML, and SCXML -> normalized SCXML
+tpuml -i coffee.json -F scxml -o coffee.scxml
+tpuml -i example/coffee-machine.scxml -F scxml
 ```
 
 `coffee.puml` can be visualized with [PlantUML Online](https://plantuml.online).
@@ -105,7 +110,7 @@ type Transition struct {
 `State` has the predicates `IsNormal`, `IsParallel`, `IsFinal`, `IsHistory`, `IsDeepHistory` and `IsPseudo`
 (history or final).
 
-The JSON emitted by `-F json` / `-e` is this structure with camelCase keys (`onEntry`, `targets`, …); empty
+The JSON emitted by `-F json` is this structure with camelCase keys (`onEntry`, `targets`, …); empty
 optional fields are omitted and `kind` defaults to `normal` when reading.
 
 ## Writing templates
@@ -136,3 +141,10 @@ draw parallel regions, and render pseudo-states.
 `<transition>` (`event`, `cond`, multiple `target`s, `type="internal"`), `<onentry>`, `<onexit>`. Executable content
 is kept as text: `<script>` verbatim, `<log>`/`<assign>`/`<raise>`/`<send>`/`<cancel>` in a short readable form,
 anything else as its XML. `<datamodel>`, `<invoke>` and `<donedata>` are ignored.
+
+`-F scxml` writes that same subset back. The document is equivalent, not byte-identical to the one it came from:
+
+- the initial child is always written as an `initial` attribute, never as an `<initial>` element;
+- executable content becomes `<script>` bodies holding the text the parser produced, except for elements it kept as
+  XML, which are written back as themselves — so model → SCXML → model is lossless;
+- comments and anything the parser ignores are not preserved.

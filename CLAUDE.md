@@ -5,9 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 `tpuml` is a Go CLI that converts state machine documents. Any supported input format is parsed into one
-format-neutral model (`internal/model`), which is then rendered either through a Go `text/template` (text outputs:
-PlantUML, code, docs) or a built-in emitter (structured outputs: JSON). The bundled `assets/puml.tmpl` (embedded in
-the binary, used when `-t` is omitted) produces PlantUML.
+format-neutral model (`internal/model`), which is then written back out either by a built-in emitter (document
+formats: SCXML, JSON) or through a Go `text/template` (free-form text: PlantUML, code, docs). Every format is
+available in both directions — a format with a parser must also have an emitter — and template rendering is the
+only one-way output. The bundled `assets/puml.tmpl` (embedded in the binary, used when `-t` is omitted) produces
+PlantUML.
 
 ## Commands
 
@@ -40,11 +42,16 @@ Pipeline: `cmd/tpuml/main.go` (`run() error`) → `format.ParserFor(name).Parse`
   synthetic transition. The model must stay a *superset* of every input format — do not shape it around one
   template. `Validate()` is the single place structural rules live; extend it when the model grows.
 - **`internal/format`** — `Parser` / `Emitter` interfaces plus the name→implementation tables and extension
-  detection. To add a format: implement it in its own package under `internal/`, register it here, add its
-  extension. Package names avoid stdlib clashes (`jsonsm`, not `json`).
-- **`internal/scxml`** — recursive `etree` walk over `<state>/<parallel>/<final>/<history>` children (direct
-  children only, so `<initial>`'s inner `<transition>` is not mistaken for a real transition). Executable content
-  is flattened to strings; unknown elements are kept as raw XML.
+  detection. To add a format: implement *both* interfaces in its own package under `internal/`, register it in both
+  tables, add its extension (`TestFormatsGoBothWays` enforces the pairing). Package names avoid stdlib clashes
+  (`jsonsm`, not `json`).
+- **`internal/scxml`** — `Parser` is a recursive `etree` walk over `<state>/<parallel>/<final>/<history>` children
+  (direct children only, so `<initial>`'s inner `<transition>` is not mistaken for a real transition). Executable
+  content is flattened to strings; unknown elements are kept as raw XML, normalized by `rawXML` (unindented,
+  canonical escaping) so the string survives a round trip. `Emitter` (`emit.go`) rebuilds the tree from `Parent`
+  links, writes the initial child as an attribute, and turns action strings back into `<script>` bodies — except
+  those that are XML, which are re-inserted as elements. States it cannot reach from the top level are an error,
+  never dropped silently.
 - **`internal/jsonsm`** — the model's own JSON shape (struct tags in `model`). Parser uses
   `DisallowUnknownFields`; round-trip equality with the SCXML parser is tested.
 - **`internal/render`** — registers sprig plus project helpers (`include`, `prefix`, `surround`, `joinNonEmpty`)

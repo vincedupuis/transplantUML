@@ -1,4 +1,6 @@
-// Package scxml parses SCXML (State Chart XML) documents into the model.
+// Package scxml reads and writes SCXML (State Chart XML) documents: Parser
+// turns a document into the model, Emitter (emit.go) writes the model back
+// out as the same subset of SCXML.
 //
 // Supported: nested <state>, <parallel>, <final>, <history type="shallow|deep">,
 // the initial attribute and the <initial> element, <transition> with multiple
@@ -77,7 +79,7 @@ func walk(sm *model.StateMachine, el *etree.Element, parent string) {
 		for _, t := range child.SelectElements("transition") {
 			sm.Transitions = append(sm.Transitions, &model.Transition{
 				Source:   st.Name,
-				Targets:  strings.Fields(t.SelectAttrValue("target", "")),
+				Targets:  targets(t.SelectAttrValue("target", "")),
 				Event:    t.SelectAttrValue("event", ""),
 				Cond:     t.SelectAttrValue("cond", ""),
 				Actions:  executableContent(t),
@@ -86,6 +88,16 @@ func walk(sm *model.StateMachine, el *etree.Element, parent string) {
 		}
 		walk(sm, child, st.Name)
 	}
+}
+
+// targets splits a transition's target attribute. A targetless transition gets
+// a nil list rather than an empty one, so that the model still compares equal
+// after a round trip through a format that omits empty lists.
+func targets(attr string) []string {
+	if fields := strings.Fields(attr); len(fields) > 0 {
+		return fields
+	}
+	return nil
 }
 
 // initialOf resolves the initial child of a <scxml> or <state> element: the
@@ -142,9 +154,15 @@ func executableContent(el *etree.Element) []string {
 	return out
 }
 
+// rawXML renders an element tpuml has no model field for. The result is
+// normalized (indentation removed, canonical escaping) so that the same
+// element always yields the same string, whatever the source document looked
+// like and however many times it went through the emitter.
 func rawXML(el *etree.Element) string {
 	doc := etree.NewDocument()
 	doc.SetRoot(el.Copy())
+	doc.Unindent()
+	canonical(doc)
 	s, err := doc.WriteToString()
 	if err != nil {
 		return "<" + el.Tag + ">"

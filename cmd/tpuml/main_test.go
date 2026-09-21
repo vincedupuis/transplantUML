@@ -27,21 +27,33 @@ func TestDefaultTemplateToStdout(t *testing.T) {
 	}
 }
 
-func TestJSONRoundTripThroughFiles(t *testing.T) {
-	dir := t.TempDir()
-	jsonPath := filepath.Join(dir, "m.json")
-	pumlPath := filepath.Join(dir, "m.puml")
+// Every built-in output format can be read back in: converting the example
+// through it must yield the same PlantUML as rendering the example directly.
+func TestRoundTripThroughFiles(t *testing.T) {
+	fromSCXML, _, err := runCLI(t, "-i", example)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"json", "scxml"} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			midPath := filepath.Join(dir, "m."+name)
+			pumlPath := filepath.Join(dir, "m.puml")
 
-	if _, _, err := runCLI(t, "-i", example, "-F", "json", "-o", jsonPath); err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := runCLI(t, "-i", jsonPath, "-o", pumlPath); err != nil {
-		t.Fatal(err)
-	}
-	fromJSON, _ := os.ReadFile(pumlPath)
-	fromSCXML, _, _ := runCLI(t, "-i", example)
-	if string(fromJSON) != fromSCXML {
-		t.Errorf("PlantUML from JSON differs from PlantUML from SCXML")
+			if _, _, err := runCLI(t, "-i", example, "-F", name, "-o", midPath); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := runCLI(t, "-i", midPath, "-o", pumlPath); err != nil {
+				t.Fatal(err)
+			}
+			got, err := os.ReadFile(pumlPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != fromSCXML {
+				t.Errorf("PlantUML via %s differs from PlantUML from SCXML:\n%s", name, got)
+			}
+		})
 	}
 }
 

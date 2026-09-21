@@ -19,8 +19,10 @@ type Parser interface {
 	Parse(src []byte) (*model.StateMachine, error)
 }
 
-// Emitter serializes the model to a structured format. Text-like outputs
-// (diagrams, code, docs) should use a Go template instead; see package render.
+// Emitter serializes the model back into one of the supported document
+// formats. Every format tpuml can read it can also write, so parsers and
+// emitters come in pairs; free-form text output (diagrams, code, docs) is the
+// template mechanism's job instead, see package render.
 type Emitter interface {
 	Emit(sm *model.StateMachine) ([]byte, error)
 }
@@ -31,7 +33,8 @@ var parsers = map[string]Parser{
 }
 
 var emitters = map[string]Emitter{
-	"json": jsonsm.Emitter{},
+	"scxml": scxml.Emitter{},
+	"json":  jsonsm.Emitter{},
 }
 
 // extensions maps a lower-case file extension to a parser name.
