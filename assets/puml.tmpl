@@ -1,57 +1,115 @@
-{{- "" -}}
+{{- /*
+PlantUML state diagram.
+
+"." at the top level is the *model.StateMachine. Every emitted line starts with
+a newline so that nested blocks can be assembled with `include ... | indent`.
+Final states are drawn as [*] on incoming arrows, history pseudo-states as
+[H] / [H*], and parallel regions are separated with "--".
+*/ -}}
 @startuml
-{{ template "outputTransitions" "" }}
-{{- template "outputInnerStates" "" }}
+{{- template "initial" "" -}}
+{{- template "states" "" }}
 @enduml
 {{ "" -}}
 
-{{- define "outputInnerStates" -}}
-{{- range GetInnerStates . -}}
-{{- template "outputState" . }}
+{{- define "states" -}}{{- /* . = parent state name; "" = top level */ -}}
+{{- range Children . -}}
+{{- template "state" . -}}
 {{- end -}}
 {{- end -}}
 
-{{- define "outputState" -}}
-{{- $innerStates := GetInnerStates .Name -}}
-{{- if gt (len $innerStates) 0 }}
+{{- define "state" -}}{{- /* . = *State */ -}}
+{{- if .IsPseudo -}}
+{{- /* drawn from the parent, see "body" and "target" */ -}}
+{{- else if .IsParallel }}
 state {{ .Name }} {
-{{ include "outputTransitions" .Name | indent 4 -}}
-{{- include "outputInnerStates" .Name | indent 4 }}
+{{ include "regions" .Name | trimPrefix "\n" | indent 4 }}
 }
+{{- template "entryExit" . -}}
+{{- template "transitions" .Name -}}
+{{- else if Children .Name }}
+state {{ .Name }} {
+{{ include "body" .Name | trimPrefix "\n" | indent 4 }}
+}
+{{- template "entryExit" . -}}
+{{- template "transitions" .Name -}}
 {{- else }}
-state {{ .Name -}}
-{{ template "outputTransitions" .Name -}}
+state {{ .Name }}
+{{- template "entryExit" . -}}
+{{- template "transitions" .Name -}}
 {{- end -}}
 {{- end -}}
 
-{{- define "outputTransitions" -}}
-{{ range (GetOutgoingTransitions . "I" "N") -}}
-[*] --> {{ .Target -}}
+{{- define "body" -}}{{- /* . = compound state name: what goes inside its braces */ -}}
+{{- template "initial" . -}}
+{{- template "history" . -}}
+{{- template "states" . -}}
 {{- end -}}
-{{- range GetOutgoingTransitions . "N" "N" }}
-{{ .Source }} --> {{ .Target -}}
-{{- template "outputTransitionParameters" . -}}
+
+{{- define "regions" -}}{{- /* . = parallel state name */ -}}
+{{- range $i, $region := Children . -}}
+{{- if $i }}
+--
 {{- end -}}
-{{- range GetOutgoingTransitions . "H" "N" }}
-[H] --> {{ .Target -}}
-{{- template "outputTransitionParameters" . -}}
-{{- end -}}
-{{- range GetOutgoingTransitions . "H" "N" }}
-[H] --> {{ .Target -}}
-{{- template "outputTransitionParameters" . -}}
-{{- end -}}
-{{- range GetIncomingTransitions . "N" "H" }}
-{{ .Source }} --> [H]
-{{- template "outputTransitionParameters" . -}}
-{{- end -}}
-{{- range GetIncomingTransitions . "N" "F" }}
-{{ .Source }} --> [*]
-{{- template "outputTransitionParameters" . -}}
+{{- template "body" $region.Name -}}
 {{- end -}}
 {{- end -}}
 
-{{- define "outputTransitionParameters" -}}
-{{- $text := join (toSlice .Event (surround "[ " .Cond " ]") (prefix "/ " .Action)) "\\n" -}}
-{{- if not (empty $text) -}}: {{ $text -}}
+{{- define "initial" -}}{{- /* . = state name; "" = the machine */ -}}
+{{- with InitialOf . }}
+[*] --> {{ . }}
 {{- end -}}
+{{- end -}}
+
+{{- define "history" -}}{{- /* . = parent state name: default transitions of its history states */ -}}
+{{- range HistoryOf . -}}
+{{- $h := . -}}
+{{- range OutgoingTransitions .Name -}}
+{{- $t := . -}}
+{{- range .Targets }}
+{{ if $h.IsDeepHistory }}[H*]{{ else }}[H]{{ end }} --> {{ template "target" . }}{{ template "label" $t }}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "entryExit" -}}{{- /* . = *State */ -}}
+{{- $s := . -}}
+{{- range .OnEntry }}
+{{ $s.Name }} : entry / {{ . }}
+{{- end -}}
+{{- range .OnExit }}
+{{ $s.Name }} : exit / {{ . }}
+{{- end -}}
+{{- end -}}
+
+{{- define "transitions" -}}{{- /* . = source state name */ -}}
+{{- range OutgoingTransitions . -}}
+{{- $t := . -}}
+{{- if or .Internal (not .Targets) }}
+{{ .Source }} : {{ template "labelText" . }}
+{{- else -}}
+{{- range .Targets }}
+{{ $t.Source }} --> {{ template "target" . }}{{ template "label" $t }}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "target" -}}{{- /* . = target state name, rendered as a PlantUML reference */ -}}
+{{- $s := State . -}}
+{{- if not $s }}{{ . }}
+{{- else if $s.IsFinal }}[*]
+{{- else if $s.IsDeepHistory }}{{ $s.Parent }}[H*]
+{{- else if $s.IsHistory }}{{ $s.Parent }}[H]
+{{- else }}{{ . }}
+{{- end -}}
+{{- end -}}
+
+{{- define "label" -}}{{- /* . = *Transition; ": event [cond] / actions" or nothing */ -}}
+{{- with include "labelText" . }}: {{ . }}{{ end -}}
+{{- end -}}
+
+{{- define "labelText" -}}{{- /* . = *Transition */ -}}
+{{- joinNonEmpty "\\n" .Event (surround "[ " .Cond " ]") (prefix "/ " (join "; " .Actions)) -}}
 {{- end -}}

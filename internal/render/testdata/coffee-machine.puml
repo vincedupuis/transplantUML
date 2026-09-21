@@ -1,0 +1,23 @@
+@startuml
+[*] --> idle
+state idle
+idle --> ready: power_on
+state ready
+ready --> select_type: select_coffee
+ready --> idle: power_off
+state select_type
+select_type --> brewing: espresso
+select_type --> brewing: latte
+select_type --> brewing: cappuccino
+select_type --> ready: cancel
+state brewing
+brewing --> ready: cancel
+brewing --> error: error
+brewing --> coffee_served: coffee_ready
+state error
+error --> ready: reset
+error --> idle: power_off
+state coffee_served
+coffee_served --> idle: power_off
+coffee_served --> ready: reset
+@enduml
