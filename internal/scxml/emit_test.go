@@ -46,8 +46,11 @@ func TestEmitGolden(t *testing.T) {
 	}
 }
 
-func TestEmitExecutableContent(t *testing.T) {
-	sm := &model.StateMachine{
+// execContentSM exercises every executable-content shape the emitter handles:
+// a plain script body, an action that is already XML, exit actions, and a
+// targetless internal transition. Shared with the schema test (schema_test.go).
+func execContentSM() *model.StateMachine {
+	return &model.StateMachine{
 		Initial: "s",
 		States: []*model.State{{
 			Name:    "s",
@@ -59,6 +62,10 @@ func TestEmitExecutableContent(t *testing.T) {
 			{Source: "s", Event: "e", Cond: "n > 3", Internal: true, Actions: []string{"raise tick"}},
 		},
 	}
+}
+
+func TestEmitExecutableContent(t *testing.T) {
+	sm := execContentSM()
 	out := string(emit(t, sm))
 	for _, want := range []string{
 		"<onentry>", "<script>x = 1;</script>", `<if cond="n > 3">`, `<log expr="'big'"/>`,

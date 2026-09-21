@@ -36,6 +36,18 @@ make build          # produces ./bin/tpuml, or: go build ./cmd/tpuml
 
 The Makefile also has `run` (`make run ARGS="-i example/coffee-machine.scxml"`), `test`, `fmt`, `vet` and `clean`.
 
+### Tests
+
+`make test` (or `go test ./...`) runs the unit, golden and round-trip tests. Two tests additionally check the
+output against something other than the project itself, and skip when their tool is missing:
+
+- **W3C schema** — every SCXML fixture and every document the SCXML emitter writes is validated with `xmllint`
+  against the vendored SCXML 1.0 schema in `internal/scxml/testdata/schema/`. `xmllint` ships with macOS and most
+  Linux distributions.
+- **PlantUML syntax** — the rendered PlantUML is parsed by PlantUML itself (`-syntax`, no Graphviz needed). It uses
+  `plantuml` from `PATH` or the jar named by `PLANTUML_JAR`; `make plantuml` downloads the jar into `bin/` and
+  `make test` picks it up from there. Needs `java`.
+
 ## Usage
 
 ```

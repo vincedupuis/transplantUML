@@ -21,6 +21,7 @@ go vet ./...
 go test ./...
 go test ./internal/scxml -run TestEdgeCases          # one test
 go test ./internal/render -run TestPlantUMLGolden/edge
+make plantuml                       # download the PlantUML jar into bin/ so TestPlantUMLSyntax runs (make test picks it up)
 
 # End-to-end
 ./tpuml -i example/coffee-machine.scxml                 # PlantUML to stdout

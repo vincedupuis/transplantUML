@@ -1,5 +1,4 @@
-<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" name="edge">
-  <initial><transition target="a"/></initial>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" name="edge" initial="a">
   <state id="a">
     <onentry><log expr="'hi'"/></onentry>
     <transition event="go" target="p"/>
@@ -11,6 +10,7 @@
     <transition event="done" target="h"/>
   </parallel>
   <state id="b">
+    <initial><transition target="b1"/></initial>
     <history id="h" type="deep"><transition target="b1"/></history>
     <state id="b1"><transition event="x" target="f"/></state>
     <final id="f"/>
