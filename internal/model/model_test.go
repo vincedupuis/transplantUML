@@ -41,6 +41,8 @@ func TestValidateErrors(t *testing.T) {
 		{"root history", func(sm *StateMachine) { sm.States[3].Parent = "" }, `history states must be nested`},
 		{"bad initial", func(sm *StateMachine) { sm.States[1].Initial = "zzz" }, `unknown initial state "zzz"`},
 		{"root initial", func(sm *StateMachine) { sm.Initial = "zzz" }, `unknown initial state "zzz"`},
+		{"initial not a child", func(sm *StateMachine) { sm.States[1].Initial = "a" }, `initial state "a" is not one of its children`},
+		{"root initial nested", func(sm *StateMachine) { sm.Initial = "b1" }, `initial state "b1" is not a top-level state`},
 		{"bad kind", func(sm *StateMachine) { sm.States[0].Kind = "weird" }, `unknown kind "weird"`},
 		{"bad source", func(sm *StateMachine) { sm.Transitions[0].Source = "zzz" }, `unknown source "zzz"`},
 		{"bad target", func(sm *StateMachine) { sm.Transitions[0].Targets = []string{"zzz"} }, `unknown target "zzz"`},

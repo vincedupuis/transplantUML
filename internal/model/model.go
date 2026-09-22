@@ -280,10 +280,14 @@ func (sm *StateMachine) Validate() error {
 			fail("state %q: %s states must be nested in a state", s.Name, s.Kind)
 		}
 		if s.Initial != "" {
-			if !s.IsNormal() {
+			init, ok := byName[s.Initial]
+			switch {
+			case !s.IsNormal():
 				fail("state %q: only normal states may declare an initial state", s.Name)
-			} else if _, ok := byName[s.Initial]; !ok {
+			case !ok:
 				fail("state %q: unknown initial state %q", s.Name, s.Initial)
+			case init.Parent != s.Name:
+				fail("state %q: initial state %q is not one of its children", s.Name, s.Initial)
 			}
 		}
 		if s.IsPseudo() && !s.IsFinal() && len(s.OnEntry)+len(s.OnExit) > 0 {
@@ -310,8 +314,10 @@ func (sm *StateMachine) Validate() error {
 	}
 
 	if sm.Initial != "" {
-		if _, ok := byName[sm.Initial]; !ok {
+		if init, ok := byName[sm.Initial]; !ok {
 			fail("unknown initial state %q", sm.Initial)
+		} else if init.Parent != "" {
+			fail("initial state %q is not a top-level state", sm.Initial)
 		}
 	}
 
