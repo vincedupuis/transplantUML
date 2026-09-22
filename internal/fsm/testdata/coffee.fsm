@@ -5,16 +5,16 @@ fsm coffee {
         on coin goto brewing
     }
     state brewing {
+        on cancel goto .
+        on error goto final
         state heating {
             on hot goto ../pouring
         }
+        on resume goto H
         state pouring {
             on done [not empty and (cup or mug)] / pour goto /idle
             on tick / count
         }
-        on cancel goto .
-        on error goto final
-        on resume goto H
         on exit / log, reset
     }
 }

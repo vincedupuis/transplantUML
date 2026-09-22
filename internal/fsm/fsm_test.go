@@ -31,8 +31,9 @@ func parse(src string) (parser.IFsmContext, []string) {
 	return p.Fsm(), errs.errs
 }
 
-// The generated parser accepts the grammar's own idioms: nested states,
-// entry/exit actions, guards, action lists, and every kind of goto.
+// The generated parser accepts the grammar's own idioms: nested states
+// interleaved with the events that concern them, entry/exit actions, guards,
+// action lists, and every kind of goto.
 func TestGrammarAccepts(t *testing.T) {
 	src, err := os.ReadFile("testdata/coffee.fsm")
 	if err != nil {
@@ -54,11 +55,55 @@ func TestGrammarRejects(t *testing.T) {
 	for _, src := range []string{
 		"fsm {}",                                // missing name
 		"fsm m { state s { on entry goto s } }", // entry cannot leave the state
-		"fsm m { on e goto s state s {} }",      // events must follow states
 		"fsm m { state s { on e [] } }",         // empty guard
+		"fsm m { state s { on e goto } }",       // goto without a target
+		"fsm m { state s { on e goto a/ } }",    // path ending in a separator
 	} {
 		if _, errs := parse(src); len(errs) == 0 {
 			t.Errorf("%q: accepted, want a syntax error", src)
+		}
+	}
+}
+
+// One alternative covers every combination of guard, actions and goto. A bare
+// "on e" parses too; rejecting it is the visitor's job, not the grammar's.
+func TestEventForms(t *testing.T) {
+	for _, body := range []string{
+		"on e",
+		"on e [g]",
+		"on e / a",
+		"on e / a, b",
+		"on e goto t",
+		"on e [g] / a",
+		"on e [g] goto t",
+		"on e / a goto t",
+		"on e [g] / a goto t",
+		"on entry",
+		"on entry / a",
+		"on exit / a, b",
+	} {
+		if _, errs := parse("fsm m { state s { " + body + " } state t {} }"); len(errs) > 0 {
+			t.Errorf("%q: %v", body, errs)
+		}
+	}
+}
+
+// Every goto target form lexes: '/' opens an absolute path even though the
+// same token opens an action list, and Prefix carries the relative forms.
+func TestGotoTargets(t *testing.T) {
+	for _, target := range []string{
+		".",
+		"final",
+		"H",
+		"t",
+		"a/b/c",
+		"/a/b",
+		"./b",
+		"../b",
+		"../../a/b",
+	} {
+		if _, errs := parse("fsm m { state s { on e goto " + target + " } }"); len(errs) > 0 {
+			t.Errorf("goto %s: %v", target, errs)
 		}
 	}
 }

@@ -4,23 +4,20 @@ grammar fsm;
 fsm
     :   'fsm' Identifier
         '{'
-            state*
-            event*
+            (state | event)*
         '}' EOF
     ;
 
 state
     :   'state' Identifier
         '{'
-            state*
-            event*
+            (state | event)*
         '}'
     ;
 
 event
     :   'on' name=('entry' | 'exit') actions?
-    |   'on' name=Identifier guard? (actions | goto)
-    |   'on' name=Identifier guard? actions goto
+    |   'on' name=Identifier guard? actions? goto?
     ;
 
 actions
@@ -60,7 +57,6 @@ goto
     :   'goto' ('.' | 'final' | 'H' | path)
     ;
 
-// A lone '/' is lexed as the actions token, never as Prefix, so it is listed here.
 path
     :   (Prefix | '/')? Identifier ('/' Identifier)*
     ;
@@ -68,6 +64,6 @@ path
 // ----------------------------------------------------------------------------
 
 Identifier: [a-zA-Z] [a-zA-Z0-9]*;
-Prefix: '/' | './' | ('../')+;
+Prefix: './' | ('../')+;
 Preprocessor: '#' ( ~[\r\n] | '\\' [\r\n] | '\\' '\n' )* -> skip;
 Blank: [ \t\r\n]+ -> channel(HIDDEN);
