@@ -3,6 +3,7 @@ package fsm
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/antlr4-go/antlr/v4"
@@ -60,6 +61,8 @@ func TestGrammarRejects(t *testing.T) {
 		"fsm m { state s { on e } }",            // neither effect nor target
 		"fsm m { state s { on e [g] } }",        // a guard alone is not a transition
 		"fsm m { state s { on e goto a/ } }",    // path ending in a separator
+		"fsm m { initial }",                     // initial modifies a state
+		"fsm m { state s { initial on e / a } }",
 	} {
 		if _, errs := parse(src); len(errs) == 0 {
 			t.Errorf("%q: accepted, want a syntax error", src)
@@ -105,5 +108,49 @@ func TestGotoTargets(t *testing.T) {
 		if _, errs := parse("fsm m { state s { on e goto " + target + " } }"); len(errs) > 0 {
 			t.Errorf("goto %s: %v", target, errs)
 		}
+	}
+}
+
+// The documents in example/ are what the README points a reader at, so they
+// have to parse.
+func TestExamplesParse(t *testing.T) {
+	paths, err := filepath.Glob("../../example/*.fsm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) == 0 {
+		t.Fatal("no examples found")
+	}
+	for _, path := range paths {
+		src, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, errs := parse(string(src)); len(errs) > 0 {
+			t.Errorf("%s: %v", path, errs)
+		}
+	}
+}
+
+// "initial" marks the child a compound state starts in, and the machine's own
+// starting state at the top level. The label gives the visitor the token.
+func TestInitialState(t *testing.T) {
+	tree, errs := parse("fsm m { initial state a { initial state b {} state c {} } state d {} }")
+	if len(errs) > 0 {
+		t.Fatalf("syntax errors: %v", errs)
+	}
+	top := tree.AllState()
+	if top[0].GetInit() == nil {
+		t.Error("a: not marked initial")
+	}
+	if top[1].GetInit() != nil {
+		t.Error("d: marked initial")
+	}
+	inner := top[0].AllState()
+	if inner[0].GetInit() == nil {
+		t.Error("b: not marked initial")
+	}
+	if inner[1].GetInit() != nil {
+		t.Error("c: marked initial")
 	}
 }

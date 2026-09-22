@@ -1,13 +1,13 @@
 # A coffee machine in the fsm language.
 fsm coffee {
-    state idle {
+    initial state idle {
         on entry / beep
         on coin goto brewing
     }
     state brewing {
         on cancel goto .
         on error goto final
-        state heating {
+        initial state heating {
             on hot goto ../pouring
         }
         on resume goto H

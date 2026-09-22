@@ -72,8 +72,9 @@ warnings.
   ANTLR4 grammar in `fsm.g4`. `parser/` is generated from it (`make generate`, Go target with `-visitor
   -no-listener`) and committed so the build needs no Java; never edit it by hand, and regenerate it after any
   grammar change. `goto` targets are `.` (self), `final`, `H` (history) or a path (`/a/b` absolute, `../b`
-  relative). The `Parser` that walks the parse tree into the model is not written yet, so the language is not
-  registered in `internal/format` and only reaches as far as the generated parser.
+  relative). A state may be marked `initial` (`initial state s { … }`), naming its parent's starting child or,
+  at the top level, the machine's. The `Parser` that walks the parse tree into the model is not written yet, so
+  the language is not registered in `internal/format` and only reaches as far as the generated parser.
 - **`internal/jsonsm`** — the model's own JSON shape (struct tags in `model`). Parser uses
   `DisallowUnknownFields`; round-trip equality with the SCXML parser is tested.
 - **`internal/render`** — registers sprig plus project helpers (`include`, `prefix`, `surround`, `joinNonEmpty`,

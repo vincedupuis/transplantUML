@@ -1,0 +1,44 @@
+# Nested states interleaved with the transitions that concern them, the initial
+# child of each compound state, entry and exit actions, boolean guards, and
+# every form a goto target can take.
+
+fsm kiosk {
+    initial state idle {
+        on entry / dim
+        on touch / wake goto ordering/browsing
+    }
+
+    state ordering {
+        on entry / newBasket
+        on exit / clearBasket, unlock
+        on abandon goto /idle
+
+        initial state browsing {
+            on add [inStock and (card or cash)] / addLine
+            on remove / dropLine goto .
+            on checkout [basket] goto ../paying
+        }
+
+        state paying {
+            on entry / lockBasket
+            on approved / receipt goto ../../done
+            on declined [retries] / warn goto ./again
+            on declined [not retries] goto ../browsing
+
+            initial state authorizing {
+                on cancel goto /ordering/browsing
+            }
+
+            state again {
+                on card goto ../authorizing
+            }
+        }
+
+        on resume goto H
+    }
+
+    state done {
+        on entry / print
+        on ack goto final
+    }
+}

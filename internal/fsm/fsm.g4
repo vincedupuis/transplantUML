@@ -9,7 +9,7 @@ fsm
     ;
 
 state
-    :   'state' Identifier
+    :   init='initial'? 'state' Identifier
         '{'
             (state | event)*
         '}'
@@ -64,5 +64,5 @@ path
 
 Identifier: [a-zA-Z] [a-zA-Z0-9]*;
 Prefix: './' | ('../')+;
-Preprocessor: '#' ( ~[\r\n] | '\\' [\r\n] | '\\' '\n' )* -> skip;
+Comment: '#' ( ~[\r\n] )* -> skip;
 Blank: [ \t\r\n]+ -> channel(HIDDEN);
