@@ -9,7 +9,7 @@ fsm
     ;
 
 state
-    :   init='initial'? 'state' Identifier
+    :   Initial? 'state' Identifier
         '{'
             (state | event)*
         '}'
@@ -62,6 +62,7 @@ path
     :   (Prefix | '/')? Identifier ('/' Identifier)*
     ;
 
+Initial: 'initial';
 Identifier: [a-zA-Z] [a-zA-Z0-9]*;
 Prefix: './' | ('../')+;
 Comment: '#' ( ~[\r\n] )* -> skip;

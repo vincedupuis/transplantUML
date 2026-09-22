@@ -63,6 +63,7 @@ func TestGrammarRejects(t *testing.T) {
 		"fsm m { state s { on e goto a/ } }",    // path ending in a separator
 		"fsm m { initial }",                     // initial modifies a state
 		"fsm m { state s { initial on e / a } }",
+		"fsm m { state initial {} }", // initial is a keyword, not a name
 	} {
 		if _, errs := parse(src); len(errs) == 0 {
 			t.Errorf("%q: accepted, want a syntax error", src)
@@ -133,24 +134,26 @@ func TestExamplesParse(t *testing.T) {
 }
 
 // "initial" marks the child a compound state starts in, and the machine's own
-// starting state at the top level. The label gives the visitor the token.
+// starting state at the top level. It is a named lexer rule declared ahead of
+// Identifier, so a state cannot be called "initial" and the visitor gets an
+// Initial() accessor.
 func TestInitialState(t *testing.T) {
 	tree, errs := parse("fsm m { initial state a { initial state b {} state c {} } state d {} }")
 	if len(errs) > 0 {
 		t.Fatalf("syntax errors: %v", errs)
 	}
 	top := tree.AllState()
-	if top[0].GetInit() == nil {
+	if top[0].Initial() == nil {
 		t.Error("a: not marked initial")
 	}
-	if top[1].GetInit() != nil {
+	if top[1].Initial() != nil {
 		t.Error("d: marked initial")
 	}
 	inner := top[0].AllState()
-	if inner[0].GetInit() == nil {
+	if inner[0].Initial() == nil {
 		t.Error("b: not marked initial")
 	}
-	if inner[1].GetInit() != nil {
+	if inner[1].Initial() != nil {
 		t.Error("c: marked initial")
 	}
 }
