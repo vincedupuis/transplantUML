@@ -123,6 +123,67 @@ func TestPlantUMLRegionTransitions(t *testing.T) {
 	}
 }
 
+// What PlantUML cannot say on its own: names it would misread, behaviours and
+// notes on states it draws as symbols, a region's own details, a second
+// stereotype, line breaks in text.
+func TestPlantUMLApproximations(t *testing.T) {
+	sm := &model.StateMachine{
+		Name: "m", Initial: "a.b",
+		States: []*model.State{
+			{Name: "a.b", Kind: model.Normal, OnEntry: []string{"one\ntwo"}, Stereotype: "st"},
+			{Name: "my-comp", Kind: model.Normal, Initial: "in"},
+			{Name: "h", Parent: "my-comp", Kind: model.HistoryShallow, Note: "remembers"},
+			{Name: "in", Parent: "my-comp", Kind: model.Normal},
+			{Name: "c", Kind: model.Choice, Stereotype: "mine"},
+			{Name: "done", Kind: model.Final, OnEntry: []string{"bye()"}, Note: "over"},
+			{Name: "p", Kind: model.Parallel},
+			{Name: "r", Parent: "p", Kind: model.Normal, Note: "region"},
+			{Name: "r1", Parent: "r", Kind: model.Normal},
+			{Name: "q", Parent: "p", Kind: model.Parallel},
+			{Name: "q1", Parent: "q", Kind: model.Normal},
+			{Name: "q2", Parent: "q", Kind: model.Normal},
+		},
+		Transitions: []*model.Transition{
+			{Source: "a.b", Targets: []string{"my-comp"}, Event: "go"},
+			{Source: "h", Targets: []string{"in"}, Note: "default"},
+			{Source: "a.b", Targets: []string{"r"}, Event: "into"},
+			{Source: "c", Targets: []string{"done"}},
+		},
+	}
+	if err := sm.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	out, warnings, err := Render(sm, assets.PlantUML)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"\ntitle m\n",
+		"\n[*] --> a_b\n",
+		"\nstate \"«st»\\na.b\" as a_b <<st>>\n",
+		"\na_b : entry / one\\ntwo\n",
+		"\nstate \"my-comp\" as my_comp {\n",
+		"\n    state h <<history>>\n    note right of h : remembers\n",
+		"\n    h --> in\n    note on link : default\n",
+		"\nstate c <<choice>>\n",
+		"\nstate done <<end>>\nnote right of done\n    entry / bye()\n    over\nend note\n",
+		"\nstate p {\n    state r1\n    --\n    state q {\n        state q1\n        --\n        state q2\n    }\n}\n",
+		"\na_b --> my_comp: go\n",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
+	}
+	wantWarnings := []string{
+		`state "c": PlantUML allows one stereotype per state; «mine» is not drawn`,
+		`region "r": PlantUML regions are anonymous; its behaviours, stereotype and note are not drawn`,
+		`region "r": PlantUML regions are anonymous; the transition a.b -> r into it is not drawn`,
+	}
+	if !reflect.DeepEqual([]string(warnings), wantWarnings) {
+		t.Errorf("warnings =\n%s\nwant\n%s", strings.Join(warnings, "\n"), strings.Join(wantWarnings, "\n"))
+	}
+}
+
 func TestHelpers(t *testing.T) {
 	sm := &model.StateMachine{
 		Initial: "a",

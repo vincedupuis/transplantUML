@@ -1,4 +1,5 @@
 @startuml
+title uml
 note as machineNote
     Every UML concept the model holds,
     in one document.
@@ -12,7 +13,7 @@ state check <<choice>>
 state split <<fork>>
 state merge <<start>>
 state sync <<join>>
-state work <<worker>>
+state "«worker»\nwork" as work <<worker>>
 work : entry / log('start')
 work : do / invoke(job.py, http://example.com/worker)
 work : pause / defer
@@ -36,15 +37,18 @@ state outer {
     inner --> inner: again
     inner : note
 }
-check --> [*]: [ retries > 3 ]
+state stop <<end>>
+state done <<end>>
+state failed <<end>>
+check --> failed: [ retries > 3 ]
 check --> work: [ retries <= 3 ]
 split --> left
 merge --> work
-sync --> [*]
+sync --> done
 work --> check: after(5s)\n/ retries = retries + 1
 note on link : Timed out.
 work --> split: split
-work --> [*]: abort
+work --> stop: abort
 work --> in: enter
 left --> sync: l
 sub --> merge: back

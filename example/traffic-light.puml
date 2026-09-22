@@ -1,4 +1,5 @@
 @startuml
+title traffic-light
 note as machineNote
     A pedestrian button shortens the green phase.
 end note

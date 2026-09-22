@@ -1,4 +1,5 @@
 @startuml
+title edge
 [*] --> a
 state a
 a : entry / log('hi')
@@ -11,12 +12,14 @@ state p {
 }
 state b {
     [*] --> b1
-    [H*] --> b1
+    state h <<history*>>
     state b1
-    b1 --> [*]: x
+    state f <<end>>
+    h --> b1
+    b1 --> f: x
 }
 a --> p: go
 a --> a: multi
 a --> b: multi
-p --> b[H*]: done
+p --> h: done
 @enduml

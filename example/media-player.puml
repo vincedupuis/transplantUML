@@ -1,4 +1,5 @@
 @startuml
+title media-player
 legend
     volume = 50
     track = 1
@@ -15,14 +16,15 @@ note right of loading
 end note
 state playback {
     [*] --> playing
-    [H*] --> playing
     state start <<entryPoint>>
     state resume <<entryPoint>>
     state eject <<exitPoint>>
+    state last <<history*>>
     state playing
     state paused
     start --> playing
-    resume --> playback[H*]
+    resume --> last
+    last --> playing
     playing --> paused: pause
     playing --> playing: next\n/ track = track + 1
     paused --> playing: play

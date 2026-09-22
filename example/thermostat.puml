@@ -1,4 +1,5 @@
 @startuml
+title thermostat
 note as machineNote
     The model's own JSON shape: every concept, no extension vocabulary needed.
 end note
@@ -10,27 +11,29 @@ endlegend
 state off
 state on {
     [*] --> decide
-    [H] --> decide
     state decide <<choice>>
-    state heating <<actuator>>
+    state "«actuator»\nheating" as heating <<actuator>>
     note right of heating : Burner on.
-    state cooling <<actuator>>
+    state "«actuator»\ncooling" as cooling <<actuator>>
     state steady
+    state last <<history>>
     decide --> heating: [ current < target - 1 ]
     decide --> cooling: [ current > target + 1 ]
     decide --> steady
     heating --> decide: after(60s)
     cooling --> decide: after(60s)
     steady --> decide: after(5m)
+    last --> decide
 }
 on : entry / display.on()
 on : do / sample sensor every 10s
 on : exit / display.off()
 on : schedule / defer
 on : [ target > 5 ]
+state fault <<end>>
 off --> on: power
 on --> off: power
-on --> [*]: sensorError
+on --> fault: sensorError
 note on link : Unrecoverable.
 on : setTarget\n/ target = value
 @enduml

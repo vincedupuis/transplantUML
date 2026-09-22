@@ -1,4 +1,5 @@
 @startuml
+title washing-machine
 [*] --> idle
 state idle
 state fill <<fork>>
@@ -14,9 +15,10 @@ state running {
     spinning --> spinning: reverse
 }
 state drain <<join>>
+state finished <<end>>
 idle --> fill: start
 fill --> heating
 running --> idle: stop
 holding --> drain: cycleDone
-drain --> [*]
+drain --> finished
 @enduml

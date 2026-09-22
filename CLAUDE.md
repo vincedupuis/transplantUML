@@ -77,12 +77,17 @@ warnings.
   `include ... | trimPrefix "\n" | indent 4`. Each scope (top level, compound body, region) declares its states
   first, then `scopeTransitions` draws the transitions whose `ScopeOf` is that scope — PlantUML creates a state
   where it first sees the name, so a forward reference into a nested state would create a stray copy, and arrows
-  inside a parallel region are only accepted inside that region's braces. Finals/terminate are drawn on incoming
-  arrows as `[*]`, history as `parent[H]`/`parent[H*]`, connectors as `<<choice>>`/`<<fork>>`/`<<join>>`/
-  `<<entryPoint>>`/`<<exitPoint>>` (junction as `<<start>>`, the filled circle), parallel regions are the *bodies*
-  of the region states separated by `--` (a leaf region is drawn as the state itself). PlantUML refuses arrows
-  across the boundary of any region but the first (`confined`), so those warn instead. Verified with the PlantUML
-  jar: `-syntax` accepts unknown stereotypes, so test new notations by rendering (`-Playout=smetana -tpng`).
+  inside a parallel region are only accepted inside that region's braces. Every model state is declared by name
+  (`id` aliases names with characters PlantUML misreads, e.g. `state "a.b" as a_b`): finals/terminate as
+  `<<end>>` (their entry/exit go into the note, PlantUML ignores their description lines), history as
+  `<<history>>`/`<<history*>>`, connectors as `<<choice>>`/`<<fork>>`/`<<join>>`/`<<entryPoint>>`/`<<exitPoint>>`
+  (junction as `<<start>>`, the filled circle); only the initial state is drawn as `[*]`. A user stereotype is
+  kept as `<<s>>` and shown as `«s»` in the label since PlantUML does not print it. Parallel regions are the
+  *bodies* of the region states separated by `--` (a leaf or orthogonal region is drawn as the state itself; a
+  compound region's own transitions, behaviours and note warn). PlantUML refuses arrows across the boundary of
+  any region but the first (`confined`), so those warn instead. Verified with the PlantUML jar: `-syntax` accepts
+  unknown stereotypes and silently ignores unsupported constructs, so test new notations by rendering
+  (`-tpng`, with `-Playout=smetana` if Graphviz is missing) and looking at the image.
 
 ## Conventions
 
