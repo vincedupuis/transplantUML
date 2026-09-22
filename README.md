@@ -90,14 +90,14 @@ output against something other than the project itself, and skip when their tool
 ## Usage
 
 ```
-tpuml -i input [-f format] [-t template.tmpl | -F format] [-o output]
+tpuml -i input [-f format] [-t template.gotmpl | -F format] [-o output]
 ```
 
 | Flag | Meaning |
 |------|---------|
 | `-i`, `--input` | Input file (required). |
 | `-f`, `--input-format` | Input format: `scxml`, `json`. Default: inferred from the extension (`.scxml`/`.xml`, `.json`). |
-| `-t`, `--template` | Go template file to render with. Default: the built-in PlantUML template (`assets/puml.tmpl`). |
+| `-t`, `--template` | Go template file to render with. Default: the built-in PlantUML template (`assets/puml.gotmpl`). |
 | `-F`, `--output-format` | Write a document format instead of running a template: `scxml`, `json`. Mutually exclusive with `-t`. |
 | `-o`, `--output` | Output file. Default: stdout. |
 | `-h`, `--help` | Show usage. |
@@ -118,7 +118,7 @@ tpuml: warning: state "work": SCXML has no deferred events; written as tpuml:def
 tpuml -i example/coffee-machine.scxml -o coffee.puml
 
 # SCXML -> your own template
-tpuml -i example/coffee-machine.scxml -t my-template.tmpl -o coffee.md
+tpuml -i example/coffee-machine.scxml -t my-template.gotmpl -o coffee.md
 
 # SCXML -> JSON model, then JSON -> PlantUML (round trip)
 tpuml -i example/coffee-machine.scxml -F json -o coffee.json
@@ -235,7 +235,7 @@ Templates use Go's [`text/template`](https://pkg.go.dev/text/template) syntax. A
 
 Call `warn` wherever the template leaves something out, so the user learns what the output does not show.
 
-[`assets/puml.tmpl`](assets/puml.tmpl) is the reference template: it shows how to recurse through compound states,
+[`assets/puml.gotmpl`](assets/puml.gotmpl) is the reference template: it shows how to recurse through compound states,
 draw parallel regions, and render pseudo-states.
 
 ### The built-in PlantUML template

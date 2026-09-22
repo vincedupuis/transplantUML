@@ -45,7 +45,7 @@ type options struct {
 func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 	var opts options
 	cmd := &cobra.Command{
-		Use:   "tpuml -i input [-f format] [-t template.tmpl | -F format] [-o output]",
+		Use:   "tpuml -i input [-f format] [-t template.gotmpl | -F format] [-o output]",
 		Short: "Convert state machine documents",
 		Long: "tpuml parses a state machine document into a format-neutral model and renders\n" +
 			"that model either through a Go template (PlantUML by default) or with a\n" +

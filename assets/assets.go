@@ -6,5 +6,5 @@ import _ "embed"
 // PlantUML is the built-in template that renders the model as a PlantUML
 // state diagram. It is used when no -t template is given.
 //
-//go:embed puml.tmpl
+//go:embed puml.gotmpl
 var PlantUML string

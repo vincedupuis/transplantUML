@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 format-neutral model (`internal/model`) of a UML state machine, which is then written back out either by a built-in
 emitter (document formats: SCXML, JSON) or through a Go `text/template` (free-form text: PlantUML, code, docs).
 Every format is available in both directions — a format with a parser must also have an emitter — and template
-rendering is the only one-way output. The bundled `assets/puml.tmpl` (embedded in the binary, used when `-t` is
+rendering is the only one-way output. The bundled `assets/puml.gotmpl` (embedded in the binary, used when `-t` is
 omitted) produces PlantUML.
 
 The user keeps one source document and generates outputs from it; round-tripping is *not* a goal. The goal is to
@@ -73,7 +73,7 @@ warnings.
   `warn`) and the model accessors as template functions. `warn` records a warning and returns `""`; `Render`
   returns the collected warnings. `joinNonEmpty` exists because sprig's `join` has the signature `join sep list`;
   don't shadow sprig names.
-- **`assets/puml.tmpl`** — every emitted line starts with `\n` so nested blocks compose via
+- **`assets/puml.gotmpl`** — every emitted line starts with `\n` so nested blocks compose via
   `include ... | trimPrefix "\n" | indent 4`. Each scope (top level, compound body, region) declares its states
   first, then `scopeTransitions` draws the transitions whose `ScopeOf` is that scope — PlantUML creates a state
   where it first sees the name, so a forward reference into a nested state would create a stray copy, and arrows
