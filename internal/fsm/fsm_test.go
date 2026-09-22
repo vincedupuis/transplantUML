@@ -57,6 +57,8 @@ func TestGrammarRejects(t *testing.T) {
 		"fsm m { state s { on entry goto s } }", // entry cannot leave the state
 		"fsm m { state s { on e [] } }",         // empty guard
 		"fsm m { state s { on e goto } }",       // goto without a target
+		"fsm m { state s { on e } }",            // neither effect nor target
+		"fsm m { state s { on e [g] } }",        // a guard alone is not a transition
 		"fsm m { state s { on e goto a/ } }",    // path ending in a separator
 	} {
 		if _, errs := parse(src); len(errs) == 0 {
@@ -65,12 +67,10 @@ func TestGrammarRejects(t *testing.T) {
 	}
 }
 
-// One alternative covers every combination of guard, actions and goto. A bare
-// "on e" parses too; rejecting it is the visitor's job, not the grammar's.
+// Two alternatives cover every combination of guard, actions and goto that
+// carries an effect or a target; TestGrammarRejects covers the rest.
 func TestEventForms(t *testing.T) {
 	for _, body := range []string{
-		"on e",
-		"on e [g]",
 		"on e / a",
 		"on e / a, b",
 		"on e goto t",
