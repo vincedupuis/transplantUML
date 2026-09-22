@@ -22,11 +22,12 @@ and **warn** (never silently drop) about the rest. Parsers, emitters and `render
 make build                          # produces ./bin/tpuml (see the Makefile for run/test/fmt/vet/clean)
 go build ./...
 go build ./cmd/tpuml                # produces ./tpuml
-go vet ./...
+make vet                            # go vet -unreachable=false ./... (the generated ANTLR parser trips that check)
 go test ./...
 go test ./internal/scxml -run TestEdgeCases          # one test
 go test ./internal/render -run TestPlantUMLGolden/edge
 make plantuml                       # download the PlantUML jar into bin/ so TestPlantUMLSyntax runs (make test picks it up)
+make generate                       # download the ANTLR jar into bin/ and regenerate internal/fsm/parser from fsm.g4
 
 # End-to-end
 ./tpuml -i example/coffee-machine.scxml                 # PlantUML to stdout
@@ -67,6 +68,11 @@ warnings.
   the initial child as an attribute, turns action strings back into `<script>` bodies — except those that are
   XML, which are re-inserted as elements — declares the extension namespace only when used, and warns for join,
   terminate, local, defer and free-text do activities. States it cannot reach from the top level are an error.
+- **`internal/fsm`** — tpuml's own DSL (`fsm name { state s { on ev [guard] / actions goto target } }`), an
+  ANTLR4 grammar in `fsm.g4`. `parser/` is generated from it (`make generate`, Go target with `-visitor
+  -no-listener`) and committed so the build needs no Java; never edit it by hand, and regenerate it after any
+  grammar change. `goto` targets are `.` (self), `final`, `H` (history) or a path (`/a/b` absolute, `../b`
+  relative). The `Parser`/`Emitter` pair that maps the parse tree to the model is not written yet.
 - **`internal/jsonsm`** — the model's own JSON shape (struct tags in `model`). Parser uses
   `DisallowUnknownFields`; round-trip equality with the SCXML parser is tested.
 - **`internal/render`** — registers sprig plus project helpers (`include`, `prefix`, `surround`, `joinNonEmpty`,

@@ -6,7 +6,13 @@ PLANTUML_VERSION := 1.2025.4
 PLANTUML_JAR ?= bin/plantuml-$(PLANTUML_VERSION).jar
 PLANTUML_URL := https://github.com/plantuml/plantuml/releases/download/v$(PLANTUML_VERSION)/plantuml-$(PLANTUML_VERSION).jar
 
-.PHONY: build run test fmt vet clean plantuml
+# ANTLR tool used to regenerate internal/fsm/parser from internal/fsm/fsm.g4
+# (`make generate`). Its version must match the Go runtime in go.mod.
+ANTLR_VERSION := 4.13.2
+ANTLR_JAR ?= bin/antlr-$(ANTLR_VERSION)-complete.jar
+ANTLR_URL := https://www.antlr.org/download/antlr-$(ANTLR_VERSION)-complete.jar
+
+.PHONY: build run test fmt vet clean plantuml antlr generate
 
 build:
 	go build -o bin/$(BINARY) ./cmd/$(BINARY)
@@ -25,11 +31,22 @@ $(PLANTUML_JAR):
 	mkdir -p $(dir $@)
 	curl -fsSL -o $@ $(PLANTUML_URL)
 
+# Download the ANTLR tool and regenerate the DSL parser. Needs java on PATH.
+antlr: $(ANTLR_JAR)
+
+$(ANTLR_JAR):
+	mkdir -p $(dir $@)
+	curl -fsSL -o $@ $(ANTLR_URL)
+
+generate: antlr
+	ANTLR_JAR=$(abspath $(ANTLR_JAR)) go generate ./...
+
 fmt:
 	gofmt -l -w .
 
+# The generated ANTLR parser trips vet's unreachable-code check; it is not ours to fix.
 vet:
-	go vet ./...
+	go vet -unreachable=false ./...
 
 clean:
 	rm -rf bin

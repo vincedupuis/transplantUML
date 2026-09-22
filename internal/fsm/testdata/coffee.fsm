@@ -1,0 +1,20 @@
+# A coffee machine in the fsm language.
+fsm coffee {
+    state idle {
+        on entry / beep
+        on coin goto brewing
+    }
+    state brewing {
+        state heating {
+            on hot goto ../pouring
+        }
+        state pouring {
+            on done [not empty and (cup or mug)] / pour goto /idle
+            on tick / count
+        }
+        on cancel goto .
+        on error goto final
+        on resume goto H
+        on exit / log, reset
+    }
+}

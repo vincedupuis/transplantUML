@@ -1,2 +1,5 @@
 .idea/
 /bin/
+# ANTLR tooling artifacts; the Go sources beside them are what is built
+internal/fsm/parser/*.interp
+internal/fsm/parser/*.tokens

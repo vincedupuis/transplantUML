@@ -73,7 +73,10 @@ cd transplantUML
 make build          # produces ./bin/tpuml, or: go build ./cmd/tpuml
 ```
 
-The Makefile also has `run` (`make run ARGS="-i example/coffee-machine.scxml"`), `test`, `fmt`, `vet` and `clean`.
+The Makefile also has `run` (`make run ARGS="-i example/coffee-machine.scxml"`), `test`, `fmt`, `vet`, `clean` and
+`generate`, which downloads the ANTLR tool and regenerates the parser of the `fsm` language
+([`internal/fsm/fsm.g4`](internal/fsm/fsm.g4)) from its grammar; the generated code is committed, so a plain build
+needs only Go.
 
 ### Tests
 
