@@ -2,8 +2,8 @@
 
 **transplantUML** (`tpuml`) converts state machine documents. It parses an input file into a format-neutral model
 of a UML state machine, then writes that model back out: with a built-in emitter, in any of the supported document
-formats (SCXML, JSON — every format `tpuml` reads it can also write), or through a Go template — so you can produce
-PlantUML, source code, documentation, or any other text. Template rendering is the only one-way direction.
+formats (SCXML, JSON), or through a Go template — so you can produce PlantUML, source code, documentation, or any
+other text.
 
 The idea is to keep **one** source document and generate every other representation from it. Each output writes
 what it can and **warns** about what it cannot: an SCXML engine has no deferred events, PlantUML has no terminate
@@ -17,8 +17,7 @@ symbol, and so on. Warnings go to stderr and never fail the conversion.
   kind (external, local, internal), multi-target and targetless; notes and stereotypes.
 - **Any text output** through the Go templating engine plus the [sprig](https://masterminds.github.io/sprig/) function
   library, with a built-in PlantUML template.
-- **Every format both ways**: `scxml` and `json` are each accepted as input (`-f`) and produced as output (`-F`),
-  so `tpuml` converts between them in either direction.
+- **Formats**: `scxml` and `json` are each accepted as input (`-f`) and produced as output (`-F`).
 - **Nothing dropped silently**: the parser warns about input it has no place for, and each output warns about
   model features it can only approximate.
 - **Validation**: dangling targets, unknown parents, duplicate ids, and similar mistakes are reported before anything

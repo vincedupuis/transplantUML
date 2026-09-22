@@ -21,10 +21,9 @@ type Parser interface {
 }
 
 // Emitter serializes the model into one of the supported document formats.
-// Every format tpuml can read it can also write, so parsers and emitters come
-// in pairs; free-form text output (diagrams, code, docs) is the template
-// mechanism's job instead, see package render. Warnings name the model
-// features the format cannot express and that were approximated or left out.
+// Free-form text output (diagrams, code, docs) is the template mechanism's
+// job instead, see package render. Warnings name the model features the
+// format cannot express and that were approximated or left out.
 type Emitter interface {
 	Emit(sm *model.StateMachine) ([]byte, model.Warnings, error)
 }

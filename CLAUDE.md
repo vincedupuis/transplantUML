@@ -7,8 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `tpuml` is a Go CLI that converts state machine documents. Any supported input format is parsed into one
 format-neutral model (`internal/model`) of a UML state machine, which is then written back out either by a built-in
 emitter (document formats: SCXML, JSON) or through a Go `text/template` (free-form text: PlantUML, code, docs).
-Every format is available in both directions — a format with a parser must also have an emitter — and template
-rendering is the only one-way output. The bundled `assets/puml.gotmpl` (embedded in the binary, used when `-t` is
+Template rendering is output-only. The bundled `assets/puml.gotmpl` (embedded in the binary, used when `-t` is
 omitted) produces PlantUML.
 
 The user keeps one source document and generates outputs from it; round-tripping is *not* a goal. The goal is to
@@ -54,8 +53,9 @@ warnings.
   when the model grows. `Ancestors`/`CommonAncestor`/`ScopeOf` exist for templates that must place a transition
   in a scope. The README's coverage table lists what each format does with each concept; keep it in step.
 - **`internal/format`** — `Parser` / `Emitter` interfaces plus the name→implementation tables and extension
-  detection. To add a format: implement *both* interfaces in its own package under `internal/`, register it in both
-  tables, add its extension (`TestFormatsGoBothWays` enforces the pairing). Package names avoid stdlib clashes
+  detection. To add a format: implement `Parser` and/or `Emitter` in its own package under `internal/`, register
+  each in its table, add its extension (`TestExtensionsHaveParsers` checks every extension names a parser). Package
+  names avoid stdlib clashes
   (`jsonsm`, not `json`).
 - **`internal/scxml`** — `Parser` is a recursive `etree` walk over `<state>/<parallel>/<final>/<history>` children
   (direct children only, so `<initial>`'s inner `<transition>` is not mistaken for a real transition). Executable

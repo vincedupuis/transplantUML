@@ -1,9 +1,6 @@
 package format
 
-import (
-	"reflect"
-	"testing"
-)
+import "testing"
 
 func TestDetect(t *testing.T) {
 	cases := map[string]string{"a.scxml": "scxml", "A.XML": "scxml", "m.json": "json", "x.puml": "", "noext": ""}
@@ -29,14 +26,10 @@ func TestLookup(t *testing.T) {
 	}
 }
 
-// Every format tpuml can read it must also be able to write, and vice versa;
-// only template output is one-way.
-func TestFormatsGoBothWays(t *testing.T) {
-	if in, out := ParserNames(), EmitterNames(); !reflect.DeepEqual(in, out) {
-		t.Errorf("parsers %v but emitters %v", in, out)
-	}
+// Every extension must name a registered parser.
+func TestExtensionsHaveParsers(t *testing.T) {
 	for ext, name := range extensions {
-		if _, err := EmitterFor(name); err != nil {
+		if _, err := ParserFor(name); err != nil {
 			t.Errorf("%s: %v", ext, err)
 		}
 	}
