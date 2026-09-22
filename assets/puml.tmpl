@@ -3,12 +3,28 @@ PlantUML state diagram.
 
 "." at the top level is the *model.StateMachine. Every emitted line starts with
 a newline so that nested blocks can be assembled with `include ... | indent`.
-Final states are drawn as [*] on incoming arrows, history pseudo-states as
-[H] / [H*], and parallel regions are separated with "--".
+
+Each scope (the top level, a compound state's braces, a parallel region)
+declares its states first and draws transitions after them, and a transition
+is drawn in the innermost scope that contains both its ends: PlantUML creates
+a state where it first sees its name, so an arrow to a nested state that has
+not been declared yet would create a copy in the wrong place, and an arrow
+between states of a parallel region is only accepted inside that region.
+Arrows that cross the boundary of any region but the first are refused by
+PlantUML altogether; they raise a warning instead.
+Final and terminate states are drawn as [*] on incoming arrows, history
+pseudo-states as [H] / [H*], the connector pseudo-states with PlantUML's
+stereotypes (<<choice>>, <<fork>>, <<join>>, <<entryPoint>>, <<exitPoint>>;
+a junction is drawn as the filled circle of <<start>>), and parallel regions
+are separated with "--". State behaviours (entry/do/exit, deferred events,
+invariant, variables) are description lines, notes are PlantUML notes.
 */ -}}
 @startuml
+{{- template "machineNote" . -}}
+{{- template "legend" . -}}
 {{- template "initial" "" -}}
-{{- template "states" "" }}
+{{- template "states" "" -}}
+{{- template "scopeTransitions" "" }}
 @enduml
 {{ "" -}}
 
@@ -19,40 +35,66 @@ Final states are drawn as [*] on incoming arrows, history pseudo-states as
 {{- end -}}
 
 {{- define "state" -}}{{- /* . = *State */ -}}
-{{- if .IsPseudo -}}
+{{- if or .IsHistory .IsFinal -}}
 {{- /* drawn from the parent, see "body" and "target" */ -}}
+{{- else if .IsTerminate -}}
+{{- warn "state %q: PlantUML has no terminate symbol; drawn as a final state" .Name -}}
+{{- else if .IsConnector }}
+state {{ .Name }} <<{{ template "stereotype" .Kind }}>>
+{{- template "note" . -}}
 {{- else if .IsParallel }}
-state {{ .Name }} {
+state {{ .Name }}{{ template "userStereotype" . }} {
 {{ include "regions" .Name | trimPrefix "\n" | indent 4 }}
 }
-{{- template "entryExit" . -}}
-{{- template "transitions" .Name -}}
+{{- template "details" . -}}
 {{- else if Children .Name }}
-state {{ .Name }} {
+state {{ .Name }}{{ template "userStereotype" . }} {
 {{ include "body" .Name | trimPrefix "\n" | indent 4 }}
 }
-{{- template "entryExit" . -}}
-{{- template "transitions" .Name -}}
+{{- template "details" . -}}
+{{- else if .Submachine }}
+state "{{ .Name }}: {{ .Submachine }}" as {{ .Name }}{{ template "userStereotype" . }}
+{{- template "details" . -}}
 {{- else }}
-state {{ .Name }}
-{{- template "entryExit" . -}}
-{{- template "transitions" .Name -}}
+state {{ .Name }}{{ template "userStereotype" . }}
+{{- template "details" . -}}
 {{- end -}}
+{{- end -}}
+
+{{- define "stereotype" -}}{{- /* . = connector StateKind */ -}}
+{{- if eq . "choice" }}choice
+{{- else if eq . "junction" }}start
+{{- else if eq . "fork" }}fork
+{{- else if eq . "join" }}join
+{{- else if eq . "entry-point" }}entryPoint
+{{- else if eq . "exit-point" }}exitPoint
+{{- end -}}
+{{- end -}}
+
+{{- define "userStereotype" -}}{{- /* . = *State */ -}}
+{{- with .Stereotype }} <<{{ . }}>>{{ end -}}
 {{- end -}}
 
 {{- define "body" -}}{{- /* . = compound state name: what goes inside its braces */ -}}
 {{- template "initial" . -}}
 {{- template "history" . -}}
 {{- template "states" . -}}
+{{- template "scopeTransitions" . -}}
 {{- end -}}
 
-{{- define "regions" -}}{{- /* . = parallel state name */ -}}
+{{- define "regions" -}}{{- /* . = parallel state name: each child is a region, drawn as its body */ -}}
 {{- range $i, $region := Children . -}}
 {{- if $i }}
 --
 {{- end -}}
+{{- if Children $region.Name -}}
 {{- template "body" $region.Name -}}
+{{- else -}}
+{{- /* a region with no substates is drawn as the state itself */ -}}
+{{- template "state" $region -}}
 {{- end -}}
+{{- end -}}
+{{- template "scopeTransitions" . -}}
 {{- end -}}
 
 {{- define "initial" -}}{{- /* . = state name; "" = the machine */ -}}
@@ -73,43 +115,128 @@ state {{ .Name }}
 {{- end -}}
 {{- end -}}
 
-{{- define "entryExit" -}}{{- /* . = *State */ -}}
+{{- define "details" -}}{{- /* . = *State: behaviours as description lines, then the note */ -}}
 {{- $s := . -}}
 {{- range .OnEntry }}
 {{ $s.Name }} : entry / {{ . }}
 {{- end -}}
+{{- range .Do }}
+{{ $s.Name }} : do / {{ . }}
+{{- end -}}
 {{- range .OnExit }}
 {{ $s.Name }} : exit / {{ . }}
 {{- end -}}
+{{- range .Defer }}
+{{ $s.Name }} : {{ . }} / defer
+{{- end -}}
+{{- with .Invariant }}
+{{ $s.Name }} : [ {{ . }} ]
+{{- end -}}
+{{- range .Variables }}
+{{ $s.Name }} : {{ .Name }}{{ prefix " = " .Value }}
+{{- end -}}
+{{- template "note" . -}}
 {{- end -}}
 
-{{- define "transitions" -}}{{- /* . = source state name */ -}}
-{{- range OutgoingTransitions . -}}
+{{- define "note" -}}{{- /* . = *State */ -}}
+{{- with .Note -}}
+{{- if contains "\n" . }}
+note right of {{ $.Name }}
+{{ indent 4 . }}
+end note
+{{- else }}
+note right of {{ $.Name }} : {{ . }}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "machineNote" -}}{{- /* . = *StateMachine */ -}}
+{{- with .Note }}
+note as machineNote
+{{ indent 4 . }}
+end note
+{{- end -}}
+{{- end -}}
+
+{{- define "legend" -}}{{- /* . = *StateMachine: its variables */ -}}
+{{- with .Variables }}
+legend
+{{- range . }}
+    {{ .Name }}{{ prefix " = " .Value }}
+{{- end }}
+endlegend
+{{- end -}}
+{{- end -}}
+
+{{- define "scopeTransitions" -}}{{- /* . = scope name ("" = top level): the transitions whose ends all lie in it */ -}}
+{{- $scope := . -}}
+{{- range $s := States -}}
+{{- if $s.IsHistory -}}
+{{- /* default transitions are drawn inside the parent, see "history" */ -}}
+{{- continue -}}
+{{- end -}}
+{{- range $t := OutgoingTransitions $s.Name -}}
+{{- if ne (ScopeOf $t) $scope -}}{{- continue -}}{{- end -}}
+{{- template "transition" $t -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "transition" -}}{{- /* . = *Transition, drawn in the scope of its common ancestor */ -}}
 {{- $t := . -}}
-{{- if or .Internal (not .Targets) }}
+{{- $scope := ScopeOf . -}}
+{{- if and $t.Source (State $t.Source).Parent (State (State $t.Source).Parent).IsParallel (Children $t.Source) -}}
+{{- warn "region %q: PlantUML regions are anonymous; its transition (%s) is not drawn" $t.Source (include "labelText" $t) -}}
+{{- else if or .IsInternal (not .Targets) }}
 {{ .Source }} : {{ template "labelText" . }}
+{{- with .Note -}}{{- warn "transition %s (%s): PlantUML cannot attach a note to an internal transition" $t.Source $t.Trigger -}}{{- end -}}
 {{- else -}}
-{{- range .Targets }}
-{{ $t.Source }} --> {{ template "target" . }}{{ template "label" $t }}
+{{- if .IsLocal -}}{{- warn "transition %s -> %s: PlantUML has no local transitions; drawn as an external one" .Source (join " " .Targets) -}}{{- end -}}
+{{- range $i, $target := .Targets -}}
+{{- if or (include "confined" (dict "state" $t.Source "scope" $scope)) (include "confined" (dict "state" $target "scope" $scope)) -}}
+{{- warn "transition %s -> %s: PlantUML cannot draw arrows across the boundary of a parallel region other than the first" $t.Source $target -}}
+{{- continue -}}
+{{- end }}
+{{ $t.Source }} --> {{ template "target" $target }}{{ template "label" $t }}
+{{- if and (not $i) $t.Note -}}{{- template "linkNote" $t.Note -}}{{- end -}}
 {{- end -}}
 {{- end -}}
+{{- end -}}
+
+{{- define "confined" -}}{{- /* . = dict "state" name "scope" name: non-empty when a region other than the first of its parallel state lies between the state (inclusive) and the scope */ -}}
+{{- $scope := .scope -}}
+{{- range $name := prepend (Ancestors .state) .state -}}
+{{- if eq $name $scope -}}{{- break -}}{{- end -}}
+{{- $s := State $name -}}
+{{- $p := State $s.Parent -}}
+{{- if and $p $p.IsParallel (ne (index (Children $p.Name) 0).Name $name) }}{{ $name }}{{ break }}{{ end -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "linkNote" -}}{{- /* . = note text, attached to the arrow just drawn */ -}}
+{{- if contains "\n" . }}
+note on link
+{{ indent 4 . }}
+end note
+{{- else }}
+note on link : {{ . }}
 {{- end -}}
 {{- end -}}
 
 {{- define "target" -}}{{- /* . = target state name, rendered as a PlantUML reference */ -}}
 {{- $s := State . -}}
 {{- if not $s }}{{ . }}
-{{- else if $s.IsFinal }}[*]
+{{- else if or $s.IsFinal $s.IsTerminate }}[*]
 {{- else if $s.IsDeepHistory }}{{ $s.Parent }}[H*]
 {{- else if $s.IsHistory }}{{ $s.Parent }}[H]
 {{- else }}{{ . }}
 {{- end -}}
 {{- end -}}
 
-{{- define "label" -}}{{- /* . = *Transition; ": event [cond] / actions" or nothing */ -}}
+{{- define "label" -}}{{- /* . = *Transition; ": trigger [cond] / actions" or nothing */ -}}
 {{- with include "labelText" . }}: {{ . }}{{ end -}}
 {{- end -}}
 
 {{- define "labelText" -}}{{- /* . = *Transition */ -}}
-{{- joinNonEmpty "\\n" .Event (surround "[ " .Cond " ]") (prefix "/ " (join "; " .Actions)) -}}
+{{- joinNonEmpty "\\n" .Trigger (surround "[ " .Cond " ]") (prefix "/ " (join "; " .Actions)) -}}
 {{- end -}}

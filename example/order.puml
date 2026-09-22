@@ -1,0 +1,28 @@
+@startuml
+legend
+    total = 0
+    attempts = 0
+endlegend
+[*] --> new
+state new
+state check <<choice>>
+state review <<manual>>
+review : do / invoke(review-queue, http://example.com/ticket)
+note right of review : A human approves large orders.
+state "payment: payment.scxml" as payment
+state retry <<start>>
+state paid
+paid : entry / log('order paid')
+new --> check: submit
+check --> [*]: [ total == 0 ]
+check --> review: [ total > 1000 ]
+check --> payment: [ total <= 1000 ]
+review --> payment: approve
+review --> [*]: reject
+payment --> paid: done.invoke
+payment --> retry: error.payment\n/ attempts = attempts + 1
+retry --> payment: [ attempts < 3 ]
+retry --> [*]: [ attempts >= 3 ]
+paid --> [*]: ship
+paid --> [*]: fraud
+@enduml

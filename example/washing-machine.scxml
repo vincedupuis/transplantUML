@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Orthogonal regions with fork and join.
+
+  A transient state whose only transition has several targets is the SCXML
+  idiom for a fork. A join has no idiom; it is marked tpuml:kind="join".
+  Note the warnings: PlantUML cannot draw arrows across the boundary of any
+  region but the first, and SCXML cannot wait for every region before
+  leaving the join.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:tpuml="https://github.com/vincedupuis/transplantUML"
+       version="1.0" name="washing-machine" initial="idle">
+  <state id="idle">
+    <transition event="start" target="fill"/>
+  </state>
+
+  <state id="fill">
+    <transition target="heating spinning"/>
+  </state>
+
+  <parallel id="running">
+    <state id="temperature" initial="heating">
+      <state id="heating">
+        <transition event="hot" target="holding"/>
+      </state>
+      <state id="holding">
+        <transition event="cold" target="heating"/>
+        <transition event="cycleDone" target="drain"/>
+      </state>
+    </state>
+    <state id="drum" initial="spinning">
+      <state id="spinning">
+        <transition event="reverse" target="spinning"/>
+        <transition event="cycleDone" target="drain"/>
+      </state>
+    </state>
+    <transition event="stop" target="idle"/>
+  </parallel>
+
+  <state id="drain" tpuml:kind="join">
+    <transition target="finished"/>
+  </state>
+
+  <final id="finished"/>
+</scxml>

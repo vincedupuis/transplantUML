@@ -45,6 +45,15 @@ func TestValidateErrors(t *testing.T) {
 		{"bad source", func(sm *StateMachine) { sm.Transitions[0].Source = "zzz" }, `unknown source "zzz"`},
 		{"bad target", func(sm *StateMachine) { sm.Transitions[0].Targets = []string{"zzz"} }, `unknown target "zzz"`},
 		{"cycle", func(sm *StateMachine) { sm.States[1].Parent = "b1" }, `forms a cycle`},
+		{"root entry point", func(sm *StateMachine) { sm.States[0].Kind = EntryPoint }, `entry-point states must be nested`},
+		{"choice with actions", func(sm *StateMachine) { sm.States[0].Kind = Choice; sm.States[0].OnEntry = []string{"x"} }, `cannot have entry/exit actions`},
+		{"final with do", func(sm *StateMachine) { sm.States[4].Do = []string{"x"} }, `cannot have do activities`},
+		{"choice with trigger", func(sm *StateMachine) { sm.States[0].Kind = Choice }, `cannot have a trigger`},
+		{"final source", func(sm *StateMachine) { sm.Transitions[0].Source = "f" }, `final state "f" cannot have outgoing transitions`},
+		{"terminate source", func(sm *StateMachine) { sm.States[0].Kind = Terminate }, `terminate state "a" cannot have outgoing transitions`},
+		{"submachine on parallel", func(sm *StateMachine) { sm.States[0].Kind = Parallel; sm.States[0].Submachine = "m" }, `only normal states can reference a submachine`},
+		{"event and after", func(sm *StateMachine) { sm.Transitions[0].After = "5s" }, `has both an event and a time trigger`},
+		{"bad transition kind", func(sm *StateMachine) { sm.Transitions[0].Kind = "sideways" }, `unknown kind "sideways"`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -80,6 +89,67 @@ func TestAccessors(t *testing.T) {
 	}
 	if sm.State("nope") != nil {
 		t.Errorf("State(nope) should be nil")
+	}
+	if got := strings.Join(sm.Ancestors("b1"), ","); got != "b" {
+		t.Errorf("Ancestors(b1) = %s", got)
+	}
+	if got := sm.Ancestors("a"); len(got) != 0 {
+		t.Errorf("Ancestors(a) = %v", got)
+	}
+}
+
+func TestCommonAncestor(t *testing.T) {
+	sm := &StateMachine{States: []*State{
+		{Name: "a"}, {Name: "b"}, {Name: "b1", Parent: "b"}, {Name: "b2", Parent: "b"}, {Name: "b11", Parent: "b1"},
+	}}
+	cases := []struct {
+		in   []string
+		want string
+	}{
+		{[]string{"a"}, ""}, {[]string{"b1"}, "b"}, {[]string{"b11"}, "b1"},
+		{[]string{"b11", "b2"}, "b"}, {[]string{"b11", "b1"}, "b"}, {[]string{"b1", "b11"}, "b"},
+		{[]string{"b11", "a"}, ""}, {[]string{"b11", "b11"}, "b1"}, {[]string{"b", "b1"}, ""}, {nil, ""},
+	}
+	for _, c := range cases {
+		if got := sm.CommonAncestor(c.in...); got != c.want {
+			t.Errorf("CommonAncestor(%v) = %q, want %q", c.in, got, c.want)
+		}
+	}
+	if got := sm.ScopeOf(&Transition{Source: "b11", Targets: []string{"b2"}}); got != "b" {
+		t.Errorf("ScopeOf(b11 -> b2) = %q", got)
+	}
+}
+
+func TestPredicates(t *testing.T) {
+	for _, kind := range []StateKind{Choice, Junction, Fork, Join, EntryPoint, ExitPoint} {
+		s := &State{Kind: kind}
+		if !s.IsConnector() || !s.IsPseudo() {
+			t.Errorf("%s must be a connector pseudo-state", kind)
+		}
+	}
+	for _, kind := range []StateKind{Normal, Parallel} {
+		if s := (&State{Kind: kind}); s.IsPseudo() || s.IsConnector() {
+			t.Errorf("%s must not be a pseudo-state", kind)
+		}
+	}
+	if s := (&State{Kind: Terminate}); !s.IsPseudo() || s.IsConnector() || !s.IsTerminate() {
+		t.Errorf("terminate predicates wrong")
+	}
+	if s := (&State{Kind: EntryPoint}); !s.IsBoundary() {
+		t.Errorf("entry points are boundary states")
+	}
+	tr := &Transition{}
+	if !tr.IsExternal() || tr.IsLocal() || tr.IsInternal() {
+		t.Errorf("an empty kind is external")
+	}
+	if tr := (&Transition{Kind: External}); !tr.IsExternal() {
+		t.Errorf("explicit external")
+	}
+	if got := (&Transition{Event: "go"}).Trigger(); got != "go" {
+		t.Errorf("Trigger = %q", got)
+	}
+	if got := (&Transition{After: "5s"}).Trigger(); got != "after(5s)" {
+		t.Errorf("Trigger = %q", got)
 	}
 }
 

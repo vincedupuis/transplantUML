@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Time triggers, variables, entry/exit actions and notes.
+
+  A <send delay> in <onentry> whose event a transition of the same state
+  consumes is read as a UML time trigger, after(...). The <cancel> in <onexit>
+  belongs to it and is not shown as an exit action.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:tpuml="https://github.com/vincedupuis/transplantUML"
+       version="1.0" name="traffic-light" initial="red">
+  <tpuml:note>A pedestrian button shortens the green phase.</tpuml:note>
+  <datamodel>
+    <data id="cycles" expr="0"/>
+    <data id="requested" expr="false"/>
+  </datamodel>
+
+  <state id="red">
+    <onentry>
+      <send event="expired" delay="30s" id="redTimer"/>
+    </onentry>
+    <onexit>
+      <cancel sendid="redTimer"/>
+      <assign location="cycles" expr="cycles + 1"/>
+    </onexit>
+    <transition event="expired" target="green"/>
+  </state>
+
+  <state id="green">
+    <tpuml:note>Cut short when a pedestrian is waiting.</tpuml:note>
+    <onentry>
+      <send event="expired" delay="25s" id="greenTimer"/>
+    </onentry>
+    <onexit>
+      <cancel sendid="greenTimer"/>
+    </onexit>
+    <transition event="expired" target="amber"/>
+    <transition event="button" cond="!requested" type="internal">
+      <assign location="requested" expr="true"/>
+    </transition>
+    <transition event="button" cond="requested" target="amber"/>
+  </state>
+
+  <state id="amber">
+    <onentry>
+      <send event="expired" delay="3s" id="amberTimer"/>
+      <assign location="requested" expr="false"/>
+    </onentry>
+    <onexit>
+      <cancel sendid="amberTimer"/>
+    </onexit>
+    <transition event="expired" target="red"/>
+  </state>
+</scxml>

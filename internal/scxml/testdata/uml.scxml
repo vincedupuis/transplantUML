@@ -1,0 +1,74 @@
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:tpuml="https://github.com/vincedupuis/transplantUML"
+       version="1.0" name="uml" initial="check">
+  <tpuml:note>Every UML concept the model holds,
+in one document.</tpuml:note>
+  <datamodel>
+    <data id="retries" expr="0"/>
+    <data id="config" src="config.json"/>
+  </datamodel>
+
+  <!-- A transient state branching on guards is a choice. -->
+  <state id="check">
+    <transition cond="retries > 3" target="failed"/>
+    <transition cond="retries &lt;= 3" target="work"/>
+  </state>
+
+  <!-- A transient state with one multi-target transition is a fork. -->
+  <state id="split">
+    <transition target="left right"/>
+  </state>
+
+  <!-- Explicit kinds for what SCXML has no idiom for. -->
+  <state id="merge" tpuml:kind="junction">
+    <transition target="work"/>
+  </state>
+  <state id="sync" tpuml:kind="join">
+    <transition target="done"/>
+  </state>
+
+  <state id="work" tpuml:stereotype="worker" tpuml:defer="pause resume" tpuml:invariant="retries >= 0">
+    <tpuml:note>Runs the job.</tpuml:note>
+    <datamodel>
+      <data id="progress" expr="0"/>
+    </datamodel>
+    <onentry>
+      <log expr="'start'"/>
+      <send event="tick" delay="5s" id="workTimer"/>
+    </onentry>
+    <onexit>
+      <cancel sendid="workTimer"/>
+    </onexit>
+    <invoke type="http://example.com/worker" src="job.py"/>
+    <transition event="tick" target="check">
+      <tpuml:note>Timed out.</tpuml:note>
+      <assign location="retries" expr="retries + 1"/>
+    </transition>
+    <transition event="split" target="split"/>
+    <transition event="abort" target="stop"/>
+    <transition event="enter" target="in"/>
+  </state>
+
+  <parallel id="both">
+    <state id="left"><transition event="l" target="sync"/></state>
+    <state id="right"><transition event="r" target="sync"/></state>
+  </parallel>
+
+  <state id="sub">
+    <invoke src="child.scxml"/>
+    <transition event="back" target="merge"/>
+  </state>
+
+  <state id="outer" initial="inner">
+    <state id="in" tpuml:kind="entry-point"><transition target="inner"/></state>
+    <state id="out" tpuml:kind="exit-point"><transition target="sub"/></state>
+    <state id="inner">
+      <transition event="leave" target="out"/>
+      <transition event="again" target="inner" tpuml:kind="local"/>
+      <transition event="note" type="internal"><tpuml:note>Not drawn.</tpuml:note></transition>
+    </state>
+  </state>
+
+  <final id="stop" tpuml:kind="terminate"/>
+  <final id="done"/>
+  <final id="failed"><donedata><content>failed</content></donedata></final>
+</scxml>

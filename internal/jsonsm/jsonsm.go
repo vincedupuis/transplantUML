@@ -14,12 +14,13 @@ import (
 
 type Parser struct{}
 
-func (Parser) Parse(src []byte) (*model.StateMachine, error) {
+// Parse never warns: the JSON shape is the model, so it holds everything.
+func (Parser) Parse(src []byte) (*model.StateMachine, model.Warnings, error) {
 	var sm model.StateMachine
 	dec := json.NewDecoder(bytes.NewReader(src))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&sm); err != nil {
-		return nil, fmt.Errorf("parsing JSON: %w", err)
+		return nil, nil, fmt.Errorf("parsing JSON: %w", err)
 	}
 	// Hand-written JSON may leave these out; keep the model uniform.
 	if sm.States == nil {
@@ -33,15 +34,16 @@ func (Parser) Parse(src []byte) (*model.StateMachine, error) {
 			s.Kind = model.Normal
 		}
 	}
-	return &sm, nil
+	return &sm, nil, nil
 }
 
 type Emitter struct{}
 
-func (Emitter) Emit(sm *model.StateMachine) ([]byte, error) {
+// Emit never warns: JSON holds the whole model.
+func (Emitter) Emit(sm *model.StateMachine) ([]byte, model.Warnings, error) {
 	out, err := json.MarshalIndent(sm, "", "  ")
 	if err != nil {
-		return nil, fmt.Errorf("encoding JSON: %w", err)
+		return nil, nil, fmt.Errorf("encoding JSON: %w", err)
 	}
-	return append(out, '\n'), nil
+	return append(out, '\n'), nil, nil
 }

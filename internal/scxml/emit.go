@@ -4,53 +4,72 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/beevik/etree"
 	"github.com/vincedupuis/transplantUML/internal/model"
 )
 
-const namespace = "http://www.w3.org/2005/07/scxml"
-
-// Emitter writes the model back out as SCXML. It is the inverse of Parser for
-// everything the model holds structurally; executable content, which the
-// parser flattens to strings, comes back as <script> bodies unless the string
-// is raw XML, so model -> SCXML -> model is stable even though the document is
-// not byte-identical to the one it came from.
+// Emitter writes the model out as SCXML. What SCXML expresses natively is
+// written natively (the connector pseudo-states as transient states, time
+// triggers as a delayed <send> cancelled on exit, submachines and do
+// activities as <invoke>); the rest is recorded in the tpuml extension
+// namespace and reported as a warning, since an SCXML engine will not honour
+// it. Executable content, which the parser flattens to strings, comes back as
+// <script> bodies unless the string is raw XML, which is re-inserted as is.
 type Emitter struct{}
 
-func (Emitter) Emit(sm *model.StateMachine) ([]byte, error) {
+func (Emitter) Emit(sm *model.StateMachine) ([]byte, model.Warnings, error) {
 	doc := etree.NewDocument()
 	doc.CreateProcInst("xml", `version="1.0" encoding="UTF-8"`)
 	root := doc.CreateElement("scxml")
+
+	e := &emitter{sm: sm, emitted: map[string]bool{}}
+	e.datamodel(root, sm.Variables)
+	e.note(root, sm.Note)
+	if err := e.children(root, ""); err != nil {
+		return nil, nil, err
+	}
+	if err := e.leftovers(); err != nil {
+		return nil, nil, err
+	}
+
+	// Attributes are written in creation order; the walk above may have used
+	// the extension namespace, which is declared only when that happened.
 	root.CreateAttr("xmlns", namespace)
+	if e.usesExt {
+		root.CreateAttr("xmlns:"+extPrefix, ExtNamespace)
+	}
 	root.CreateAttr("version", "1.0")
 	setAttr(root, "name", sm.Name)
 	setAttr(root, "initial", sm.Initial)
-
-	e := &emitter{sm: sm, emitted: map[string]bool{}}
-	if err := e.children(root, ""); err != nil {
-		return nil, err
-	}
-	if err := e.leftovers(); err != nil {
-		return nil, err
-	}
 
 	canonical(doc)
 	doc.Indent(2)
 	var buf bytes.Buffer
 	if _, err := doc.WriteTo(&buf); err != nil {
-		return nil, fmt.Errorf("writing XML: %w", err)
+		return nil, nil, fmt.Errorf("writing XML: %w", err)
 	}
-	return buf.Bytes(), nil
+	return buf.Bytes(), e.warn, nil
 }
 
+// stateTags maps each kind to its SCXML element. Kinds SCXML has no element
+// for become transient <state>s (or a <final> for terminate) tagged with
+// tpuml:kind so that the parser reads them back.
 var stateTags = map[model.StateKind]string{
 	model.Normal:         "state",
 	model.Parallel:       "parallel",
 	model.Final:          "final",
+	model.Terminate:      "final",
 	model.HistoryShallow: "history",
 	model.HistoryDeep:    "history",
+	model.Choice:         "state",
+	model.Junction:       "state",
+	model.Fork:           "state",
+	model.Join:           "state",
+	model.EntryPoint:     "state",
+	model.ExitPoint:      "state",
 }
 
 // emitter walks the flat model as a tree, recording what it wrote so that
@@ -58,6 +77,8 @@ var stateTags = map[model.StateKind]string{
 type emitter struct {
 	sm      *model.StateMachine
 	emitted map[string]bool
+	usesExt bool
+	warn    model.Warnings
 }
 
 // children writes every direct child of parent (and their descendants) under el.
@@ -74,16 +95,44 @@ func (e *emitter) children(el *etree.Element, parent string) error {
 			child.CreateAttr("type", "deep") // shallow is the SCXML default
 		}
 		setAttr(child, "initial", s.Initial)
-		actions(child, "onentry", s.OnEntry)
-		actions(child, "onexit", s.OnExit)
-		for _, t := range e.sm.OutgoingTransitions(s.Name) {
+		e.pseudo(child, s)
+		e.ext(child, "stereotype", s.Stereotype)
+		e.ext(child, "invariant", s.Invariant)
+		if len(s.Defer) > 0 {
+			e.ext(child, "defer", strings.Join(s.Defer, " "))
+			e.warn.Addf("state %q: SCXML has no deferred events; written as tpuml:defer, which engines ignore", s.Name)
+		}
+		e.note(child, s.Note)
+		e.datamodel(child, s.Variables)
+
+		transitions := e.sm.OutgoingTransitions(s.Name)
+		onentry, onexit := append([]string(nil), s.OnEntry...), append([]string(nil), s.OnExit...)
+		for _, delay := range delays(transitions) {
+			id := s.Name + ".after." + eventSafe(delay)
+			onentry = append(onentry, fmt.Sprintf(`<send event="%s" delay="%s" id="%s"/>`, afterEvent(delay), delay, id))
+			onexit = append(onexit, fmt.Sprintf(`<cancel sendid="%s"/>`, id))
+		}
+		actions(child, "onentry", onentry)
+		actions(child, "onexit", onexit)
+		e.invokes(child, s)
+
+		for _, t := range transitions {
 			tr := child.CreateElement("transition")
-			setAttr(tr, "event", t.Event)
+			if t.After != "" {
+				tr.CreateAttr("event", afterEvent(t.After))
+			} else {
+				setAttr(tr, "event", t.Event)
+			}
 			setAttr(tr, "cond", t.Cond)
 			setAttr(tr, "target", strings.Join(t.Targets, " "))
-			if t.Internal {
+			switch {
+			case t.IsInternal():
 				tr.CreateAttr("type", "internal")
+			case t.IsLocal():
+				e.ext(tr, "kind", string(model.Local))
+				e.warn.Addf("transition %s -> %s: SCXML has no local transitions; written as an external one tagged tpuml:kind=\"local\"", t.Source, strings.Join(t.Targets, " "))
 			}
+			e.note(tr, t.Note)
 			executable(tr, t.Actions)
 		}
 		if err := e.children(child, s.Name); err != nil {
@@ -92,6 +141,111 @@ func (e *emitter) children(el *etree.Element, parent string) error {
 	}
 	return nil
 }
+
+// pseudo tags the kinds SCXML has no element for and warns where the SCXML
+// stand-in does not behave like the UML original.
+func (e *emitter) pseudo(el *etree.Element, s *model.State) {
+	switch s.Kind {
+	case model.Choice, model.Junction, model.Fork, model.EntryPoint, model.ExitPoint:
+		// A transient state entered and left in the same step: same behaviour.
+	case model.Join:
+		e.warn.Addf("state %q: SCXML cannot join regions; the first region to reach it leaves the parallel state", s.Name)
+	case model.Terminate:
+		e.warn.Addf("state %q: SCXML has no terminate; written as a <final> state, which runs exit actions", s.Name)
+	default:
+		return
+	}
+	e.ext(el, "kind", string(s.Kind))
+}
+
+// invokes writes the submachine reference and the do activities as <invoke>.
+func (e *emitter) invokes(el *etree.Element, s *model.State) {
+	if s.Submachine != "" {
+		el.CreateElement("invoke").CreateAttr("src", s.Submachine)
+	}
+	for _, do := range s.Do {
+		if child, ok := parseElement(do); ok {
+			el.AddChild(child)
+			continue
+		}
+		inv := el.CreateElement("invoke")
+		if src, typ, ok := parseInvoke(do); ok {
+			setAttr(inv, "type", typ)
+			inv.CreateAttr("src", src)
+			continue
+		}
+		inv.CreateAttr("type", extPrefix+":do")
+		inv.CreateElement("content").SetText(do)
+		e.warn.Addf("state %q: SCXML cannot run the do activity %q; written as <invoke> content", s.Name, do)
+	}
+}
+
+// parseInvoke reads the parser's compact form of an <invoke>: "invoke(src)"
+// or "invoke(src, type)". The type is the last comma-separated part when it
+// looks like a type (no spaces or parentheses); anything else is all source.
+func parseInvoke(s string) (src, typ string, ok bool) {
+	if !strings.HasPrefix(s, "invoke(") || !strings.HasSuffix(s, ")") {
+		return "", "", false
+	}
+	src = strings.TrimSuffix(strings.TrimPrefix(s, "invoke("), ")")
+	if i := strings.LastIndex(src, ", "); i >= 0 && !strings.ContainsAny(src[i+2:], " ()") {
+		src, typ = src[:i], src[i+2:]
+	}
+	return src, typ, src != ""
+}
+
+func (e *emitter) datamodel(el *etree.Element, vars []model.Variable) {
+	if len(vars) == 0 {
+		return
+	}
+	dm := el.CreateElement("datamodel")
+	for _, v := range vars {
+		d := dm.CreateElement("data")
+		d.CreateAttr("id", v.Name)
+		switch {
+		case strings.HasPrefix(v.Value, "src(") && strings.HasSuffix(v.Value, ")"):
+			d.CreateAttr("src", strings.TrimSuffix(strings.TrimPrefix(v.Value, "src("), ")"))
+		case v.Value != "":
+			d.CreateAttr("expr", v.Value)
+		}
+	}
+}
+
+func (e *emitter) note(el *etree.Element, text string) {
+	if text == "" {
+		return
+	}
+	e.usesExt = true
+	el.CreateElement(extPrefix + ":note").SetText(text)
+}
+
+// ext sets a tpuml extension attribute, unless the value is empty.
+func (e *emitter) ext(el *etree.Element, key, value string) {
+	if value != "" {
+		e.usesExt = true
+		el.CreateAttr(extPrefix+":"+key, value)
+	}
+}
+
+// delays lists the distinct time triggers among transitions, in order.
+func delays(transitions []*model.Transition) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, t := range transitions {
+		if t.After != "" && !seen[t.After] {
+			seen[t.After] = true
+			out = append(out, t.After)
+		}
+	}
+	return out
+}
+
+// afterEvent names the event a time trigger's <send> raises.
+func afterEvent(delay string) string { return "after." + eventSafe(delay) }
+
+var unsafeEventChars = regexp.MustCompile(`[^A-Za-z0-9_.-]`)
+
+func eventSafe(s string) string { return unsafeEventChars.ReplaceAllString(s, "_") }
 
 // leftovers reports the states the walk never reached and the transitions that
 // hang off them. A valid model has none; see model.Validate.

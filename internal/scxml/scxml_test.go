@@ -15,7 +15,7 @@ func parseFile(t *testing.T, path string) *model.StateMachine {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sm, err := Parser{}.Parse(src)
+	sm, _, err := Parser{}.Parse(src)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,6 +105,160 @@ func TestEdgeCases(t *testing.T) {
 	}
 }
 
+// uml.scxml holds every UML concept the model has, using the tpuml extension
+// vocabulary where SCXML has nothing native.
+func TestUMLConcepts(t *testing.T) {
+	src, err := os.ReadFile("testdata/uml.scxml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sm, warnings, err := Parser{}.Parse(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sm.Validate(); err != nil {
+		t.Fatalf("model does not validate: %v", err)
+	}
+	if want := []string{`state "failed": <donedata> is not supported and was dropped`}; !reflect.DeepEqual([]string(warnings), want) {
+		t.Errorf("warnings = %q, want %q", warnings, want)
+	}
+
+	wantKinds := map[string]model.StateKind{
+		"check": model.Choice, "split": model.Fork, "merge": model.Junction, "sync": model.Join,
+		"in": model.EntryPoint, "out": model.ExitPoint, "stop": model.Terminate, "done": model.Final,
+		"work": model.Normal, "both": model.Parallel, "sub": model.Normal, "inner": model.Normal,
+	}
+	for name, want := range wantKinds {
+		if got := sm.State(name).Kind; got != want {
+			t.Errorf("%s: kind %q, want %q", name, got, want)
+		}
+	}
+
+	if sm.Note != "Every UML concept the model holds,\nin one document." {
+		t.Errorf("machine note = %q", sm.Note)
+	}
+	wantVars := []model.Variable{{Name: "retries", Value: "0"}, {Name: "config", Value: "src(config.json)"}}
+	if !reflect.DeepEqual(sm.Variables, wantVars) {
+		t.Errorf("machine variables = %+v", sm.Variables)
+	}
+
+	work := sm.State("work")
+	if work.Stereotype != "worker" || work.Invariant != "retries >= 0" || work.Note != "Runs the job." {
+		t.Errorf("work annotations = %+v", *work)
+	}
+	if !reflect.DeepEqual(work.Defer, []string{"pause", "resume"}) {
+		t.Errorf("work.Defer = %q", work.Defer)
+	}
+	if !reflect.DeepEqual(work.Variables, []model.Variable{{Name: "progress", Value: "0"}}) {
+		t.Errorf("work.Variables = %+v", work.Variables)
+	}
+	if !reflect.DeepEqual(work.Do, []string{"invoke(job.py, http://example.com/worker)"}) {
+		t.Errorf("work.Do = %q", work.Do)
+	}
+	// The timer's <send> and <cancel> became the time trigger, not actions.
+	if !reflect.DeepEqual(work.OnEntry, []string{"log('start')"}) || len(work.OnExit) != 0 {
+		t.Errorf("work entry/exit = %q / %q", work.OnEntry, work.OnExit)
+	}
+	timed := sm.OutgoingTransitions("work")[0]
+	if timed.After != "5s" || timed.Event != "" || timed.Note != "Timed out." || !reflect.DeepEqual(timed.Actions, []string{"retries = retries + 1"}) {
+		t.Errorf("time trigger = %+v", *timed)
+	}
+
+	if got := sm.State("sub").Submachine; got != "child.scxml" {
+		t.Errorf("submachine = %q", got)
+	}
+
+	inner := sm.OutgoingTransitions("inner")
+	if !inner[0].IsExternal() || !inner[1].IsLocal() || !inner[2].IsInternal() {
+		t.Errorf("transition kinds = %q %q %q", inner[0].Kind, inner[1].Kind, inner[2].Kind)
+	}
+	if inner[2].Note != "Not drawn." {
+		t.Errorf("internal transition note = %q", inner[2].Note)
+	}
+}
+
+// The choice/fork idiom must not swallow states that merely look transient.
+func TestConnectorIdiom(t *testing.T) {
+	cases := map[string]struct {
+		body string
+		want model.StateKind
+	}{
+		"guarded branches":    {`<transition cond="a" target="x"/><transition cond="b" target="y"/>`, model.Choice},
+		"branches with else":  {`<transition cond="a" target="x"/><transition target="y"/>`, model.Choice},
+		"multi-target":        {`<transition target="x y"/>`, model.Fork},
+		"single pass-through": {`<transition target="x"/>`, model.Normal},
+		"unguarded branches":  {`<transition target="x"/><transition target="y"/>`, model.Normal},
+		"has an event":        {`<transition event="e" cond="a" target="x"/><transition cond="b" target="y"/>`, model.Normal},
+		"has entry action":    {`<onentry><log/></onentry><transition cond="a" target="x"/><transition cond="b" target="y"/>`, model.Normal},
+		"targetless":          {`<transition cond="a"/><transition cond="b" target="y"/>`, model.Normal},
+		"opted out":           {`<transition tpuml:kind="x" cond="a" target="x"/><transition cond="b" target="y"/>`, model.Choice},
+		"forced normal":       {`<transition cond="a" target="x"/><transition cond="b" target="y"/>`, model.Normal},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			attr := ""
+			if name == "forced normal" {
+				attr = ` tpuml:kind="normal"`
+			}
+			src := `<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:tpuml="` + ExtNamespace + `" initial="s">` +
+				`<state id="s"` + attr + `>` + c.body + `</state><state id="x"/><state id="y"/></scxml>`
+			sm, _, err := Parser{}.Parse([]byte(src))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := sm.State("s").Kind; got != c.want {
+				t.Errorf("kind = %q, want %q", got, c.want)
+			}
+		})
+	}
+}
+
+// The extension attributes are recognised by namespace, whatever the prefix.
+func TestExtensionPrefix(t *testing.T) {
+	src := `<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:x="` + ExtNamespace + `" xmlns:o="urn:other">` +
+		`<state id="s" x:kind="junction" o:kind="ignored"><x:note>hi</x:note><transition target="s"/></state></scxml>`
+	sm, _, err := Parser{}.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := sm.State("s"); s.Kind != model.Junction || s.Note != "hi" {
+		t.Errorf("state = %+v", *s)
+	}
+}
+
+func TestParserWarnings(t *testing.T) {
+	src := `<scxml xmlns="http://www.w3.org/2005/07/scxml"><script>x()</script><state id="s"><onentry/><foo/></state></scxml>`
+	_, warnings, err := Parser{}.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{`state "s": <foo> is not supported and was dropped`, `<script> at the top level is not supported and was dropped`}
+	if !reflect.DeepEqual([]string(warnings), want) {
+		t.Errorf("warnings = %q, want %q", warnings, want)
+	}
+}
+
+func TestInvokeForms(t *testing.T) {
+	src := `<scxml xmlns="http://www.w3.org/2005/07/scxml"><state id="s">
+	  <invoke src="a.scxml"/>
+	  <invoke type="http://www.w3.org/TR/scxml/" src="b.scxml"/>
+	  <invoke type="x" srcexpr="'c'"/>
+	  <invoke src="d.scxml"><param name="p" expr="1"/></invoke>
+	</state></scxml>`
+	sm, _, err := Parser{}.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := sm.State("s")
+	if s.Submachine != "a.scxml" {
+		t.Errorf("submachine = %q", s.Submachine)
+	}
+	want := []string{"invoke(b.scxml)", "invoke('c', x)", `<invoke src="d.scxml"><param name="p" expr="1"/></invoke>`}
+	if !reflect.DeepEqual(s.Do, want) {
+		t.Errorf("Do = %q, want %q", s.Do, want)
+	}
+}
+
 func TestExecutableContentAndInternal(t *testing.T) {
 	src := `<scxml initial="s">
 	  <state id="s">
@@ -121,7 +275,7 @@ func TestExecutableContentAndInternal(t *testing.T) {
 	    <transition event="nowhere"/>
 	  </state>
 	</scxml>`
-	sm, err := Parser{}.Parse([]byte(src))
+	sm, _, err := Parser{}.Parse([]byte(src))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,19 +291,19 @@ func TestExecutableContentAndInternal(t *testing.T) {
 		t.Errorf("OnExit = %q", got)
 	}
 	tr := sm.OutgoingTransitions("s")
-	if !tr[0].Internal || !reflect.DeepEqual(tr[0].Actions, []string{"log(evt: _event.name)"}) {
+	if !tr[0].IsInternal() || !reflect.DeepEqual(tr[0].Actions, []string{"log(evt: _event.name)"}) {
 		t.Errorf("internal transition = %+v", *tr[0])
 	}
-	if tr[1].Internal || len(tr[1].Targets) != 0 {
+	if tr[1].IsInternal() || len(tr[1].Targets) != 0 {
 		t.Errorf("targetless transition = %+v", *tr[1])
 	}
 }
 
 func TestErrors(t *testing.T) {
-	if _, err := (Parser{}).Parse([]byte("<scxml>")); err == nil || !strings.Contains(err.Error(), "parsing XML") {
+	if _, _, err := (Parser{}).Parse([]byte("<scxml>")); err == nil || !strings.Contains(err.Error(), "parsing XML") {
 		t.Errorf("malformed XML: %v", err)
 	}
-	if _, err := (Parser{}).Parse([]byte("<root/>")); err == nil || !strings.Contains(err.Error(), "<scxml>") {
+	if _, _, err := (Parser{}).Parse([]byte("<root/>")); err == nil || !strings.Contains(err.Error(), "<scxml>") {
 		t.Errorf("missing root: %v", err)
 	}
 }

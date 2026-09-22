@@ -40,7 +40,11 @@ func validateSCXML(t *testing.T, what string, src []byte) {
 func TestSCXMLValidatesAgainstW3CSchema(t *testing.T) {
 	requireXMLLint(t)
 
-	for _, path := range []string{"../../example/coffee-machine.scxml", "testdata/edge.scxml"} {
+	examples, err := filepath.Glob("../../example/*.scxml")
+	if err != nil || len(examples) == 0 {
+		t.Fatalf("no examples found: %v", err)
+	}
+	for _, path := range append(examples, "testdata/edge.scxml", "testdata/uml.scxml") {
 		t.Run(filepath.Base(path), func(t *testing.T) {
 			src, err := os.ReadFile(path)
 			if err != nil {

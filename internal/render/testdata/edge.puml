@@ -2,9 +2,6 @@
 [*] --> a
 state a
 a : entry / log('hi')
-a --> p: go
-a --> a: multi
-a --> b: multi
 state p {
     [*] --> r1a
     state r1a
@@ -12,11 +9,14 @@ state p {
     [*] --> r2a
     state r2a
 }
-p --> b[H*]: done
 state b {
     [*] --> b1
     [H*] --> b1
     state b1
     b1 --> [*]: x
 }
+a --> p: go
+a --> a: multi
+a --> b: multi
+p --> b[H*]: done
 @enduml

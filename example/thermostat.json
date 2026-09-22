@@ -1,0 +1,41 @@
+{
+  "name": "thermostat",
+  "initial": "off",
+  "variables": [
+    { "name": "target", "value": "21" },
+    { "name": "current", "value": "18" }
+  ],
+  "note": "The model's own JSON shape: every concept, no extension vocabulary needed.",
+  "states": [
+    { "name": "off", "kind": "normal" },
+    {
+      "name": "on",
+      "kind": "normal",
+      "initial": "decide",
+      "onEntry": ["display.on()"],
+      "onExit": ["display.off()"],
+      "do": ["sample sensor every 10s"],
+      "defer": ["schedule"],
+      "invariant": "target > 5"
+    },
+    { "name": "decide", "parent": "on", "kind": "choice" },
+    { "name": "heating", "parent": "on", "kind": "normal", "stereotype": "actuator", "note": "Burner on." },
+    { "name": "cooling", "parent": "on", "kind": "normal", "stereotype": "actuator" },
+    { "name": "steady", "parent": "on", "kind": "normal" },
+    { "name": "last", "parent": "on", "kind": "history-shallow" },
+    { "name": "fault", "kind": "terminate" }
+  ],
+  "transitions": [
+    { "source": "off", "targets": ["on"], "event": "power" },
+    { "source": "on", "targets": ["off"], "event": "power" },
+    { "source": "on", "targets": ["fault"], "event": "sensorError", "note": "Unrecoverable." },
+    { "source": "on", "event": "setTarget", "actions": ["target = value"], "kind": "internal" },
+    { "source": "last", "targets": ["decide"] },
+    { "source": "decide", "targets": ["heating"], "cond": "current < target - 1" },
+    { "source": "decide", "targets": ["cooling"], "cond": "current > target + 1" },
+    { "source": "decide", "targets": ["steady"] },
+    { "source": "heating", "targets": ["decide"], "after": "60s" },
+    { "source": "cooling", "targets": ["decide"], "after": "60s" },
+    { "source": "steady", "targets": ["decide"], "after": "5m" }
+  ]
+}

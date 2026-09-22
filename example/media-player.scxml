@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Compound states, deep history, entry and exit points, deferred events,
+  invariants, and the three transition kinds.
+
+  Entry and exit points are transient states inside the compound state,
+  marked tpuml:kind. "again" is a local transition (stays inside "playback",
+  no exit/entry of the compound); "volume" is internal (no state change).
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:tpuml="https://github.com/vincedupuis/transplantUML"
+       version="1.0" name="media-player" initial="stopped">
+  <datamodel>
+    <data id="volume" expr="50"/>
+    <data id="track" expr="1"/>
+  </datamodel>
+
+  <state id="stopped">
+    <transition event="play" target="resume"/>
+    <transition event="open" target="loading"/>
+  </state>
+
+  <state id="loading" tpuml:defer="play pause next">
+    <tpuml:note>Commands received while loading are
+queued and handled once playback starts.</tpuml:note>
+    <transition event="loaded" target="start"/>
+    <transition event="failed" target="stopped"/>
+  </state>
+
+  <state id="playback" initial="playing" tpuml:invariant="track &gt;= 1">
+    <onentry><log expr="'engine on'"/></onentry>
+    <onexit><log expr="'engine off'"/></onexit>
+
+    <state id="start" tpuml:kind="entry-point">
+      <transition target="playing"/>
+    </state>
+    <state id="resume" tpuml:kind="entry-point">
+      <transition target="last"/>
+    </state>
+    <state id="eject" tpuml:kind="exit-point">
+      <transition target="stopped"/>
+    </state>
+
+    <history id="last" type="deep">
+      <transition target="playing"/>
+    </history>
+
+    <state id="playing">
+      <transition event="pause" target="paused"/>
+      <transition event="next" target="playing" tpuml:kind="local">
+        <assign location="track" expr="track + 1"/>
+      </transition>
+    </state>
+
+    <state id="paused">
+      <transition event="play" target="playing"/>
+      <transition event="stop" target="eject"/>
+    </state>
+
+    <transition event="volume" type="internal">
+      <assign location="volume" expr="_event.data"/>
+    </transition>
+    <transition event="stop" target="stopped"/>
+  </state>
+</scxml>

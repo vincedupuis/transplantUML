@@ -1,0 +1,21 @@
+@startuml
+note as machineNote
+    A pedestrian button shortens the green phase.
+end note
+legend
+    cycles = 0
+    requested = false
+endlegend
+[*] --> red
+state red
+red : exit / cycles = cycles + 1
+state green
+note right of green : Cut short when a pedestrian is waiting.
+state amber
+amber : entry / requested = false
+red --> green: after(30s)
+green --> amber: after(25s)
+green : button\n[ !requested ]\n/ requested = true
+green --> amber: button\n[ requested ]
+amber --> red: after(3s)
+@enduml

@@ -3,6 +3,7 @@ package render
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -36,12 +37,9 @@ func plantUMLArgs(t *testing.T) []string {
 // on failure.
 func TestPlantUMLSyntax(t *testing.T) {
 	args := plantUMLArgs(t)
-	for name, path := range map[string]string{
-		"coffee-machine": "../../example/coffee-machine.scxml",
-		"edge":           "../scxml/testdata/edge.scxml",
-	} {
-		t.Run(name, func(t *testing.T) {
-			puml := renderSCXML(t, path)
+	for input := range goldens(t) {
+		t.Run(filepath.Base(input), func(t *testing.T) {
+			puml := renderFile(t, input)
 			cmd := exec.Command(args[0], args[1:]...)
 			cmd.Stdin = strings.NewReader(puml)
 			out, err := cmd.CombinedOutput()

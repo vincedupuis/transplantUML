@@ -11,7 +11,7 @@ import (
 
 func emit(t *testing.T, sm *model.StateMachine) []byte {
 	t.Helper()
-	out, err := Emitter{}.Emit(sm)
+	out, _, err := Emitter{}.Emit(sm)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -21,10 +21,10 @@ func emit(t *testing.T, sm *model.StateMachine) []byte {
 // SCXML -> model -> SCXML -> model must be lossless. The two documents are not
 // byte-identical (executable content comes back as <script>), but the models are.
 func TestEmitRoundTrip(t *testing.T) {
-	for _, path := range []string{"../../example/coffee-machine.scxml", "testdata/edge.scxml"} {
+	for _, path := range []string{"../../example/coffee-machine.scxml", "testdata/edge.scxml", "testdata/uml.scxml"} {
 		want := parseFile(t, path)
 		out := emit(t, want)
-		got, err := Parser{}.Parse(out)
+		got, _, err := Parser{}.Parse(out)
 		if err != nil {
 			t.Fatalf("%s: re-parsing emitted SCXML: %v", path, err)
 		}
@@ -35,14 +35,55 @@ func TestEmitRoundTrip(t *testing.T) {
 }
 
 // Regenerate with:
-// go run ./cmd/tpuml -i internal/scxml/testdata/edge.scxml -F scxml -o internal/scxml/testdata/edge.emitted.scxml
+// go run ./cmd/tpuml -i internal/scxml/testdata/<name>.scxml -F scxml -o internal/scxml/testdata/<name>.emitted.scxml
 func TestEmitGolden(t *testing.T) {
-	want, err := os.ReadFile("testdata/edge.emitted.scxml")
+	for _, name := range []string{"edge", "uml"} {
+		want, err := os.ReadFile("testdata/" + name + ".emitted.scxml")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := emit(t, parseFile(t, "testdata/"+name+".scxml")); string(got) != string(want) {
+			t.Errorf("output differs from testdata/%s.emitted.scxml\n--- got ---\n%s--- want ---\n%s", name, got, want)
+		}
+	}
+}
+
+// Every model feature SCXML can only approximate must be named in a warning.
+func TestEmitWarnings(t *testing.T) {
+	_, warnings, err := Emitter{}.Emit(parseFile(t, "testdata/uml.scxml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := emit(t, parseFile(t, "testdata/edge.scxml")); string(got) != string(want) {
-		t.Errorf("output differs from testdata/edge.emitted.scxml\n--- got ---\n%s--- want ---\n%s", got, want)
+	want := []string{
+		`state "sync": SCXML cannot join regions; the first region to reach it leaves the parallel state`,
+		`state "work": SCXML has no deferred events; written as tpuml:defer, which engines ignore`,
+		`transition inner -> inner: SCXML has no local transitions; written as an external one tagged tpuml:kind="local"`,
+		`state "stop": SCXML has no terminate; written as a <final> state, which runs exit actions`,
+	}
+	if !reflect.DeepEqual([]string(warnings), want) {
+		t.Errorf("warnings =\n%s\nwant\n%s", strings.Join(warnings, "\n"), strings.Join(want, "\n"))
+	}
+
+	sm := &model.StateMachine{States: []*model.State{{Name: "s", Kind: model.Normal, Do: []string{"spin the wheel"}}}}
+	out, warnings, err := Emitter{}.Emit(sm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), `<invoke type="tpuml:do">`) || !strings.Contains(string(out), "<content>spin the wheel</content>") {
+		t.Errorf("free-text do activity not written as invoke content:\n%s", out)
+	}
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "cannot run the do activity") {
+		t.Errorf("warnings = %q", warnings)
+	}
+}
+
+// The extension namespace is declared only when something uses it.
+func TestEmitDeclaresExtensionOnlyWhenUsed(t *testing.T) {
+	if out := emit(t, parseFile(t, "testdata/edge.scxml")); strings.Contains(string(out), "xmlns:tpuml") {
+		t.Errorf("edge.scxml needs no extension, but got:\n%s", out)
+	}
+	if out := emit(t, parseFile(t, "testdata/uml.scxml")); !strings.Contains(string(out), `xmlns:tpuml="`+ExtNamespace+`"`) {
+		t.Errorf("uml.scxml uses the extension, but got:\n%s", out)
 	}
 }
 
@@ -59,7 +100,7 @@ func execContentSM() *model.StateMachine {
 			OnExit:  []string{"log(bye)"},
 		}},
 		Transitions: []*model.Transition{
-			{Source: "s", Event: "e", Cond: "n > 3", Internal: true, Actions: []string{"raise tick"}},
+			{Source: "s", Event: "e", Cond: "n > 3", Kind: model.Internal, Actions: []string{"raise tick"}},
 		},
 	}
 }
@@ -79,7 +120,7 @@ func TestEmitExecutableContent(t *testing.T) {
 		t.Errorf("targetless transition must not get a target attribute:\n%s", out)
 	}
 
-	got, err := Parser{}.Parse([]byte(out))
+	got, _, err := Parser{}.Parse([]byte(out))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +138,7 @@ func TestEmitErrors(t *testing.T) {
 		"unknown kind": {States: []*model.State{{Name: "a", Kind: "sparkly"}}},
 	}
 	for want, sm := range cases {
-		if _, err := (Emitter{}).Emit(sm); err == nil || !strings.Contains(err.Error(), want) {
+		if _, _, err := (Emitter{}).Emit(sm); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("want error containing %q, got %v", want, err)
 		}
 	}

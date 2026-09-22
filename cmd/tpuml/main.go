@@ -13,6 +13,7 @@ import (
 
 	"github.com/vincedupuis/transplantUML/assets"
 	"github.com/vincedupuis/transplantUML/internal/format"
+	"github.com/vincedupuis/transplantUML/internal/model"
 	"github.com/vincedupuis/transplantUML/internal/render"
 )
 
@@ -87,10 +88,11 @@ func convert(opts options, stdout, stderr io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("reading input: %w", err)
 	}
-	sm, err := parser.Parse(src)
+	sm, warnings, err := parser.Parse(src)
 	if err != nil {
 		return fmt.Errorf("%s: %w", opts.input, err)
 	}
+	report(stderr, warnings)
 	if err := sm.Validate(); err != nil {
 		return fmt.Errorf("%s: invalid state machine:\n%w", opts.input, err)
 	}
@@ -102,7 +104,7 @@ func convert(opts options, stdout, stderr io.Writer) error {
 		if err != nil {
 			return err
 		}
-		if out, err = emitter.Emit(sm); err != nil {
+		if out, warnings, err = emitter.Emit(sm); err != nil {
 			return err
 		}
 	default:
@@ -114,12 +116,13 @@ func convert(opts options, stdout, stderr io.Writer) error {
 			}
 			tmpl = string(data)
 		}
-		text, err := render.Render(sm, tmpl)
+		text, w, err := render.Render(sm, tmpl)
 		if err != nil {
 			return err
 		}
-		out = []byte(text)
+		out, warnings = []byte(text), w
 	}
+	report(stderr, warnings)
 
 	if opts.output == "" {
 		_, err = stdout.Write(out)
@@ -130,4 +133,13 @@ func convert(opts options, stdout, stderr io.Writer) error {
 	}
 	fmt.Fprintln(stderr, "output written to", opts.output)
 	return nil
+}
+
+// report prints the warnings a parser, emitter or template raised: what the
+// input held that the model or the output has no place for. They never fail
+// the conversion.
+func report(stderr io.Writer, warnings model.Warnings) {
+	for _, w := range warnings {
+		fmt.Fprintln(stderr, "tpuml: warning:", w)
+	}
 }

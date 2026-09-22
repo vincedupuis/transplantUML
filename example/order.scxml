@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Choice, junction, submachine state, do activity, terminate and stereotypes.
+
+  "check" needs no markup: a state with nothing but guarded eventless
+  transitions is the SCXML idiom for a choice. The junction has no idiom, so it
+  is marked tpuml:kind="junction". Invoking another SCXML document makes
+  "payment" a submachine state; invoking anything else is a do activity.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:tpuml="https://github.com/vincedupuis/transplantUML"
+       version="1.0" name="order" initial="new">
+  <datamodel>
+    <data id="total" expr="0"/>
+    <data id="attempts" expr="0"/>
+  </datamodel>
+
+  <state id="new">
+    <transition event="submit" target="check"/>
+  </state>
+
+  <state id="check">
+    <transition cond="total == 0" target="rejected"/>
+    <transition cond="total &gt; 1000" target="review"/>
+    <transition cond="total &lt;= 1000" target="payment"/>
+  </state>
+
+  <state id="review" tpuml:stereotype="manual">
+    <tpuml:note>A human approves large orders.</tpuml:note>
+    <invoke type="http://example.com/ticket" src="review-queue"/>
+    <transition event="approve" target="payment"/>
+    <transition event="reject" target="rejected"/>
+  </state>
+
+  <state id="payment">
+    <invoke src="payment.scxml"/>
+    <transition event="done.invoke" target="paid"/>
+    <transition event="error.payment" target="retry">
+      <assign location="attempts" expr="attempts + 1"/>
+    </transition>
+  </state>
+
+  <!-- A junction: the same guarded branching as a choice, but the guards are
+       static, evaluated before the compound transition starts. -->
+  <state id="retry" tpuml:kind="junction">
+    <transition cond="attempts &lt; 3" target="payment"/>
+    <transition cond="attempts &gt;= 3" target="rejected"/>
+  </state>
+
+  <state id="paid">
+    <onentry><log expr="'order paid'"/></onentry>
+    <transition event="ship" target="shipped"/>
+    <transition event="fraud" target="killed"/>
+  </state>
+
+  <final id="shipped"/>
+  <final id="rejected"/>
+  <!-- Terminate: the machine stops on the spot, no exit actions run. -->
+  <final id="killed" tpuml:kind="terminate"/>
+</scxml>

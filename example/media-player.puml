@@ -1,0 +1,41 @@
+@startuml
+legend
+    volume = 50
+    track = 1
+endlegend
+[*] --> stopped
+state stopped
+state loading
+loading : play / defer
+loading : pause / defer
+loading : next / defer
+note right of loading
+    Commands received while loading are
+    queued and handled once playback starts.
+end note
+state playback {
+    [*] --> playing
+    [H*] --> playing
+    state start <<entryPoint>>
+    state resume <<entryPoint>>
+    state eject <<exitPoint>>
+    state playing
+    state paused
+    start --> playing
+    resume --> playback[H*]
+    playing --> paused: pause
+    playing --> playing: next\n/ track = track + 1
+    paused --> playing: play
+    paused --> eject: stop
+}
+playback : entry / log('engine on')
+playback : exit / log('engine off')
+playback : [ track >= 1 ]
+stopped --> resume: play
+stopped --> loading: open
+loading --> start: loaded
+loading --> stopped: failed
+playback : volume\n/ volume = _event.data
+playback --> stopped: stop
+eject --> stopped
+@enduml

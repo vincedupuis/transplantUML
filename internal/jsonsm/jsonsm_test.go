@@ -12,20 +12,20 @@ import (
 
 // SCXML -> model -> JSON -> model must be lossless.
 func TestRoundTrip(t *testing.T) {
-	for _, path := range []string{"../../example/coffee-machine.scxml", "../scxml/testdata/edge.scxml"} {
+	for _, path := range []string{"../../example/coffee-machine.scxml", "../scxml/testdata/edge.scxml", "../scxml/testdata/uml.scxml"} {
 		src, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
 		}
-		want, err := scxml.Parser{}.Parse(src)
+		want, _, err := scxml.Parser{}.Parse(src)
 		if err != nil {
 			t.Fatal(err)
 		}
-		out, err := Emitter{}.Emit(want)
+		out, _, err := Emitter{}.Emit(want)
 		if err != nil {
 			t.Fatal(err)
 		}
-		got, err := Parser{}.Parse(out)
+		got, _, err := Parser{}.Parse(out)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -36,7 +36,7 @@ func TestRoundTrip(t *testing.T) {
 }
 
 func TestParseDefaults(t *testing.T) {
-	sm, err := Parser{}.Parse([]byte(`{"initial":"a","states":[{"name":"a"}]}`))
+	sm, _, err := Parser{}.Parse([]byte(`{"initial":"a","states":[{"name":"a"}]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestParseDefaults(t *testing.T) {
 }
 
 func TestParseRejectsUnknownFields(t *testing.T) {
-	_, err := Parser{}.Parse([]byte(`{"states":[{"name":"a","colour":"red"}]}`))
+	_, _, err := Parser{}.Parse([]byte(`{"states":[{"name":"a","colour":"red"}]}`))
 	if err == nil || !strings.Contains(err.Error(), "colour") {
 		t.Errorf("want unknown field error, got %v", err)
 	}

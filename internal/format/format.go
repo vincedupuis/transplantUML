@@ -14,17 +14,19 @@ import (
 	"github.com/vincedupuis/transplantUML/internal/scxml"
 )
 
-// Parser turns a source document into the model.
+// Parser turns a source document into the model. Warnings name the parts of
+// the document the model has no place for, so nothing is dropped silently.
 type Parser interface {
-	Parse(src []byte) (*model.StateMachine, error)
+	Parse(src []byte) (*model.StateMachine, model.Warnings, error)
 }
 
-// Emitter serializes the model back into one of the supported document
-// formats. Every format tpuml can read it can also write, so parsers and
-// emitters come in pairs; free-form text output (diagrams, code, docs) is the
-// template mechanism's job instead, see package render.
+// Emitter serializes the model into one of the supported document formats.
+// Every format tpuml can read it can also write, so parsers and emitters come
+// in pairs; free-form text output (diagrams, code, docs) is the template
+// mechanism's job instead, see package render. Warnings name the model
+// features the format cannot express and that were approximated or left out.
 type Emitter interface {
-	Emit(sm *model.StateMachine) ([]byte, error)
+	Emit(sm *model.StateMachine) ([]byte, model.Warnings, error)
 }
 
 var parsers = map[string]Parser{

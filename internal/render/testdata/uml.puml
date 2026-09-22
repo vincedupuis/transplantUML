@@ -1,0 +1,52 @@
+@startuml
+note as machineNote
+    Every UML concept the model holds,
+    in one document.
+end note
+legend
+    retries = 0
+    config = src(config.json)
+endlegend
+[*] --> check
+state check <<choice>>
+state split <<fork>>
+state merge <<start>>
+state sync <<join>>
+state work <<worker>>
+work : entry / log('start')
+work : do / invoke(job.py, http://example.com/worker)
+work : pause / defer
+work : resume / defer
+work : [ retries >= 0 ]
+work : progress = 0
+note right of work : Runs the job.
+state both {
+    state left
+    --
+    state right
+}
+state "sub: child.scxml" as sub
+state outer {
+    [*] --> inner
+    state in <<entryPoint>>
+    state out <<exitPoint>>
+    state inner
+    in --> inner
+    inner --> out: leave
+    inner --> inner: again
+    inner : note
+}
+check --> [*]: [ retries > 3 ]
+check --> work: [ retries <= 3 ]
+split --> left
+merge --> work
+sync --> [*]
+work --> check: after(5s)\n/ retries = retries + 1
+note on link : Timed out.
+work --> split: split
+work --> [*]: abort
+work --> in: enter
+left --> sync: l
+sub --> merge: back
+out --> sub
+@enduml

@@ -8,7 +8,10 @@ import (
 	"testing"
 )
 
-const example = "../../example/coffee-machine.scxml"
+const (
+	example = "../../example/coffee-machine.scxml"
+	uml     = "../../internal/scxml/testdata/uml.scxml"
+)
 
 func runCLI(t *testing.T, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
@@ -27,33 +30,61 @@ func TestDefaultTemplateToStdout(t *testing.T) {
 	}
 }
 
-// Every built-in output format can be read back in: converting the example
-// through it must yield the same PlantUML as rendering the example directly.
+// Every built-in output format can be read back in: converting a document
+// through it must yield the same PlantUML as rendering the document directly.
 func TestRoundTripThroughFiles(t *testing.T) {
-	fromSCXML, _, err := runCLI(t, "-i", example)
+	for _, input := range []string{example, uml} {
+		fromSCXML, _, err := runCLI(t, "-i", input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range []string{"json", "scxml"} {
+			t.Run(filepath.Base(input)+"/"+name, func(t *testing.T) {
+				dir := t.TempDir()
+				midPath := filepath.Join(dir, "m."+name)
+				pumlPath := filepath.Join(dir, "m.puml")
+
+				if _, _, err := runCLI(t, "-i", input, "-F", name, "-o", midPath); err != nil {
+					t.Fatal(err)
+				}
+				if _, _, err := runCLI(t, "-i", midPath, "-o", pumlPath); err != nil {
+					t.Fatal(err)
+				}
+				got, err := os.ReadFile(pumlPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if string(got) != fromSCXML {
+					t.Errorf("PlantUML via %s differs from PlantUML from SCXML:\n%s", name, got)
+				}
+			})
+		}
+	}
+}
+
+// Warnings from the parser and from the output go to stderr, prefixed, and
+// never fail the conversion.
+func TestWarningsOnStderr(t *testing.T) {
+	out, stderr, err := runCLI(t, "-i", uml)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"json", "scxml"} {
-		t.Run(name, func(t *testing.T) {
-			dir := t.TempDir()
-			midPath := filepath.Join(dir, "m."+name)
-			pumlPath := filepath.Join(dir, "m.puml")
-
-			if _, _, err := runCLI(t, "-i", example, "-F", name, "-o", midPath); err != nil {
-				t.Fatal(err)
-			}
-			if _, _, err := runCLI(t, "-i", midPath, "-o", pumlPath); err != nil {
-				t.Fatal(err)
-			}
-			got, err := os.ReadFile(pumlPath)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if string(got) != fromSCXML {
-				t.Errorf("PlantUML via %s differs from PlantUML from SCXML:\n%s", name, got)
-			}
-		})
+	if !strings.HasPrefix(out, "@startuml\n") {
+		t.Errorf("unexpected output:\n%s", out)
+	}
+	for _, want := range []string{
+		"tpuml: warning: state \"failed\": <donedata> is not supported and was dropped\n",
+		"tpuml: warning: state \"stop\": PlantUML has no terminate symbol",
+	} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("stderr missing %q:\n%s", want, stderr)
+		}
+	}
+	if _, stderr, err := runCLI(t, "-i", uml, "-F", "scxml"); err != nil || !strings.Contains(stderr, "SCXML has no deferred events") {
+		t.Errorf("emitter warnings not reported: %v\n%s", err, stderr)
+	}
+	if _, stderr, err := runCLI(t, "-i", example); err != nil || stderr != "" {
+		t.Errorf("a plain document must not warn: %v\n%s", err, stderr)
 	}
 }
 

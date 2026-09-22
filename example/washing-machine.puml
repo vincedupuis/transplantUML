@@ -1,0 +1,22 @@
+@startuml
+[*] --> idle
+state idle
+state fill <<fork>>
+state running {
+    [*] --> heating
+    state heating
+    state holding
+    heating --> holding: hot
+    holding --> heating: cold
+    --
+    [*] --> spinning
+    state spinning
+    spinning --> spinning: reverse
+}
+state drain <<join>>
+idle --> fill: start
+fill --> heating
+running --> idle: stop
+holding --> drain: cycleDone
+drain --> [*]
+@enduml
