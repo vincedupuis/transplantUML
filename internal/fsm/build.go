@@ -188,9 +188,9 @@ func (b *builder) target(n *node, g parser.IGotoContext) (string, bool) {
 }
 
 // synthesize returns the final or history state of scope, which the language
-// asks for by keyword instead of declaring. A document free to name a state
-// "<scope>.final" or "<state>.H" itself can collide with the name made here;
-// model.Validate reports that as a duplicate state name.
+// asks for by keyword instead of declaring. A name holds no dot, so the names
+// made here are out of a document's reach and cannot collide with a declared
+// state.
 func (b *builder) synthesize(scope *node, suffix string, kind model.StateKind) string {
 	if s, ok := scope.synth[suffix]; ok {
 		return s.Name

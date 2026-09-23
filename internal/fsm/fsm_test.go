@@ -137,12 +137,12 @@ func TestInitialState(t *testing.T) {
 	}
 }
 
-// Identifier carries every name the language can write, so the punctuation a
-// source document may already use — underscore, dot, hyphen — has to lex in
-// each of those positions. A name still begins with a letter or an underscore,
-// which is what keeps "goto ." a keyword rather than a name.
+// A name is a letter or an underscore followed by letters, digits and
+// underscores. The punctuation other formats allow in an id, dots and hyphens,
+// is not part of a name here, so "goto ." stays a keyword and no document can
+// declare the synthesized "<scope>.final" or "<state>.H".
 func TestIdentifierCharset(t *testing.T) {
-	src := "fsm vending.machine { state _idle-1 { on coin.in [has-change] / open_1 goto pay.now } state pay.now {} }"
+	src := "fsm vending_machine { state _idle1 { on coin_in [hasChange] / open_1 goto payNow } state payNow {} }"
 	if _, err := parse(src); err != nil {
 		t.Errorf("charset: %v", err)
 	}
@@ -150,6 +150,13 @@ func TestIdentifierCharset(t *testing.T) {
 		"fsm m { state .a {} }",
 		"fsm m { state -a {} }",
 		"fsm m { state 1a {} }",
+		"fsm vending.machine { state a {} }",
+		"fsm m { state pay.now {} }",
+		"fsm m { state pay-now {} }",
+		"fsm m { state a { on coin.in / g goto a } }",
+		"fsm m { state a { on e [has-change] / g goto a } }",
+		"fsm m { state a { on e / g goto pay.now } state pay.now {} }",
+		"fsm m { state a { after(retry.delay) goto a } }",
 	} {
 		if _, err := parse(src); err == nil {
 			t.Errorf("%q: accepted, want a syntax error", src)

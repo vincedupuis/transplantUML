@@ -65,6 +65,6 @@ goto
 
 Initial: 'initial';
 Duration: [0-9]+ ('.' [0-9]+)? ('ms' | 's');
-Identifier: [a-zA-Z_] [a-zA-Z0-9_.\-]*;
+Identifier: [a-zA-Z_] [a-zA-Z0-9_]*;
 Comment: '#' ( ~[\r\n] )* -> skip;
 Blank: [ \t\r\n]+ -> channel(HIDDEN);

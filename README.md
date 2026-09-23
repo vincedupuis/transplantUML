@@ -384,7 +384,8 @@ states by name — so nesting never has to be spelled out, and a target may be d
 
 `final` and `H` are the two states the language never declares, so the parser creates them the first time a `goto`
 asks for one, named `<scope>.final` and `<state>.H`. A name is a letter or an underscore followed by letters,
-digits, underscores, dots and hyphens, so a name a source document already uses survives the trip — which means a
-document may declare one of those two names itself, and `Validate` then reports the duplicate.
+digits and underscores — no dots or hyphens, which is what keeps those two names out of a document's reach and
+`goto .` a keyword rather than a name. A state whose id in another format carries punctuation therefore has to be
+renamed when the machine is written in this language.
 
 Everything else UML has — state kinds, `do`/`defer`, variables, notes — has no syntax yet.
