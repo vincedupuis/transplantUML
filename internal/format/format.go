@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/vincedupuis/transplantUML/internal/fsm"
 	"github.com/vincedupuis/transplantUML/internal/jsonsm"
 	"github.com/vincedupuis/transplantUML/internal/model"
 	"github.com/vincedupuis/transplantUML/internal/scxml"
@@ -31,6 +32,7 @@ type Emitter interface {
 var parsers = map[string]Parser{
 	"scxml": scxml.Parser{},
 	"json":  jsonsm.Parser{},
+	"fsm":   fsm.Parser{},
 }
 
 var emitters = map[string]Emitter{
@@ -43,6 +45,7 @@ var extensions = map[string]string{
 	".scxml": "scxml",
 	".xml":   "scxml",
 	".json":  "json",
+	".fsm":   "fsm",
 }
 
 func ParserFor(name string) (Parser, error) {

@@ -45,7 +45,7 @@ func goldens(t *testing.T) map[string]string {
 		"../scxml/testdata/edge.scxml": "testdata/edge.puml",
 		"../scxml/testdata/uml.scxml":  "testdata/uml.puml",
 	}
-	for _, pattern := range []string{"../../example/*.scxml", "../../example/*.json"} {
+	for _, pattern := range []string{"../../example/*.scxml", "../../example/*.json", "../../example/*.fsm"} {
 		paths, err := filepath.Glob(pattern)
 		if err != nil {
 			t.Fatal(err)

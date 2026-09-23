@@ -1,0 +1,35 @@
+@startuml
+title kiosk
+[*] --> idle
+state idle
+idle : entry / dim
+state ordering {
+    [*] --> browsing
+    state browsing
+    state paying {
+        [*] --> authorizing
+        state authorizing
+        state again
+        again --> authorizing: card
+    }
+    paying : entry / lockBasket
+    state "ordering.H" as ordering_H <<history>>
+    browsing : add\n[ inStock and (card or cash) ]\n/ addLine
+    browsing --> browsing: remove\n/ dropLine
+    browsing --> paying: checkout\n[ basket ]
+    paying --> again: declined\n[ retries ]\n/ warn
+    paying --> browsing: declined\n[ not retries ]
+    authorizing --> browsing: cancel
+}
+ordering : entry / newBasket
+ordering : exit / clearBasket
+ordering : exit / unlock
+state done
+done : entry / print
+state final <<end>>
+idle --> browsing: touch\n/ wake
+ordering --> idle: abandon
+ordering --> ordering_H: resume
+paying --> done: approved\n/ receipt
+done --> final: ack
+@enduml

@@ -73,10 +73,12 @@ warnings.
   -no-listener`) and committed so the build needs no Java; never edit it by hand, and regenerate it after any
   grammar change. `goto` targets are `.` (self), `final`, `H` (history) or a path (`/a/b` absolute, `../b`
   relative). A state may be marked `initial` (`initial state s { … }`), naming its parent's starting child or,
-  at the top level, the machine's. The `Parser` and the builder that walks the parse tree into the model are not
-  written yet, so the language is not registered in `internal/format` and only reaches as far as the generated
-  parser. The builder reports only what the model cannot hold — two `initial` children in one scope collapse into
-  one `State.Initial` — and `model.Validate()` does the rest.
+  at the top level, the machine's. `build.go` holds `Parser` and the `builder` that walks the parse tree into the
+  model: `declare` creates every state first, then `walk` resolves the transitions, because a `goto` may name a
+  state declared further down. `final` and `H` have no declaration syntax, so `synthesize` creates them on first
+  use as `<scope>.final` and `<state>.H` (a `.` cannot clash with an Identifier). The builder reports only what
+  the model cannot hold — two `initial` children in one scope would collapse into one `State.Initial`, and the
+  machine has nowhere to put a top-level `on` clause — and `model.Validate()` does the rest.
 - **`internal/jsonsm`** — the model's own JSON shape (struct tags in `model`). Parser uses
   `DisallowUnknownFields`; round-trip equality with the SCXML parser is tested.
 - **`internal/render`** — registers sprig plus project helpers (`include`, `prefix`, `surround`, `joinNonEmpty`,

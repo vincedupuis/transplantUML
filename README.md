@@ -17,7 +17,8 @@ symbol, and so on. Warnings go to stderr and never fail the conversion.
   kind (external, local, internal), multi-target and targetless; notes and stereotypes.
 - **Any text output** through the Go templating engine plus the [sprig](https://masterminds.github.io/sprig/) function
   library, with a built-in PlantUML template.
-- **Formats**: `scxml` and `json` are each accepted as input (`-f`) and produced as output (`-F`).
+- **Formats**: `scxml` and `json` are each accepted as input (`-f`) and produced as output (`-F`); `fsm`,
+  tpuml's own compact language, is input only.
 - **Nothing dropped silently**: the parser warns about input it has no place for, and each output warns about
   model features it can only approximate.
 - **Validation**: dangling targets, unknown parents, duplicate ids, and similar mistakes are reported before anything
@@ -98,7 +99,7 @@ tpuml -i input [-f format] [-t template.gotmpl | -F format] [-o output]
 | Flag                    | Meaning                                                                                               |
 |-------------------------|-------------------------------------------------------------------------------------------------------|
 | `-i`, `--input`         | Input file (required).                                                                                |
-| `-f`, `--input-format`  | Input format: `scxml`, `json`. Default: inferred from the extension (`.scxml`/`.xml`, `.json`).       |
+| `-f`, `--input-format`  | Input format: `scxml`, `json`, `fsm`. Default: inferred from the extension (`.scxml`/`.xml`, `.json`, `.fsm`). |
 | `-t`, `--template`      | Go template file to render with. Default: the built-in PlantUML template (`assets/puml.gotmpl`).      |
 | `-F`, `--output-format` | Write a document format instead of running a template: `scxml`, `json`. Mutually exclusive with `-t`. |
 | `-o`, `--output`        | Output file. Default: stdout.                                                                         |
@@ -146,6 +147,7 @@ it next to it (`<name>.puml`, kept up to date by the tests):
 | [`media-player.scxml`](example/media-player.scxml)       | compound state, deep history, entry/exit points, deferred events, invariant, local and internal transitions |
 | [`washing-machine.scxml`](example/washing-machine.scxml) | orthogonal regions, fork and join — and the warnings PlantUML's region limitation produces                  |
 | [`thermostat.json`](example/thermostat.json)             | the same concepts written directly in the model's JSON shape                                                |
+| [`kiosk.fsm`](example/kiosk.fsm)                         | the `fsm` language: nested states, entry/exit actions, guards, and every `goto` target form                 |
 
 Run any of them with `tpuml -i example/<name>` and compare with the `.puml` beside it; add `-F scxml` or `-F json`
 to see the other formats.
@@ -322,3 +324,50 @@ equivalent, not byte-identical, to the one it came from:
 Warnings name what SCXML can only approximate: join (the first region to reach it leaves the parallel state),
 terminate (a `<final>`, which runs exit actions), local transitions (written external), deferred events (ignored by
 engines), and free-text do activities (written as `<invoke>` content).
+
+## The fsm language
+
+tpuml's own input format, a compact alternative to writing SCXML by hand. The grammar is
+[`internal/fsm/fsm.g4`](internal/fsm/fsm.g4); [`example/kiosk.fsm`](example/kiosk.fsm) uses every construct.
+
+```
+fsm kiosk {
+    initial state idle {
+        on entry / dim
+        on touch / wake goto ordering/browsing
+    }
+    state ordering {
+        on exit / clearBasket, unlock
+        initial state browsing {
+            on add [inStock and (card or cash)] / addLine
+            on checkout [basket] goto ../paying
+        }
+        state paying { on approved / receipt goto ../../done }
+        on resume goto H
+    }
+    state done { on ack goto final }
+}
+```
+
+States and `on` clauses may be interleaved, so a transition can sit next to the children it concerns. A transition
+is `on <event> [guard] / action, action goto <target>`, where the guard and the actions are optional but at least
+one of the actions and the `goto` must be present. `on entry` and `on exit` take actions only.
+
+`initial` marks the child its parent starts in, or the machine's starting state at the top level. Declaring two in
+one scope is an error; declaring none is a warning.
+
+A `goto` target is resolved from the state that declares the transition:
+
+| Target        | Resolves to                                                              |
+|---------------|--------------------------------------------------------------------------|
+| `.`           | the declaring state itself                                                |
+| `b`, `b/c`    | from its parent, so a bare name is a sibling                              |
+| `./b`         | from the state itself, so a child                                         |
+| `../b`        | from its parent; each further `../` climbs one more level                 |
+| `/a/b`        | from the top level                                                        |
+| `final`       | the final state of the scope holding the declaring state, created on use  |
+| `H`           | the shallow history of the declaring state, created on use                |
+
+`final` and `H` are the two states the language never declares, so the parser creates them the first time a `goto`
+asks for one, named `<scope>.final` and `<state>.H`. Everything else UML has — state kinds, time triggers,
+`do`/`defer`, variables, notes — has no syntax yet.

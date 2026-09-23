@@ -1,36 +1,10 @@
 package fsm
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/antlr4-go/antlr/v4"
-	"github.com/vincedupuis/transplantUML/internal/fsm/parser"
 )
-
-// syntaxErrors collects what the generated lexer and parser reject, instead of
-// printing it to stderr as ANTLR's default listener does.
-type syntaxErrors struct {
-	*antlr.DefaultErrorListener
-	errs []string
-}
-
-func (l *syntaxErrors) SyntaxError(_ antlr.Recognizer, _ any, line, column int, msg string, _ antlr.RecognitionException) {
-	l.errs = append(l.errs, fmt.Sprintf("%d:%d: %s", line, column, msg))
-}
-
-func parse(src string) (parser.IFsmContext, []string) {
-	errs := &syntaxErrors{DefaultErrorListener: antlr.NewDefaultErrorListener()}
-	lexer := parser.NewfsmLexer(antlr.NewInputStream(src))
-	lexer.RemoveErrorListeners()
-	lexer.AddErrorListener(errs)
-	p := parser.NewfsmParser(antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel))
-	p.RemoveErrorListeners()
-	p.AddErrorListener(errs)
-	return p.Fsm(), errs.errs
-}
 
 // The generated parser accepts the grammar's own idioms: nested states
 // interleaved with the events that concern them, entry/exit actions, guards,
@@ -40,9 +14,9 @@ func TestGrammarAccepts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tree, errs := parse(string(src))
-	if len(errs) > 0 {
-		t.Fatalf("syntax errors: %v", errs)
+	tree, err := parse(string(src))
+	if err != nil {
+		t.Fatalf("syntax errors: %v", err)
 	}
 	if got := tree.Identifier().GetText(); got != "coffee" {
 		t.Errorf("machine name = %q, want coffee", got)
@@ -65,7 +39,7 @@ func TestGrammarRejects(t *testing.T) {
 		"fsm m { state s { initial on e / a } }",
 		"fsm m { state initial {} }", // initial is a keyword, not a name
 	} {
-		if _, errs := parse(src); len(errs) == 0 {
+		if _, err := parse(src); err == nil {
 			t.Errorf("%q: accepted, want a syntax error", src)
 		}
 	}
@@ -86,8 +60,8 @@ func TestEventForms(t *testing.T) {
 		"on entry / a",
 		"on exit / a, b",
 	} {
-		if _, errs := parse("fsm m { state s { " + body + " } state t {} }"); len(errs) > 0 {
-			t.Errorf("%q: %v", body, errs)
+		if _, err := parse("fsm m { state s { " + body + " } state t {} }"); err != nil {
+			t.Errorf("%q: %v", body, err)
 		}
 	}
 }
@@ -106,8 +80,8 @@ func TestGotoTargets(t *testing.T) {
 		"../b",
 		"../../a/b",
 	} {
-		if _, errs := parse("fsm m { state s { on e goto " + target + " } }"); len(errs) > 0 {
-			t.Errorf("goto %s: %v", target, errs)
+		if _, err := parse("fsm m { state s { on e goto " + target + " } }"); err != nil {
+			t.Errorf("goto %s: %v", target, err)
 		}
 	}
 }
@@ -127,8 +101,8 @@ func TestExamplesParse(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, errs := parse(string(src)); len(errs) > 0 {
-			t.Errorf("%s: %v", path, errs)
+		if _, err := parse(string(src)); err != nil {
+			t.Errorf("%s: %v", path, err)
 		}
 	}
 }
@@ -138,9 +112,9 @@ func TestExamplesParse(t *testing.T) {
 // Identifier, so a state cannot be called "initial" and the visitor gets an
 // Initial() accessor.
 func TestInitialState(t *testing.T) {
-	tree, errs := parse("fsm m { initial state a { initial state b {} state c {} } state d {} }")
-	if len(errs) > 0 {
-		t.Fatalf("syntax errors: %v", errs)
+	tree, err := parse("fsm m { initial state a { initial state b {} state c {} } state d {} }")
+	if err != nil {
+		t.Fatalf("syntax errors: %v", err)
 	}
 	top := tree.AllState()
 	if top[0].Initial() == nil {
