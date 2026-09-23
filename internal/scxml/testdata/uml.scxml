@@ -34,15 +34,18 @@ in one document.</tpuml:note>
     <onentry>
       <log expr="'start'"/>
       <send event="tick" delay="5s" id="workTimer"/>
+      <send event="retry" delayexpr="retryDelay" id="retryTimer"/>
     </onentry>
     <onexit>
       <cancel sendid="workTimer"/>
+      <cancel sendid="retryTimer"/>
     </onexit>
     <invoke type="http://example.com/worker" src="job.py"/>
     <transition event="tick" target="check">
       <tpuml:note>Timed out.</tpuml:note>
       <assign location="retries" expr="retries + 1"/>
     </transition>
+    <transition event="retry" target="check"/>
     <transition event="split" target="split"/>
     <transition event="abort" target="stop"/>
     <transition event="enter" target="in"/>

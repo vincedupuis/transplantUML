@@ -1,6 +1,7 @@
 # Nested states interleaved with the transitions that concern them, the initial
-# child of each compound state, entry and exit actions, boolean guards, and
-# every form a goto target can take: a state name, ".", "final" and "H".
+# child of each compound state, entry and exit actions, boolean guards, time
+# triggers on a delay and on a computed one, and every form a goto target can
+# take: a state name, ".", "final" and "H".
 
 fsm kiosk {
     initial state idle {
@@ -12,6 +13,7 @@ fsm kiosk {
         on entry / newBasket
         on exit / clearBasket, unlock
         on abandon goto idle
+        after(90s) goto idle
 
         initial state browsing {
             on add [inStock and (card or cash)] / addLine
@@ -27,6 +29,7 @@ fsm kiosk {
 
             initial state authorizing {
                 on cancel goto browsing
+                after(authTimeout) [retries] / warn goto again
             }
 
             state again {

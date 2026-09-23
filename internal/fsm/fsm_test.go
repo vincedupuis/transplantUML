@@ -28,14 +28,20 @@ func TestGrammarAccepts(t *testing.T) {
 
 func TestGrammarRejects(t *testing.T) {
 	for _, src := range []string{
-		"fsm {}",                                // missing name
-		"fsm m { state s { on entry goto s } }", // entry cannot leave the state
-		"fsm m { state s { on e [] } }",         // empty guard
-		"fsm m { state s { on e goto } }",       // goto without a target
-		"fsm m { state s { on e } }",            // neither effect nor target
-		"fsm m { state s { on e [g] } }",        // a guard alone is not a transition
-		"fsm m { state s { on e goto a/b } }",   // a target is a name, not a path
-		"fsm m { initial }",                     // initial modifies a state
+		"fsm {}",                                 // missing name
+		"fsm m { state s { on entry goto s } }",  // entry cannot leave the state
+		"fsm m { state s { on e [] } }",          // empty guard
+		"fsm m { state s { on e goto } }",        // goto without a target
+		"fsm m { state s { on e } }",             // neither effect nor target
+		"fsm m { state s { on e [g] } }",         // a guard alone is not a transition
+		"fsm m { state s { on e goto a/b } }",    // a target is a name, not a path
+		"fsm m { state s { after(5s) } }",        // neither effect nor target
+		"fsm m { state s { after 5s goto s } }",  // a delay sits in parentheses
+		"fsm m { state s { after(5) goto s } }",  // a delay carries its unit
+		"fsm m { state s { after(5m) goto s } }", // and the unit is ms or s
+		"fsm m { state s { after() goto s } }",   // a delay is not optional
+		"fsm m { state s { on after(5s) goto s } }",
+		"fsm m { initial }", // initial modifies a state
 		"fsm m { state s { initial on e / a } }",
 		"fsm m { state initial {} }", // initial is a keyword, not a name
 	} {
@@ -59,6 +65,10 @@ func TestEventForms(t *testing.T) {
 		"on entry",
 		"on entry / a",
 		"on exit / a, b",
+		"after(5s) / a",
+		"after(250ms) goto t",
+		"after(1.5s) [g] / a goto t",
+		"after(retryDelay) goto t",
 	} {
 		if _, err := parse("fsm m { state s { " + body + " } state t {} }"); err != nil {
 			t.Errorf("%q: %v", body, err)

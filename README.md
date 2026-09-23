@@ -46,7 +46,7 @@ symbol, and so on. Warnings go to stderr and never fail the conversion.
 | State invariant                        | `Invariant`                                  | `tpuml:invariant`                                       | `X : [ cond ]`                                      |
 | Variables                              | `Variables` on the machine / the state       | `<datamodel>`                                           | `legend` / `X : name = value`                       |
 | Trigger, guard, effect                 | `Event`, `Cond`, `Actions`                   | `event`, `cond`, executable content                     | `A --> B : ev [ g ] / act`                          |
-| Time trigger `after(5s)`               | `After`                                      | `<send delay>` in `<onentry>`, `<cancel>` in `<onexit>` | `after(5s)`                                         |
+| Time trigger `after(5s)`               | `After`                                      | `<send delay(expr)>` in `<onentry>`, `<cancel>` on exit  | `after(5s)`                                         |
 | Completion transition                  | no `Event`, no `After`                       | eventless `<transition>`                                | unlabelled arrow                                    |
 | External / local / internal transition | `Kind`                                       | `type="internal"`; `tpuml:kind="local"` ⚠               | `X : ev / act` for internal; local drawn external ⚠ |
 | Note                                   | `Note` on the machine, a state, a transition | `<tpuml:note>`                                          | `note`, `note on link`                              |
@@ -147,7 +147,7 @@ it next to it (`<name>.puml`, kept up to date by the tests):
 | [`media-player.scxml`](example/media-player.scxml)       | compound state, deep history, entry/exit points, deferred events, invariant, local and internal transitions |
 | [`washing-machine.scxml`](example/washing-machine.scxml) | orthogonal regions, fork and join — and the warnings PlantUML's region limitation produces                  |
 | [`thermostat.json`](example/thermostat.json)             | the same concepts written directly in the model's JSON shape                                                |
-| [`kiosk.fsm`](example/kiosk.fsm)                         | the `fsm` language: nested states, entry/exit actions, guards, and every `goto` target form                 |
+| [`kiosk.fsm`](example/kiosk.fsm)                         | the `fsm` language: nested states, entry/exit actions, guards, time triggers, every `goto` target form      |
 
 Run any of them with `tpuml -i example/<name>` and compare with the `.puml` beside it; add `-F scxml` or `-F json`
 to see the other formats.
@@ -289,7 +289,9 @@ and a **do activity** otherwise: `invoke(src)` or `invoke(src, type)` for a plai
   with several targets. Add `tpuml:kind="normal"` to keep such a state as a state.
 - A `<send event="E" delay="D">` in `<onentry>` whose event `E` is consumed by a `<transition>` of the same state
   is a **time trigger**: the transition gets `After: D` and the `<send>` (and a matching `<cancel>` in `<onexit>`)
-  are not treated as actions.
+  are not treated as actions. `delayexpr` counts as well, and the emitter writes `After` back to whichever of the
+  two fits: `delay` when it is a time value such as `5s` or `250ms`, `delayexpr` when it is anything the engine has
+  to evaluate.
 
 ### The tpuml extension vocabulary
 
@@ -344,6 +346,8 @@ fsm kiosk {
         }
         state paying { on approved / receipt goto done }
         on resume goto H
+        after(90s) goto idle
+        after(authTimeout) goto idle
     }
     state done { on ack goto final }
 }
@@ -352,6 +356,12 @@ fsm kiosk {
 States and `on` clauses may be interleaved, so a transition can sit next to the children it concerns. A transition
 is `on <event> [guard] / action, action goto <target>`, where the guard and the actions are optional but at least
 one of the actions and the `goto` must be present. `on entry` and `on exit` take actions only.
+
+`after(<delay>)` in place of `on <event>` makes the clause a time trigger, filling `After`: it fires that long
+after its state is entered, and takes the same guard, actions and `goto`. A delay is either a number and a unit,
+`ms` or `s` — the time value SCXML accepts — as in `after(250ms)` and `after(1.5s)`, or a name, as in
+`after(retryDelay)`, which the generated code calls for the delay the way it calls a guard or an effect. SCXML
+takes the first as `delay` and the second as `delayexpr`.
 
 A guard is a Boolean combination of names: `not`, `and`, `or` and parentheses over identifiers, with `not`
 binding tightest and `or` loosest. An identifier in a guard names a predicate, one after `/` an effect, and the
@@ -377,4 +387,4 @@ asks for one, named `<scope>.final` and `<state>.H`. A name is a letter or an un
 digits, underscores, dots and hyphens, so a name a source document already uses survives the trip — which means a
 document may declare one of those two names itself, and `Validate` then reports the duplicate.
 
-Everything else UML has — state kinds, time triggers, `do`/`defer`, variables, notes — has no syntax yet.
+Everything else UML has — state kinds, `do`/`defer`, variables, notes — has no syntax yet.

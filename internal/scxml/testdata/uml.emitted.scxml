@@ -27,15 +27,18 @@ in one document.</tpuml:note>
     <onentry>
       <script>log('start')</script>
       <send event="after.5s" delay="5s" id="work.after.5s"/>
+      <send event="after.retryDelay" delayexpr="retryDelay" id="work.after.retryDelay"/>
     </onentry>
     <onexit>
       <cancel sendid="work.after.5s"/>
+      <cancel sendid="work.after.retryDelay"/>
     </onexit>
     <invoke type="http://example.com/worker" src="job.py"/>
     <transition event="after.5s" target="check">
       <tpuml:note>Timed out.</tpuml:note>
       <script>retries = retries + 1</script>
     </transition>
+    <transition event="after.retryDelay" target="check"/>
     <transition event="split" target="split"/>
     <transition event="abort" target="stop"/>
     <transition event="enter" target="in"/>

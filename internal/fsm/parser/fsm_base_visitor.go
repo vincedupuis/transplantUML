@@ -19,6 +19,10 @@ func (v *BasefsmVisitor) VisitEvent(ctx *EventContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasefsmVisitor) VisitTrigger(ctx *TriggerContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasefsmVisitor) VisitActions(ctx *ActionsContext) interface{} {
 	return v.VisitChildren(ctx)
 }

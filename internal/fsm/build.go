@@ -24,7 +24,7 @@ func (Parser) Parse(src []byte) (*model.StateMachine, model.Warnings, error) {
 	}
 	b.declare(b.root, tree.AllState())
 	for _, ec := range tree.AllEvent() {
-		b.failf(ec.GetStart(), "the machine itself has no behaviour, put %q inside a state", ec.GetName().GetText())
+		b.failf(ec.GetStart(), "the machine itself has no behaviour, put %q inside a state", trigger(ec))
 	}
 	b.walk(b.root)
 	if err := errors.Join(b.errs...); err != nil {
@@ -131,16 +131,22 @@ func (b *builder) walk(scope *node) {
 }
 
 func (b *builder) event(n *node, ec parser.IEventContext) {
-	// "entry" and "exit" are keywords, so no Identifier can carry that text.
-	switch name := ec.GetName().GetText(); name {
-	case "entry":
-		n.state.OnEntry = append(n.state.OnEntry, effects(ec)...)
-		return
-	case "exit":
-		n.state.OnExit = append(n.state.OnExit, effects(ec)...)
+	// Only the behaviour alternative labels a name, and "entry" and "exit" are
+	// keywords, so no Identifier can carry that text.
+	if name := ec.GetName(); name != nil {
+		if name.GetText() == "entry" {
+			n.state.OnEntry = append(n.state.OnEntry, effects(ec)...)
+		} else {
+			n.state.OnExit = append(n.state.OnExit, effects(ec)...)
+		}
 		return
 	}
-	t := &model.Transition{Source: n.state.Name, Event: ec.GetName().GetText(), Actions: effects(ec)}
+	t := &model.Transition{Source: n.state.Name, Actions: effects(ec)}
+	if tr := ec.Trigger(); tr.GetName() != nil {
+		t.Event = tr.GetName().GetText()
+	} else {
+		t.After = tr.GetDelay().GetText()
+	}
 	if g := ec.Guard(); g != nil {
 		t.Cond = text(g.Expression())
 	}
@@ -200,6 +206,15 @@ func (b *builder) synthesize(scope *node, suffix string, kind model.StateKind) s
 	scope.synth[suffix] = s
 	b.sm.States = append(b.sm.States, s)
 	return s.Name
+}
+
+// trigger is what an event clause fires on, as the document writes it: an
+// event name, "entry", "exit", or a whole "after(5s)".
+func trigger(ec parser.IEventContext) string {
+	if name := ec.GetName(); name != nil {
+		return name.GetText()
+	}
+	return text(ec.Trigger())
 }
 
 func effects(ec parser.IEventContext) []string {

@@ -47,6 +47,7 @@ merge --> work
 sync --> done
 work --> check: after(5s)\n/ retries = retries + 1
 note on link : Timed out.
+work --> check: after(retryDelay)
 work --> split: split
 work --> stop: abort
 work --> in: enter

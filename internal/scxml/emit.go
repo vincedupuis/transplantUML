@@ -109,8 +109,14 @@ func (e *emitter) children(el *etree.Element, parent string) error {
 		onentry, onexit := append([]string(nil), s.OnEntry...), append([]string(nil), s.OnExit...)
 		for _, delay := range delays(transitions) {
 			id := s.Name + ".after." + eventSafe(delay)
-			onentry = append(onentry, fmt.Sprintf(`<send event="%s" delay="%s" id="%s"/>`, afterEvent(delay), delay, id))
-			onexit = append(onexit, fmt.Sprintf(`<cancel sendid="%s"/>`, id))
+			send := etree.NewElement("send")
+			send.CreateAttr("event", afterEvent(delay))
+			send.CreateAttr(delayAttr(delay), delay)
+			send.CreateAttr("id", id)
+			cancel := etree.NewElement("cancel")
+			cancel.CreateAttr("sendid", id)
+			onentry = append(onentry, rawXML(send))
+			onexit = append(onexit, rawXML(cancel))
 		}
 		actions(child, "onentry", onentry)
 		actions(child, "onexit", onexit)
@@ -242,6 +248,18 @@ func delays(transitions []*model.Transition) []string {
 
 // afterEvent names the event a time trigger's <send> raises.
 func afterEvent(delay string) string { return "after." + eventSafe(delay) }
+
+// timeValue is the CSS2 time SCXML's delay attribute takes.
+var timeValue = regexp.MustCompile(`^[0-9]+(\.[0-9]+)?(ms|s)$`)
+
+// delayAttr names the attribute a <send> carries the delay in: delay for a
+// time value, delayexpr for anything else, which the engine evaluates.
+func delayAttr(delay string) string {
+	if timeValue.MatchString(delay) {
+		return "delay"
+	}
+	return "delayexpr"
+}
 
 var unsafeEventChars = regexp.MustCompile(`[^A-Za-z0-9_.-]`)
 

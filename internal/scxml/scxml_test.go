@@ -163,6 +163,11 @@ func TestUMLConcepts(t *testing.T) {
 	if timed.After != "5s" || timed.Event != "" || timed.Note != "Timed out." || !reflect.DeepEqual(timed.Actions, []string{"retries = retries + 1"}) {
 		t.Errorf("time trigger = %+v", *timed)
 	}
+	// A delayexpr is a delay the engine computes; it reaches After like a plain
+	// delay does, and the emitter puts it back in delayexpr.
+	if computed := sm.OutgoingTransitions("work")[1]; computed.After != "retryDelay" || computed.Event != "" {
+		t.Errorf("computed time trigger = %+v", *computed)
+	}
 
 	if got := sm.State("sub").Submachine; got != "child.scxml" {
 		t.Errorf("submachine = %q", got)

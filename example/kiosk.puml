@@ -10,6 +10,7 @@ state ordering {
         [*] --> authorizing
         state authorizing
         state again
+        authorizing --> again: after(authTimeout)\n[ retries ]\n/ warn
         again --> authorizing: card
     }
     paying : entry / lockBasket
@@ -29,6 +30,7 @@ done : entry / print
 state final <<end>>
 idle --> browsing: touch\n/ wake
 ordering --> idle: abandon
+ordering --> idle: after(90s)
 ordering --> ordering_H: resume
 paying --> done: approved\n/ receipt
 done --> final: ack

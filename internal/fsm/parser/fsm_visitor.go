@@ -16,6 +16,9 @@ type fsmVisitor interface {
 	// Visit a parse tree produced by fsmParser#event.
 	VisitEvent(ctx *EventContext) interface{}
 
+	// Visit a parse tree produced by fsmParser#trigger.
+	VisitTrigger(ctx *TriggerContext) interface{}
+
 	// Visit a parse tree produced by fsmParser#actions.
 	VisitActions(ctx *ActionsContext) interface{}
 

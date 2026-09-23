@@ -17,8 +17,13 @@ state
 
 event
     :   'on' name=('entry' | 'exit') actions?
-    |   'on' name=Identifier guard? actions goto?
-    |   'on' name=Identifier guard? goto
+    |   trigger guard? actions goto?
+    |   trigger guard? goto
+    ;
+
+trigger
+    :   'on' name=Identifier
+    |   'after' '(' delay=(Duration | Identifier) ')'
     ;
 
 actions
@@ -59,6 +64,7 @@ goto
     ;
 
 Initial: 'initial';
+Duration: [0-9]+ ('.' [0-9]+)? ('ms' | 's');
 Identifier: [a-zA-Z_] [a-zA-Z0-9_.\-]*;
 Comment: '#' ( ~[\r\n] )* -> skip;
 Blank: [ \t\r\n]+ -> channel(HIDDEN);

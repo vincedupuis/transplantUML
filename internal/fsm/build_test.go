@@ -118,6 +118,37 @@ func TestBuildTargets(t *testing.T) {
 	}
 }
 
+// A time trigger fires on the delay rather than on an event, so it fills
+// After and leaves Event empty; the rest of the clause reads as usual. The
+// delay is a time value or, like a guard or an effect, the name of something
+// the generated code calls for it.
+func TestBuildTimeTrigger(t *testing.T) {
+	sm := build(t, "fsm m { initial state a { after(1.5s) [hot] / log goto b } state b { after(250ms) / tick } state c { after(retryDelay) goto a } }")
+	for _, want := range []struct {
+		source, after, target, cond string
+		actions                     []string
+	}{
+		{"a", "1.5s", "b", "hot", []string{"log"}},
+		{"b", "250ms", "", "", []string{"tick"}},
+		{"c", "retryDelay", "a", "", nil},
+	} {
+		i := slices.IndexFunc(sm.Transitions, func(t *model.Transition) bool { return t.Source == want.source })
+		if i < 0 {
+			t.Errorf("missing transition from %s", want.source)
+			continue
+		}
+		tr := sm.Transitions[i]
+		target := ""
+		if len(tr.Targets) > 0 {
+			target = tr.Targets[0]
+		}
+		if tr.Event != "" || tr.After != want.after || target != want.target || tr.Cond != want.cond || !slices.Equal(tr.Actions, want.actions) {
+			t.Errorf("from %s: event %q after %q target %q cond %q actions %v, want after %q target %q cond %q actions %v",
+				want.source, tr.Event, tr.After, target, tr.Cond, tr.Actions, want.after, want.target, want.cond, want.actions)
+		}
+	}
+}
+
 func TestBuildErrors(t *testing.T) {
 	cases := map[string]string{
 		"fsm m { initial state a {} initial state b {} }":         `already starts in "a"`,
@@ -126,6 +157,7 @@ func TestBuildErrors(t *testing.T) {
 		"fsm m { state a { on e goto nope } }":                    `the machine has no state called "nope"`,
 		"fsm m { state a { on e goto H } }":                       `state "a" has no children, so it has no history`,
 		"fsm m { on e goto a state a {} }":                        `the machine itself has no behaviour`,
+		"fsm m { after(5s) goto a state a {} }":                   `put "after(5s)" inside a state`,
 	}
 	for src, want := range cases {
 		_, _, err := Parser{}.Parse([]byte(src))
