@@ -95,20 +95,21 @@ func TestBuildCoffee(t *testing.T) {
 	}
 }
 
-// Each goto prefix is measured from the state that declares the transition.
-func TestBuildPaths(t *testing.T) {
+// A goto names its target outright, wherever it sits and whether or not it is
+// declared before the transition that names it.
+func TestBuildTargets(t *testing.T) {
 	const src = `fsm m {
 		initial state a {
-			initial state b { initial state c {} on e goto ./c }
-			on f goto ../a/b
+			initial state b { initial state c {} on e goto c }
+			on f goto b
 		}
-		state d { on g goto /a/b/c }
+		state d { on g goto c }
 	}`
 	sm := build(t, src)
 	for _, want := range []struct{ source, target string }{
-		{"b", "c"}, // ./c from b
-		{"a", "b"}, // ../a/b from a climbs to the root, then back down
-		{"d", "c"}, // /a/b/c
+		{"b", "c"}, // a child
+		{"a", "b"}, // a child declared by name alone
+		{"d", "c"}, // a grandchild of another branch, declared further up
 	} {
 		i := slices.IndexFunc(sm.Transitions, func(t *model.Transition) bool { return t.Source == want.source })
 		if i < 0 || !slices.Equal(sm.Transitions[i].Targets, []string{want.target}) {
@@ -119,14 +120,12 @@ func TestBuildPaths(t *testing.T) {
 
 func TestBuildErrors(t *testing.T) {
 	cases := map[string]string{
-		"fsm m { initial state a {} initial state b {} }": `already starts in "a"`,
-		"fsm m { state a {} state a {} }":                 `already has a state called "a"`,
-		"fsm m { state p { state a {} state a {} } }":     `state "p" already has a state called "a"`,
-		"fsm m { state a { on e goto nope } }":            `has no state called "nope"`,
-		"fsm m { state a { on e goto /a/nope } }":         `state "a" has no state called "nope"`,
-		"fsm m { state a { on e goto ../../x } }":         `climbs above the machine`,
-		"fsm m { state a { on e goto H } }":               `state "a" has no children, so it has no history`,
-		"fsm m { on e goto a state a {} }":                `the machine itself has no behaviour`,
+		"fsm m { initial state a {} initial state b {} }":         `already starts in "a"`,
+		"fsm m { state a {} state a {} }":                         `the machine already has a state called "a"`,
+		"fsm m { state p { state a {} } state q { state a {} } }": `the machine already has a state called "a"`,
+		"fsm m { state a { on e goto nope } }":                    `the machine has no state called "nope"`,
+		"fsm m { state a { on e goto H } }":                       `state "a" has no children, so it has no history`,
+		"fsm m { on e goto a state a {} }":                        `the machine itself has no behaviour`,
 	}
 	for src, want := range cases {
 		_, _, err := Parser{}.Parse([]byte(src))

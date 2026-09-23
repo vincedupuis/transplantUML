@@ -34,7 +34,7 @@ func TestGrammarRejects(t *testing.T) {
 		"fsm m { state s { on e goto } }",       // goto without a target
 		"fsm m { state s { on e } }",            // neither effect nor target
 		"fsm m { state s { on e [g] } }",        // a guard alone is not a transition
-		"fsm m { state s { on e goto a/ } }",    // path ending in a separator
+		"fsm m { state s { on e goto a/b } }",   // a target is a name, not a path
 		"fsm m { initial }",                     // initial modifies a state
 		"fsm m { state s { initial on e / a } }",
 		"fsm m { state initial {} }", // initial is a keyword, not a name
@@ -66,19 +66,14 @@ func TestEventForms(t *testing.T) {
 	}
 }
 
-// Every goto target form lexes: '/' opens an absolute path even though the
-// same token opens an action list, and Prefix carries the relative forms.
+// Every goto target form lexes: a state name, or one of the three keywords
+// standing for a state the document never declares.
 func TestGotoTargets(t *testing.T) {
 	for _, target := range []string{
 		".",
 		"final",
 		"H",
 		"t",
-		"a/b/c",
-		"/a/b",
-		"./b",
-		"../b",
-		"../../a/b",
 	} {
 		if _, err := parse("fsm m { state s { on e goto " + target + " } }"); err != nil {
 			t.Errorf("goto %s: %v", target, err)

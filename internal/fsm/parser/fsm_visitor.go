@@ -42,7 +42,4 @@ type fsmVisitor interface {
 
 	// Visit a parse tree produced by fsmParser#goto.
 	VisitGoto(ctx *GotoContext) interface{}
-
-	// Visit a parse tree produced by fsmParser#path.
-	VisitPath(ctx *PathContext) interface{}
 }

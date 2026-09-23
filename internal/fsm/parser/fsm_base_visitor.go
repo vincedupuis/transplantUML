@@ -54,7 +54,3 @@ func (v *BasefsmVisitor) VisitSingle_expression(ctx *Single_expressionContext) i
 func (v *BasefsmVisitor) VisitGoto(ctx *GotoContext) interface{} {
 	return v.VisitChildren(ctx)
 }
-
-func (v *BasefsmVisitor) VisitPath(ctx *PathContext) interface{} {
-	return v.VisitChildren(ctx)
-}

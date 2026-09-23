@@ -55,15 +55,10 @@ single_expression
     ;
 
 goto
-    :   'goto' ('.' | 'final' | 'H' | path)
-    ;
-
-path
-    :   (Prefix | '/')? Identifier ('/' Identifier)*
+    :   'goto' ('.' | 'final' | 'H' | Identifier)
     ;
 
 Initial: 'initial';
 Identifier: [a-zA-Z] [a-zA-Z0-9]*;
-Prefix: './' | ('../')+;
 Comment: '#' ( ~[\r\n] )* -> skip;
 Blank: [ \t\r\n]+ -> channel(HIDDEN);

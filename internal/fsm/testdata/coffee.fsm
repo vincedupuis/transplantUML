@@ -8,11 +8,11 @@ fsm coffee {
         on cancel goto .
         on error goto final
         initial state heating {
-            on hot goto ../pouring
+            on hot goto pouring
         }
         on resume goto H
         state pouring {
-            on done [not empty and (cup or mug)] / pour goto /idle
+            on done [not empty and (cup or mug)] / pour goto idle
             on tick / count
         }
         on exit / log, reset

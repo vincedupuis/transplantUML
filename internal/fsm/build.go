@@ -3,7 +3,6 @@ package fsm
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
 	"github.com/vincedupuis/transplantUML/internal/fsm/parser"
@@ -19,8 +18,9 @@ func (Parser) Parse(src []byte) (*model.StateMachine, model.Warnings, error) {
 		return nil, nil, err
 	}
 	b := &builder{
-		sm:   &model.StateMachine{Name: tree.Identifier().GetText()},
-		root: &node{children: map[string]*node{}},
+		sm:     &model.StateMachine{Name: tree.Identifier().GetText()},
+		root:   &node{},
+		states: map[string]*node{},
 	}
 	b.declare(b.root, tree.AllState())
 	for _, ec := range tree.AllEvent() {
@@ -57,20 +57,20 @@ func parse(src string) (parser.IFsmContext, error) {
 }
 
 // node mirrors one state of the parse tree. The builder needs the tree twice:
-// once to declare every state, and again to resolve goto paths, which may name
-// a state declared further down the document.
+// once to declare every state, and again to resolve the goto targets, which may
+// name a state declared further down the document.
 type node struct {
-	state    *model.State
-	parent   *node // nil for the root, whose state is nil too
-	ctx      parser.IStateContext
-	children map[string]*node
-	order    []*node
-	synth    map[string]*model.State // the final and history states goto asks for
+	state  *model.State
+	parent *node // nil for the root, whose state is nil too
+	ctx    parser.IStateContext
+	order  []*node
+	synth  map[string]*model.State // the final and history states goto asks for
 }
 
 type builder struct {
 	sm       *model.StateMachine
 	root     *node
+	states   map[string]*node // every declared state, by name
 	warnings model.Warnings
 	errs     []error
 }
@@ -84,8 +84,10 @@ func (b *builder) declare(scope *node, states []parser.IStateContext) {
 	var initial antlr.Token
 	for _, sc := range states {
 		name := sc.Identifier().GetText()
-		if _, dup := scope.children[name]; dup {
-			b.failf(sc.Identifier().GetSymbol(), "%s already has a state called %q", describe(scope), name)
+		// One namespace for the whole machine: goto names a state outright,
+		// and the model keys its states by name.
+		if _, dup := b.states[name]; dup {
+			b.failf(sc.Identifier().GetSymbol(), "the machine already has a state called %q", name)
 			continue
 		}
 		st := &model.State{Name: name, Kind: model.Normal}
@@ -94,8 +96,8 @@ func (b *builder) declare(scope *node, states []parser.IStateContext) {
 		}
 		b.sm.States = append(b.sm.States, st)
 
-		n := &node{state: st, parent: scope, ctx: sc, children: map[string]*node{}}
-		scope.children[name] = n
+		n := &node{state: st, parent: scope, ctx: sc}
+		b.states[name] = n
 		scope.order = append(scope.order, n)
 
 		if tok := sc.Initial(); tok != nil {
@@ -155,8 +157,13 @@ func (b *builder) event(n *node, ec parser.IEventContext) {
 // target names the state a goto leads to, creating the final or history state
 // it asks for if this is the first time the document mentions it.
 func (b *builder) target(n *node, g parser.IGotoContext) (string, bool) {
-	if p := g.Path(); p != nil {
-		return b.resolve(n, p)
+	if id := g.Identifier(); id != nil {
+		target, ok := b.states[id.GetText()]
+		if !ok {
+			b.failf(id.GetSymbol(), "the machine has no state called %q", id.GetText())
+			return "", false
+		}
+		return target.state.Name, true
 	}
 	switch g.GetChild(1).(antlr.TerminalNode).GetText() {
 	case ".":
@@ -172,37 +179,6 @@ func (b *builder) target(n *node, g parser.IGotoContext) (string, bool) {
 		}
 		return b.synthesize(n, "H", model.HistoryShallow), true
 	}
-}
-
-// resolve follows a goto path from the state that declared the transition:
-// "/a/b" from the top level, "./b" from the state itself, "../b" and a bare
-// "b" from its parent, and one more level up for each further "../".
-func (b *builder) resolve(n *node, p parser.IPathContext) (string, bool) {
-	base := n.parent
-	if pf := p.Prefix(); pf != nil {
-		base = n
-		for range strings.Count(pf.GetText(), "../") {
-			if base == nil {
-				break
-			}
-			base = base.parent
-		}
-	} else if p.GetStart().GetText() == "/" {
-		base = b.root
-	}
-	if base == nil {
-		b.failf(p.GetStart(), "%q climbs above the machine", text(p))
-		return "", false
-	}
-	for _, id := range p.AllIdentifier() {
-		next, ok := base.children[id.GetText()]
-		if !ok {
-			b.failf(id.GetSymbol(), "%q: %s has no state called %q", text(p), describe(base), id.GetText())
-			return "", false
-		}
-		base = next
-	}
-	return base.state.Name, true
 }
 
 // synthesize returns the final or history state of scope, which the language

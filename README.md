@@ -334,15 +334,15 @@ tpuml's own input format, a compact alternative to writing SCXML by hand. The gr
 fsm kiosk {
     initial state idle {
         on entry / dim
-        on touch / wake goto ordering/browsing
+        on touch / wake goto browsing
     }
     state ordering {
         on exit / clearBasket, unlock
         initial state browsing {
             on add [inStock and (card or cash)] / addLine
-            on checkout [basket] goto ../paying
+            on checkout [basket] goto paying
         }
-        state paying { on approved / receipt goto ../../done }
+        state paying { on approved / receipt goto done }
         on resume goto H
     }
     state done { on ack goto final }
@@ -356,17 +356,15 @@ one of the actions and the `goto` must be present. `on entry` and `on exit` take
 `initial` marks the child its parent starts in, or the machine's starting state at the top level. Declaring two in
 one scope is an error; declaring none is a warning.
 
-A `goto` target is resolved from the state that declares the transition:
+A `goto` names its target outright. State names are one namespace for the whole machine — the model keys its
+states by name — so nesting never has to be spelled out, and a target may be declared further down the document:
 
-| Target        | Resolves to                                                              |
-|---------------|--------------------------------------------------------------------------|
-| `.`           | the declaring state itself                                                |
-| `b`, `b/c`    | from its parent, so a bare name is a sibling                              |
-| `./b`         | from the state itself, so a child                                         |
-| `../b`        | from its parent; each further `../` climbs one more level                 |
-| `/a/b`        | from the top level                                                        |
-| `final`       | the final state of the scope holding the declaring state, created on use  |
-| `H`           | the shallow history of the declaring state, created on use                |
+| Target  | Resolves to                                                             |
+|---------|-------------------------------------------------------------------------|
+| `b`     | the state called `b`, wherever it sits                                   |
+| `.`     | the declaring state itself                                               |
+| `final` | the final state of the scope holding the declaring state, created on use |
+| `H`     | the shallow history of the declaring state, created on use               |
 
 `final` and `H` are the two states the language never declares, so the parser creates them the first time a `goto`
 asks for one, named `<scope>.final` and `<state>.H`. Everything else UML has — state kinds, time triggers,
