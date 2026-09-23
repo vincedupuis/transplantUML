@@ -353,6 +353,12 @@ States and `on` clauses may be interleaved, so a transition can sit next to the 
 is `on <event> [guard] / action, action goto <target>`, where the guard and the actions are optional but at least
 one of the actions and the `goto` must be present. `on entry` and `on exit` take actions only.
 
+A guard is a Boolean combination of names: `not`, `and`, `or` and parentheses over identifiers, with `not`
+binding tightest and `or` loosest. An identifier in a guard names a predicate, one after `/` an effect, and the
+generated code calls it — the grammar keeps the bare name because that is the one form every target language can
+render as its own call, be it `inStock()`, `this->inStock()` or `ctx.InStock`. Receivers, arguments, comparisons
+and literals therefore have no syntax. What stands between the brackets reaches `Cond` verbatim, spacing included.
+
 `initial` marks the child its parent starts in, or the machine's starting state at the top level. Declaring two in
 one scope is an error; declaring none is a warning.
 
@@ -367,5 +373,8 @@ states by name — so nesting never has to be spelled out, and a target may be d
 | `H`     | the shallow history of the declaring state, created on use               |
 
 `final` and `H` are the two states the language never declares, so the parser creates them the first time a `goto`
-asks for one, named `<scope>.final` and `<state>.H`. Everything else UML has — state kinds, time triggers,
-`do`/`defer`, variables, notes — has no syntax yet.
+asks for one, named `<scope>.final` and `<state>.H`. A name is a letter or an underscore followed by letters,
+digits, underscores, dots and hyphens, so a name a source document already uses survives the trip — which means a
+document may declare one of those two names itself, and `Validate` then reports the duplicate.
+
+Everything else UML has — state kinds, time triggers, `do`/`defer`, variables, notes — has no syntax yet.

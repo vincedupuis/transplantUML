@@ -59,6 +59,6 @@ goto
     ;
 
 Initial: 'initial';
-Identifier: [a-zA-Z] [a-zA-Z0-9]*;
+Identifier: [a-zA-Z_] [a-zA-Z0-9_.\-]*;
 Comment: '#' ( ~[\r\n] )* -> skip;
 Blank: [ \t\r\n]+ -> channel(HIDDEN);

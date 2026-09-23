@@ -77,9 +77,11 @@ warnings.
   machine's. `build.go` holds `Parser` and the `builder` that walks the parse tree into the
   model: `declare` creates every state first, then `walk` resolves the transitions, because a `goto` may name a
   state declared further down. `final` and `H` have no declaration syntax, so `synthesize` creates them on first
-  use as `<scope>.final` and `<state>.H` (a `.` cannot clash with an Identifier). The builder reports only what
-  the model cannot hold — two `initial` children in one scope would collapse into one `State.Initial`, a repeated
-  state name would collapse the builder's own index, and the machine has nowhere to put a top-level `on` clause —
+  use as `<scope>.final` and `<state>.H` (an Identifier holds letters, digits, `_`, `.` and `-`, so a document can
+  declare those names itself; `model.Validate` catches the duplicate). The builder reports only what the model
+  cannot hold — two `initial` children in one scope would
+  collapse into one `State.Initial`, a repeated state name would collapse the builder's own index, and the machine
+  has nowhere to put a top-level `on` clause —
   and `model.Validate()` does the rest.
 - **`internal/jsonsm`** — the model's own JSON shape (struct tags in `model`). Parser uses
   `DisallowUnknownFields`; round-trip equality with the SCXML parser is tested.

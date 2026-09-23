@@ -126,3 +126,23 @@ func TestInitialState(t *testing.T) {
 		t.Error("c: marked initial")
 	}
 }
+
+// Identifier carries every name the language can write, so the punctuation a
+// source document may already use — underscore, dot, hyphen — has to lex in
+// each of those positions. A name still begins with a letter or an underscore,
+// which is what keeps "goto ." a keyword rather than a name.
+func TestIdentifierCharset(t *testing.T) {
+	src := "fsm vending.machine { state _idle-1 { on coin.in [has-change] / open_1 goto pay.now } state pay.now {} }"
+	if _, err := parse(src); err != nil {
+		t.Errorf("charset: %v", err)
+	}
+	for _, src := range []string{
+		"fsm m { state .a {} }",
+		"fsm m { state -a {} }",
+		"fsm m { state 1a {} }",
+	} {
+		if _, err := parse(src); err == nil {
+			t.Errorf("%q: accepted, want a syntax error", src)
+		}
+	}
+}
