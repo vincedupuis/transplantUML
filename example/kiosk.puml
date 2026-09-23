@@ -9,6 +9,8 @@ state ordering {
     state paying {
         [*] --> authorizing
         state authorizing
+        authorizing : do / spin
+        authorizing : touch / defer
         state again
         authorizing --> again: after(authTimeout)\n[ retries ]\n/ warn
         again --> authorizing: card

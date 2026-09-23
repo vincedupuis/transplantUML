@@ -131,13 +131,18 @@ func (b *builder) walk(scope *node) {
 }
 
 func (b *builder) event(n *node, ec parser.IEventContext) {
-	// Only the behaviour alternative labels a name, and "entry" and "exit" are
-	// keywords, so no Identifier can carry that text.
+	// The behaviour and defer alternatives are the ones that label a name, and
+	// "entry", "exit" and "do" are keywords, so no Identifier carries that text.
 	if name := ec.GetName(); name != nil {
-		if name.GetText() == "entry" {
+		switch {
+		case ec.Defer() != nil:
+			n.state.Defer = append(n.state.Defer, name.GetText())
+		case name.GetText() == "entry":
 			n.state.OnEntry = append(n.state.OnEntry, effects(ec)...)
-		} else {
+		case name.GetText() == "exit":
 			n.state.OnExit = append(n.state.OnExit, effects(ec)...)
+		default:
+			n.state.Do = append(n.state.Do, effects(ec)...)
 		}
 		return
 	}
@@ -209,7 +214,7 @@ func (b *builder) synthesize(scope *node, suffix string, kind model.StateKind) s
 }
 
 // trigger is what an event clause fires on, as the document writes it: an
-// event name, "entry", "exit", or a whole "after(5s)".
+// event name, "entry", "exit", "do", or a whole "after(5s)".
 func trigger(ec parser.IEventContext) string {
 	if name := ec.GetName(); name != nil {
 		return name.GetText()

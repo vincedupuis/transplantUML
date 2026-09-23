@@ -65,6 +65,12 @@ func TestBuildCoffee(t *testing.T) {
 	if got := sm.State("brewing").OnExit; !slices.Equal(got, []string{"log", "reset"}) {
 		t.Errorf("brewing exit = %v, want [log reset]", got)
 	}
+	if got := sm.State("brewing").Do; !slices.Equal(got, []string{"heat"}) {
+		t.Errorf("brewing do = %v, want [heat]", got)
+	}
+	if got := sm.State("pouring").Defer; !slices.Equal(got, []string{"coin"}) {
+		t.Errorf("pouring defer = %v, want [coin]", got)
+	}
 
 	for _, want := range []struct {
 		source, event, target, cond string
@@ -146,6 +152,31 @@ func TestBuildTimeTrigger(t *testing.T) {
 			t.Errorf("from %s: event %q after %q target %q cond %q actions %v, want after %q target %q cond %q actions %v",
 				want.source, tr.Event, tr.After, target, tr.Cond, tr.Actions, want.after, want.target, want.cond, want.actions)
 		}
+	}
+}
+
+// A behaviour clause and a deferred event may each be written more than once
+// in a state, and every line adds to the list the model keeps.
+func TestBuildBehaviours(t *testing.T) {
+	sm := build(t, "fsm m { initial state a { entry / dim do / poll do / refresh exit / stop on pause / defer on resume / defer } }")
+	a := sm.State("a")
+	for _, want := range []struct {
+		what string
+		got  []string
+		list []string
+	}{
+		{"entry", a.OnEntry, []string{"dim"}},
+		{"do", a.Do, []string{"poll", "refresh"}},
+		{"exit", a.OnExit, []string{"stop"}},
+		{"defer", a.Defer, []string{"pause", "resume"}},
+	} {
+		if !slices.Equal(want.got, want.list) {
+			t.Errorf("a %s = %v, want %v", want.what, want.got, want.list)
+		}
+	}
+	// A deferred event is not a transition.
+	if got := sm.OutgoingTransitions("a"); len(got) != 0 {
+		t.Errorf("transitions = %v, want none", got)
 	}
 }
 

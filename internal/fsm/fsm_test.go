@@ -28,18 +28,23 @@ func TestGrammarAccepts(t *testing.T) {
 
 func TestGrammarRejects(t *testing.T) {
 	for _, src := range []string{
-		"fsm {}",                                 // missing name
-		"fsm m { state s { on entry goto s } }",  // entry cannot leave the state
-		"fsm m { state s { on e [] } }",          // empty guard
-		"fsm m { state s { on e goto } }",        // goto without a target
-		"fsm m { state s { on e } }",             // neither effect nor target
-		"fsm m { state s { on e [g] } }",         // a guard alone is not a transition
-		"fsm m { state s { on e goto a/b } }",    // a target is a name, not a path
-		"fsm m { state s { after(5s) } }",        // neither effect nor target
-		"fsm m { state s { after 5s goto s } }",  // a delay sits in parentheses
-		"fsm m { state s { after(5) goto s } }",  // a delay carries its unit
-		"fsm m { state s { after(5m) goto s } }", // and the unit is ms or s
-		"fsm m { state s { after() goto s } }",   // a delay is not optional
+		"fsm {}",                                    // missing name
+		"fsm m { state s { entry goto s } }",        // entry cannot leave the state
+		"fsm m { state s { on entry / a } }",        // a behaviour is not a trigger
+		"fsm m { state s { do goto s } }",           // a do activity is not a transition
+		"fsm m { state s { on e [g] / defer } }",    // no guard on a deferred event
+		"fsm m { state s { on e / defer goto s } }", // and no target
+		"fsm m { state s { defer e } }",             // a deferred event names its event first
+		"fsm m { state s { on e [] } }",             // empty guard
+		"fsm m { state s { on e goto } }",           // goto without a target
+		"fsm m { state s { on e } }",                // neither effect nor target
+		"fsm m { state s { on e [g] } }",            // a guard alone is not a transition
+		"fsm m { state s { on e goto a/b } }",       // a target is a name, not a path
+		"fsm m { state s { after(5s) } }",           // neither effect nor target
+		"fsm m { state s { after 5s goto s } }",     // a delay sits in parentheses
+		"fsm m { state s { after(5) goto s } }",     // a delay carries its unit
+		"fsm m { state s { after(5m) goto s } }",    // and the unit is ms or s
+		"fsm m { state s { after() goto s } }",      // a delay is not optional
 		"fsm m { state s { on after(5s) goto s } }",
 		"fsm m { initial }", // initial modifies a state
 		"fsm m { state s { initial on e / a } }",
@@ -52,7 +57,8 @@ func TestGrammarRejects(t *testing.T) {
 }
 
 // Two alternatives cover every combination of guard, actions and goto that
-// carries an effect or a target; TestGrammarRejects covers the rest.
+// carries an effect or a target, and two more the behaviours of a state and
+// the events it defers; TestGrammarRejects covers the rest.
 func TestEventForms(t *testing.T) {
 	for _, body := range []string{
 		"on e / a",
@@ -62,9 +68,12 @@ func TestEventForms(t *testing.T) {
 		"on e [g] goto t",
 		"on e / a goto t",
 		"on e [g] / a goto t",
-		"on entry",
-		"on entry / a",
-		"on exit / a, b",
+		"entry",
+		"entry / a",
+		"exit / a, b",
+		"do / poll",
+		"do / poll, refresh",
+		"on pause / defer",
 		"after(5s) / a",
 		"after(250ms) goto t",
 		"after(1.5s) [g] / a goto t",

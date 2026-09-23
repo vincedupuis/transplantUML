@@ -16,7 +16,8 @@ state
     ;
 
 event
-    :   'on' name=('entry' | 'exit') actions?
+    :   name=('entry' | 'exit' | 'do') actions?
+    |   'on' name=Identifier '/' Defer
     |   trigger guard? actions goto?
     |   trigger guard? goto
     ;
@@ -64,6 +65,7 @@ goto
     ;
 
 Initial: 'initial';
+Defer: 'defer';
 Duration: [0-9]+ ('.' [0-9]+)? ('ms' | 's');
 Identifier: [a-zA-Z_] [a-zA-Z0-9_]*;
 Comment: '#' ( ~[\r\n] )* -> skip;

@@ -147,7 +147,7 @@ it next to it (`<name>.puml`, kept up to date by the tests):
 | [`media-player.scxml`](example/media-player.scxml)       | compound state, deep history, entry/exit points, deferred events, invariant, local and internal transitions |
 | [`washing-machine.scxml`](example/washing-machine.scxml) | orthogonal regions, fork and join — and the warnings PlantUML's region limitation produces                  |
 | [`thermostat.json`](example/thermostat.json)             | the same concepts written directly in the model's JSON shape                                                |
-| [`kiosk.fsm`](example/kiosk.fsm)                         | the `fsm` language: nested states, entry/exit actions, guards, time triggers, every `goto` target form      |
+| [`kiosk.fsm`](example/kiosk.fsm)                         | the `fsm` language: nested states, behaviours, deferred events, guards, time triggers, `goto` forms         |
 
 Run any of them with `tpuml -i example/<name>` and compare with the `.puml` beside it; add `-F scxml` or `-F json`
 to see the other formats.
@@ -335,16 +335,20 @@ tpuml's own input format, a compact alternative to writing SCXML by hand. The gr
 ```
 fsm kiosk {
     initial state idle {
-        on entry / dim
+        entry / dim
         on touch / wake goto browsing
     }
     state ordering {
-        on exit / clearBasket, unlock
+        exit / clearBasket, unlock
         initial state browsing {
             on add [inStock and (card or cash)] / addLine
             on checkout [basket] goto paying
         }
-        state paying { on approved / receipt goto done }
+        state paying {
+            do / spin
+            on touch / defer
+            on approved / receipt goto done
+        }
         on resume goto H
         after(90s) goto idle
         after(authTimeout) goto idle
@@ -353,9 +357,14 @@ fsm kiosk {
 }
 ```
 
-States and `on` clauses may be interleaved, so a transition can sit next to the children it concerns. A transition
-is `on <event> [guard] / action, action goto <target>`, where the guard and the actions are optional but at least
-one of the actions and the `goto` must be present. `on entry` and `on exit` take actions only.
+States and the clauses that concern them may be interleaved, so a transition can sit next to the children it
+affects. A transition is `on <event> [guard] / action, action goto <target>`, where the guard and the actions are
+optional but at least one of the actions and the `goto` must be present.
+
+The behaviours of a state are written as UML writes them, without `on`: `entry / action, action`, `do / activity`
+and `exit / action, action`, each of which may appear more than once and adds to what came before. A deferred
+event keeps the `on`, as `on pause / defer`, since the name before the `/` is the document's own event rather
+than a keyword; it takes no guard and no `goto`, because the model holds only the event's name.
 
 `after(<delay>)` in place of `on <event>` makes the clause a time trigger, filling `After`: it fires that long
 after its state is entered, and takes the same guard, actions and `goto`. A delay is either a number and a unit,
@@ -388,4 +397,4 @@ digits and underscores — no dots or hyphens, which is what keeps those two nam
 `goto .` a keyword rather than a name. A state whose id in another format carries punctuation therefore has to be
 renamed when the machine is written in this language.
 
-Everything else UML has — state kinds, `do`/`defer`, variables, notes — has no syntax yet.
+Everything else UML has — state kinds, variables, notes — has no syntax yet.
