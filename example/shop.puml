@@ -13,7 +13,14 @@ state "«secure»\ncheckout" as checkout <<secure>> {
     note right of checkout_H : Back to the step the customer left.
     state address
     state route <<choice>>
-    state review
+    state review {
+        [*] --> depth
+        state depth <<choice>>
+        state quick
+        state thorough
+        depth --> quick: [ regular ]
+        depth --> thorough: [ else ]
+    }
     state paying
     state paid <<start>>
     state "checkout.H-deep" as checkout_H_deep <<history*>>

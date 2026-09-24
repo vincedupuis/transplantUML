@@ -103,9 +103,9 @@ func (b *builder) declare(scope *node, ctx antlr.ParserRuleContext) {
 		case *parser.RegionContext:
 			name, kind = c.Identifier(), model.Normal
 		case *parser.ChoiceContext:
-			name, kind = c.Identifier(), model.Choice
+			name, kind, mark = c.Identifier(), model.Choice, c.Initial()
 		case *parser.JunctionContext:
-			name, kind = c.Identifier(), model.Junction
+			name, kind, mark = c.Identifier(), model.Junction, c.Initial()
 		case *parser.ForkContext:
 			name, kind = c.Identifier(), model.Fork
 		case *parser.JoinContext:

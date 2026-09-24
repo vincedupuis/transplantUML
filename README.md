@@ -417,6 +417,19 @@ and literals therefore have no syntax. What stands between the brackets reaches 
 
 `initial` marks the child its parent starts in, or the machine's starting state at the top level. Declaring two in
 one scope is an error; declaring none is a warning.
+It marks a state, a parallel state or a submachine state, and also a choice or a junction.
+UML lets the initial transition lead to either, which then picks the starting state:
+
+```
+state review {
+  initial choice depth {
+    [regular] goto quick
+    [else] goto thorough
+  }
+  state quick { … }
+  state thorough { … }
+}
+```
 
 The other state kinds follow UML's own names. A state is declared with `state`, the pseudostates without it:
 

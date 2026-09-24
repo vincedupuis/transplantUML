@@ -3,7 +3,7 @@
 # entry and exit points on a state and on the machine itself, completion
 # transitions, goto terminate and goto final, the shallow and deep history of
 # another state, a named final state, a note on an unnamed terminate and on a
-# history, and a stereotype.
+# history, a choice as a state's initial child, and a stereotype.
 
 fsm shop {
   entry point reorder / loadBasket goto checkout
@@ -27,7 +27,15 @@ fsm shop {
       [large] goto review
       [else] goto paying
     }
-    state review { on approved goto paying }
+    state review {
+      on approved goto paying
+      initial choice depth {
+        [regular] goto quick
+        [else] goto thorough
+      }
+      state quick {}
+      state thorough {}
+    }
     state paying {
       on cash goto paid
       on card goto paid

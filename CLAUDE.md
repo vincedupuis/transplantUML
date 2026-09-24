@@ -84,7 +84,8 @@ warnings.
   terminate` reaches in that scope; `goto local <target>`
   makes a local transition, whose target must be inside the source, and a clause without `goto` is internal; one name
   reaches any state because the names are one namespace for the whole machine, as they are in the model. A state
-  may be marked `initial` (`initial state s { … }`), naming its parent's starting child or, at the top level, the
+  may be marked `initial` (`initial state s { … }`), as may a choice or a junction since UML lets the
+  initial transition lead to one, naming its parent's starting child or, at the top level, the
   machine's. `build.go` holds `Parser` and the `builder` that walks the parse tree into the
   model: `declare` creates every state first, in document order, then `walk` resolves the transitions, because a
   `goto` may name a state declared further down. The unnamed final, terminate and history states have no name

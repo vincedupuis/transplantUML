@@ -582,6 +582,25 @@ func TestBuildInitialSubmachine(t *testing.T) {
 	}
 }
 
+// UML lets the initial transition lead to a choice or a junction, which then
+// picks the starting state.
+func TestBuildInitialPseudostate(t *testing.T) {
+	sm := build(t, `fsm m {
+		initial junction j goto s
+		state s {
+			initial choice c { [x] goto a [else] goto b }
+			state a {}
+			state b {}
+		}
+	}`)
+	if sm.Initial != "j" {
+		t.Errorf("machine initial = %q, want j", sm.Initial)
+	}
+	if got := sm.State("s").Initial; got != "c" {
+		t.Errorf("s initial = %q, want c", got)
+	}
+}
+
 // A choice or junction with a single branch may write it on the declaring
 // line. It holds that one branch only, so the next clause belongs to the
 // enclosing state.
@@ -620,6 +639,7 @@ func TestBuildErrors(t *testing.T) {
 		"fsm m { state a { choice c { goto local b } state b {} } }":                        `a local transition stays inside "c", but "b" is not inside it`,
 		"fsm m { submachine a {} state a {} }":                                              `the machine already has a state called "a"`,
 		"fsm m { initial submachine a {} initial state b {} }":                              `already starts in "a"`,
+		"fsm m { initial state a {} initial choice c goto a }":                              `already starts in "a"`,
 		"fsm m { | n | goto a state a {} }":                                                 `put "goto a" inside a state`,
 		"fsm m { state a { invariant [x] invariant [y] } }":                                 `state "a" already has the invariant [x]`,
 		"fsm m { invariant [x] state a {} }":                                                `put "invariant [x]" inside a state`,

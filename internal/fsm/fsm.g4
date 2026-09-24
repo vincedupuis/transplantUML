@@ -45,7 +45,7 @@ region
     ;
 
 choice
-    :   Note? 'choice' Identifier stereotype?
+    :   Note? Initial? 'choice' Identifier stereotype?
         (   '{'
                 branch*
             '}'
@@ -54,7 +54,7 @@ choice
     ;
 
 junction
-    :   Note? 'junction' Identifier stereotype?
+    :   Note? Initial? 'junction' Identifier stereotype?
         (   '{'
                 branch*
             '}'
