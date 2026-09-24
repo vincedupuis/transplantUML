@@ -129,11 +129,20 @@ func TestGrammarRejects(t *testing.T) {
 		"fsm m { H goto a state a {} }",                             // a history belongs to a state
 		"fsm m { parallel state p { H goto p region r {} } }",       // or a region, never a parallel state
 		"fsm m { submachine s { H goto s } }",                       // nor a submachine state
-		"fsm m { state s { H on e goto s } }",                       // a history default has no trigger
-		"fsm m { state s { H [g] goto s } }",                        // nor a guard
-		"fsm m { state s { H / a } }",                               // and always a goto
-		"fsm m { state s { H* } }",                                  //
-		"fsm m { state s { s.H goto s } }",                          // it is declared inside its state
+		"fsm m { state s { H / a } }",                               // a history default ends in a goto
+		"fsm m { state s { H goto s <<a>> } }",                      // its stereotype follows H
+		"fsm m { final state f {} }",                                // a final state has no behaviours
+		"fsm m { final state f { entry / a } }",                     //
+		"fsm m { final f }",                                         // and is written "final state"
+		"fsm m { initial final state f }",                           // a scope never starts in it
+		"fsm m { final state f.g }",                                 // its name is a name
+		"fsm m { parallel state p { final state f region r {} } }",  // a parallel state holds regions only
+		"fsm m { submachine s { final state f } }",                  // a submachine state's states are the machine's
+		"fsm m { terminate t }",                                     // a terminate is written "terminate state"
+		"fsm m { terminate state t {} }",                            // on one line
+		"fsm m { initial terminate state t }",                       //
+		"fsm m { parallel state p { terminate state region r {} } }",
+		"fsm m { state s { s.H goto s } }", // it is declared inside its state
 	} {
 		if _, err := parse(src); err == nil {
 			t.Errorf("%q: accepted, want a syntax error", src)
@@ -242,6 +251,28 @@ func TestInitialState(t *testing.T) {
 	}
 	if inner[1].Initial() != nil {
 		t.Error("c: marked initial")
+	}
+}
+
+// A final state, a terminate and a history are one-line declarations, named
+// or not, and a history's default is optional. Line breaks carry no meaning,
+// so a clause after a bare H is the declaring state's own.
+func TestEndingsAccepted(t *testing.T) {
+	for _, src := range []string{
+		"fsm m { final state }",
+		"fsm m { final state done }",
+		"| n | fsm m { | n | final state done <<ok>> | n | terminate state <<alarm>> }",
+		"fsm m { state s { final state terminate state abort final state f <<x>> } }",
+		"fsm m { parallel state p { region r { final state terminate state t } } }",
+		"fsm m { state s { H } }",
+		"fsm m { state s { | n | H* <<kept>> } }",
+		"fsm m { state s { H <<kept>> / a goto s } }",
+		"fsm m { state s { H on e goto s } }",
+		"fsm m { state s { H [g] goto s } }",
+	} {
+		if _, err := parse(src); err != nil {
+			t.Errorf("%q: %v", src, err)
+		}
 	}
 }
 

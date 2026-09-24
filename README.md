@@ -149,7 +149,7 @@ it next to it (`<name>.puml`, kept up to date by the tests):
 | [`washing-machine.scxml`](example/washing-machine.scxml) | orthogonal regions, fork and join — and the warnings PlantUML's region limitation produces                            |
 | [`thermostat.json`](example/thermostat.json)             | the same concepts written directly in the model's JSON shape                                                          |
 | [`kiosk.fsm`](example/kiosk.fsm)                         | the `fsm` language: nesting, behaviours, deferred events, invariants, guards, time triggers, transition kinds, notes  |
-| [`shop.fsm`](example/shop.fsm)                           | the `fsm` language's state kinds (parallel, submachine, all pseudostates, history) and stereotypes                    |
+| [`shop.fsm`](example/shop.fsm)                           | the `fsm` language's state kinds (parallel, submachine, all pseudostates, history, named finals) and stereotypes      |
 
 Run any of them with `tpuml -i example/<name>` and compare with the `.puml` beside it; add `-F scxml` or `-F json`
 to see the other formats.
@@ -499,7 +499,7 @@ states by name — so nesting never has to be spelled out, and a target may be d
 | `b.H`, `b.H*` | the shallow or deep history of the state called `b`, created on use           |
 | `local b`, `local H`, `local b.H` | the same state, reached by a local transition                          |
 
-These are the states the language never declares, so the parser creates them the first time a `goto` asks for one,
+The parser creates these states the first time a `goto` or a declaration asks for one,
 named `<scope>.final`, `<scope>.terminate`, `<state>.H` and `<state>.H-deep`. Leaving through an exit point, `final`
 and `terminate` belong to the scope around the point's state. A parallel state has no history of its own, only its
 regions do.
@@ -518,6 +518,30 @@ state player {
 It is the same state `goto H` or `goto H*` reaches, and the one transition leaving it.
 UML gives it no trigger and no guard, and its target has to be inside the state.
 A state or a region declares each kind at most once.
+The actions and the `goto` are optional, so `H` alone only declares the history, to give it a note or a stereotype.
+
+A final state and a terminate pseudostate are declared on one line, with or without a name:
+
+```
+state paying {
+  initial state card {
+    on approved goto paid         # the named final state
+    on stop goto final            # the unnamed one of this scope
+    on fraud goto terminate
+  }
+  | Nothing left to pay. |
+  final state <<closed>>          # is paying.final
+  terminate state                 # is paying.terminate
+}
+| Receipt printed. |
+final state paid <<ok>>
+```
+
+A named one is reached by its name, like any state, so a scope may end in several.
+One without a name is the state `goto final` or `goto terminate` reaches in that scope, which the declaration only
+annotates; a scope declares each at most once.
+Both take a note and a stereotype, and nothing else: UML gives a final state no behaviours.
+They go wherever a state may, except directly in a parallel state, and are never `initial`.
 
 A name is a letter or an underscore followed by letters, digits and underscores — no dots or hyphens,
 which is what keeps those names out of a document's reach. A state whose id in another format carries punctuation therefore has to be

@@ -78,19 +78,22 @@ warnings.
   the machine it refers to, so its body holds clauses only), and the pseudostates `choice`/`junction` (branches,
   `[else]` becomes `Cond` "else"), `fork`, `join`, `entry point`/`exit point`, declared without `state`. A clause
   with no trigger is a completion transition. `goto` targets are a state name, `final`, `terminate`, or history as
-  `H`/`H*`, alone or after a state name (`s.H*`), and a line `H / actions goto target` inside a state or region
-  gives that history its default transition; `goto local <target>`
+  `H`/`H*`, alone or after a state name (`s.H*`); a line `H <<s>> / actions goto target` inside a state or region
+  annotates that history and optionally gives it its default transition, and `final state [name]` / `terminate
+  state [name]` declare a named final or terminate or, without a name, annotate the one `goto final` / `goto
+  terminate` reaches in that scope; `goto local <target>`
   makes a local transition, whose target must be inside the source, and a clause without `goto` is internal; one name
   reaches any state because the names are one namespace for the whole machine, as they are in the model. A state
   may be marked `initial` (`initial state s { … }`), naming its parent's starting child or, at the top level, the
   machine's. `build.go` holds `Parser` and the `builder` that walks the parse tree into the
   model: `declare` creates every state first, in document order, then `walk` resolves the transitions, because a
-  `goto` may name a state declared further down. `final`, `terminate` and history have no declaration syntax, so
-  `synthesize` creates them on first use as `<scope>.final`, `<scope>.terminate`, `<state>.H` and
-  `<state>.H-deep` (an Identifier holds letters, digits and `_` only, so no document can declare those names
+  `goto` may name a state declared further down. The unnamed final, terminate and history states have no name
+  to declare, so `synthesize` creates them on first use, from a `goto` or an unnamed declaration, as
+  `<scope>.final`, `<scope>.terminate`, `<state>.H` and `<state>.H-deep` (an Identifier holds letters, digits and `_` only, so no document can declare those names
   itself). The builder reports only what the model cannot hold or would misplace — two `initial` children in one
   scope would collapse into one `State.Initial`, a repeated state name would collapse the builder's own index,
-  the machine has nowhere to put a top-level `on` clause, and a history or final state made directly inside a
+  the machine has nowhere to put a top-level `on` clause, two unnamed finals, terminates or `H` lines in one scope
+  would fold into one state, and a history or final state made directly inside a
   parallel state would become a region — and `model.Validate()` does the rest.
 - **`internal/jsonsm`** — the model's own JSON shape (struct tags in `model`). Parser uses
   `DisallowUnknownFields`; round-trip equality with the SCXML parser is tested.

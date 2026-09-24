@@ -19,6 +19,12 @@ type fsmVisitor interface {
 	// Visit a parse tree produced by fsmParser#submachine.
 	VisitSubmachine(ctx *SubmachineContext) interface{}
 
+	// Visit a parse tree produced by fsmParser#final.
+	VisitFinal(ctx *FinalContext) interface{}
+
+	// Visit a parse tree produced by fsmParser#terminate.
+	VisitTerminate(ctx *TerminateContext) interface{}
+
 	// Visit a parse tree produced by fsmParser#region.
 	VisitRegion(ctx *RegionContext) interface{}
 

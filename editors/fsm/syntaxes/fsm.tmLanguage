@@ -21,6 +21,7 @@
 		<dict><key>include</key><string>#parallel</string></dict>
 		<dict><key>include</key><string>#point</string></dict>
 		<dict><key>include</key><string>#history</string></dict>
+		<dict><key>include</key><string>#ending</string></dict>
 		<dict><key>include</key><string>#declaration</string></dict>
 		<dict><key>include</key><string>#stereotype</string></dict>
 		<dict><key>include</key><string>#behaviour</string></dict>
@@ -99,6 +100,20 @@
 			<string>(?&lt;![\w.])H\*?(?![\w*])</string>
 			<key>name</key>
 			<string>storage.type.pseudostate.fsm</string>
+		</dict>
+		<key>ending</key>
+		<dict>
+			<key>match</key>
+			<string>\b(final|terminate)\s+(state)\b(?:\s+(?!(?:state|parallel|submachine|final|terminate|choice|junction|fork|join|entry|exit|do|on|after|invariant|initial|goto|H)\b)([A-Za-z_]\w*))?</string>
+			<key>captures</key>
+			<dict>
+				<key>1</key>
+				<dict><key>name</key><string>storage.type.state.fsm</string></dict>
+				<key>2</key>
+				<dict><key>name</key><string>storage.type.state.fsm</string></dict>
+				<key>3</key>
+				<dict><key>name</key><string>entity.name.type.state.fsm</string></dict>
+			</dict>
 		</dict>
 		<key>declaration</key>
 		<dict>

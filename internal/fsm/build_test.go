@@ -395,10 +395,9 @@ func TestBuildHistoryDefault(t *testing.T) {
 		}
 	}
 
-	// The model keeps one default, inside the state whose history it is.
+	// The model keeps the default inside the state whose history it is.
 	for src, want := range map[string]string{
 		"fsm m { initial state a { H goto b initial state c {} } state b {} }": `default leads inside "a", "b" is not inside it`,
-		"fsm m { initial state a { H goto b H goto b initial state b {} } }":   `at most one outgoing transition, its default, has 2`,
 	} {
 		sm, _, err := Parser{}.Parse([]byte(src))
 		if err != nil {
@@ -407,6 +406,55 @@ func TestBuildHistoryDefault(t *testing.T) {
 		if err := sm.Validate(); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s\n  want error containing %q, got %v", src, want, err)
 		}
+	}
+}
+
+// A final or terminate state is declared by name, or without one to annotate
+// the state goto final or goto terminate reaches; an H line annotates its
+// history state whether or not it gives a default.
+func TestBuildDeclaredEndings(t *testing.T) {
+	sm := build(t, `fsm m {
+		initial state a {
+			| kept | H* <<k>>
+			initial state b {
+				on e goto final
+				on f goto terminate
+				on g goto done
+				on h goto abort
+			}
+			| over | final state <<o>>
+			terminate state
+		}
+		| paid | final state done <<ok>>
+		terminate state abort
+		final state
+	}`)
+	for _, want := range []struct {
+		name, parent, note, stereotype string
+		kind                           model.StateKind
+	}{
+		{"a.H-deep", "a", "kept", "k", model.HistoryDeep},
+		{"a.final", "a", "over", "o", model.Final},
+		{"a.terminate", "a", "", "", model.Terminate},
+		{"done", "", "paid", "ok", model.Final},
+		{"abort", "", "", "", model.Terminate},
+		{"final", "", "", "", model.Final},
+	} {
+		s := sm.State(want.name)
+		if s == nil {
+			t.Errorf("missing state %s", want.name)
+			continue
+		}
+		if s.Kind != want.kind || s.Parent != want.parent || s.Note != want.note || s.Stereotype != want.stereotype {
+			t.Errorf("%s: got kind %q parent %q note %q stereotype %q, want %q %q %q %q", want.name,
+				s.Kind, s.Parent, s.Note, s.Stereotype, want.kind, want.parent, want.note, want.stereotype)
+		}
+	}
+	if got := len(sm.States); got != 8 {
+		t.Errorf("want 8 states, one per declaration, got %d", got)
+	}
+	if out := sm.OutgoingTransitions("a.H-deep"); len(out) != 0 {
+		t.Errorf("a.H-deep: want no default, got %v", out)
 	}
 }
 
@@ -577,6 +625,12 @@ func TestBuildErrors(t *testing.T) {
 		"fsm m { invariant [x] state a {} }":                                                `put "invariant [x]" inside a state`,
 		"fsm m { submachine a { on e goto H } }":                                            `state "a" has no children, so it has no history`,
 		"fsm m { state a { H goto a } }":                                                    `state "a" has no children, so it has no history`,
+		"fsm m { state a { H } }":                                                           `state "a" has no children, so it has no history`,
+		"fsm m { state a { H goto b | n | H goto b state b {} } }":                          `state "a" declares H twice`,
+		"fsm m { final state final state }":                                                 `the machine declares an unnamed final state twice`,
+		"fsm m { state a { terminate state | n | terminate state } }":                       `state "a" declares an unnamed terminate state twice`,
+		"fsm m { final state a state a {} }":                                                `the machine already has a state called "a"`,
+		"fsm m { state a {} terminate state a }":                                            `the machine already has a state called "a"`,
 		"fsm m { parallel state p { region r { H goto p } } }":                              `state "r" has no children, so it has no history`,
 	}
 	for src, want := range cases {

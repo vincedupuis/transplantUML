@@ -115,8 +115,25 @@ func (b *builder) declare(scope *node, ctx antlr.ParserRuleContext) {
 			if c.GetKind().GetText() == "exit" {
 				kind = model.ExitPoint
 			}
+		case *parser.FinalContext:
+			name, kind = c.Identifier(), model.Final
+		case *parser.TerminateContext:
+			name, kind = c.Identifier(), model.Terminate
+		case *parser.HistoryContext:
+			suffix, kind := "H", model.HistoryShallow
+			if c.GetKind().GetText() == "H*" {
+				suffix, kind = "H-deep", model.HistoryDeep
+			}
+			b.unnamed(scope, c, c.GetKind().GetText(), suffix, kind)
+			continue
 		default:
 			continue // events, which walk reads
+		}
+		// A final or terminate state without a name is the one goto final or
+		// goto terminate reaches.
+		if name == nil {
+			b.unnamed(scope, child.(antlr.ParserRuleContext), "an unnamed "+string(kind)+" state", string(kind), kind)
+			continue
 		}
 		n := b.add(scope, name, kind, child.(antlr.ParserRuleContext))
 		if n == nil {
@@ -149,6 +166,26 @@ func (b *builder) declare(scope *node, ctx antlr.ParserRuleContext) {
 	// Every region of a parallel state is entered, so it starts in none.
 	if initial == nil && resting && (scope.state == nil || !scope.state.IsParallel()) {
 		b.warnings.Addf("%s has no initial state", describe(scope))
+	}
+}
+
+// unnamed declares the final, terminate or history state of scope that the
+// language otherwise creates on a goto, so that it can carry a note and a
+// stereotype. A second declaration would fold into the same state.
+func (b *builder) unnamed(scope *node, ctx antlr.ParserRuleContext, what, suffix string, kind model.StateKind) {
+	at := ctx.GetStart()
+	if leading(ctx) != nil {
+		at = ctx.GetChild(1).(antlr.TerminalNode).GetSymbol()
+	}
+	if _, ok := scope.synth[suffix]; ok {
+		b.failf(at, "%s declares %s twice", describe(scope), what)
+		return
+	}
+	b.synthesize(scope, suffix, kind)
+	s := scope.synth[suffix]
+	s.Note = note(leading(ctx))
+	if st := ctx.(stereotyped).Stereotype(); st != nil {
+		s.Stereotype = st.Identifier().GetText()
 	}
 }
 
@@ -303,20 +340,22 @@ func (b *builder) event(n *node, ec parser.IEventContext) {
 	b.sm.Transitions = append(b.sm.Transitions, t)
 }
 
-// history adds the default transition of the history state an H or H* line
-// declares, the one taken while the state has no history yet. It is the same
-// history state that goto H or goto H* leads to.
+// history adds the default transition an H or H* line may give the history
+// state declare made for it, the one taken while the state has no history
+// yet.
 func (b *builder) history(n *node, hc parser.IHistoryContext) {
 	kind := hc.GetKind()
 	if len(n.order) == 0 {
 		b.failf(kind, "%s has no children, so it has no history", describe(n))
 		return
 	}
-	suffix, hk := "H", model.HistoryShallow
-	if kind.GetText() == "H*" {
-		suffix, hk = "H-deep", model.HistoryDeep
+	if hc.Goto_() == nil {
+		return
 	}
-	b.synthesize(n, suffix, hk)
+	suffix := "H"
+	if kind.GetText() == "H*" {
+		suffix = "H-deep"
+	}
 	// The history sits inside n, so goto final ends n's own region.
 	b.leave(&node{state: n.synth[suffix], parent: n}, hc.Actions(), hc.Goto_())
 }

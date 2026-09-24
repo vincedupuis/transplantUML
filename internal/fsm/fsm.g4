@@ -4,14 +4,14 @@ grammar fsm;
 fsm
     :   Note? 'fsm' Identifier
         '{'
-            (state | parallel | submachine | choice | junction | fork | join | point | event)*
+            (state | parallel | submachine | final | terminate | choice | junction | fork | join | point | event)*
         '}' EOF
     ;
 
 state
     :   Note? Initial? 'state' Identifier stereotype?
         '{'
-            (state | parallel | submachine | choice | junction | fork | join | point | history | event)*
+            (state | parallel | submachine | final | terminate | choice | junction | fork | join | point | history | event)*
         '}'
     ;
 
@@ -29,10 +29,18 @@ submachine
         '}'
     ;
 
+final
+    :   Note? 'final' 'state' Identifier? stereotype?
+    ;
+
+terminate
+    :   Note? 'terminate' 'state' Identifier? stereotype?
+    ;
+
 region
     :   Note? 'region' Identifier stereotype?
         '{'
-            (state | parallel | submachine | choice | junction | fork | join | history)*
+            (state | parallel | submachine | final | terminate | choice | junction | fork | join | history)*
         '}'
     ;
 
@@ -70,7 +78,7 @@ point
     ;
 
 history
-    :   kind=('H' | 'H*') actions? goto
+    :   Note? kind=('H' | 'H*') stereotype? (actions? goto)?
     ;
 
 stereotype

@@ -23,6 +23,14 @@ func (v *BasefsmVisitor) VisitSubmachine(ctx *SubmachineContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasefsmVisitor) VisitFinal(ctx *FinalContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasefsmVisitor) VisitTerminate(ctx *TerminateContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasefsmVisitor) VisitRegion(ctx *RegionContext) interface{} {
 	return v.VisitChildren(ctx)
 }

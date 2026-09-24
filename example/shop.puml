@@ -9,13 +9,14 @@ state "«secure»\ncheckout" as checkout <<secure>> {
     [*] --> address
     state express <<entryPoint>>
     state cancelled <<exitPoint>>
+    state "checkout.H" as checkout_H <<history>>
+    note right of checkout_H : Back to the step the customer left.
     state address
     state route <<choice>>
     state review
     state paying
     state paid <<start>>
     state "checkout.H-deep" as checkout_H_deep <<history*>>
-    state "checkout.H" as checkout_H <<history>>
     express --> paying: / useSavedCard
     address --> route: next\n/ computeTotal
     route --> review: [ large ]
@@ -39,7 +40,10 @@ state shipping {
 }
 state merge <<join>>
 state done
+state refunded <<end>>
+note right of refunded : Money returned.
 state terminate <<end>>
+note right of terminate : Fraud closes the shop.
 state final <<end>>
 reorder --> checkout: / loadBasket
 browsing --> checkout: buy
@@ -54,5 +58,6 @@ packed --> merge
 merge --> done: / close
 done --> checkout_H_deep: reopen
 done --> checkout_H: back
+done --> refunded: refund
 done --> final
 @enduml
