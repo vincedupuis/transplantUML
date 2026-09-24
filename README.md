@@ -355,7 +355,7 @@ The command's own input format, a compact alternative to writing SCXML by hand. 
 [`internal/fsm/fsm.g4`](internal/fsm/fsm.g4); [`example/kiosk.fsm`](example/kiosk.fsm) and
 [`example/shop.fsm`](example/shop.fsm) between them use every construct.
 [`docs/uml-coverage.md`](docs/uml-coverage.md) compares the language with UML state machines, concept by concept,
-with an example of each.
+with an example of each. [`docs/fsm-syntax.md`](docs/fsm-syntax.md) is a syntax synopsis of every construct.
 
 ```
 fsm kiosk {
