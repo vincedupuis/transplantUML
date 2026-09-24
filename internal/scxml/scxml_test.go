@@ -162,6 +162,17 @@ func TestUMLConcepts(t *testing.T) {
 	if got := sm.State("outer"); got.Initial != "inner" || !slices.Equal(got.InitialActions, []string{"log('hi')"}) {
 		t.Errorf("outer initial = %q with %q, want inner with the log", got.Initial, got.InitialActions)
 	}
+	// done.invoke of the submachine's invoke and done.state of the state itself
+	// are UML's completion event.
+	for _, source := range []string{"sub", "outer"} {
+		found := false
+		for _, tr := range sm.OutgoingTransitions(source) {
+			found = found || (tr.Event == "" && slices.Equal(tr.Targets, []string{"done"}))
+		}
+		if !found {
+			t.Errorf("%s: no completion transition to done", source)
+		}
+	}
 	if got := sm.State("outer").ExitNote; got != "Says goodbye." {
 		t.Errorf("outer exit note = %q", got)
 	}
@@ -326,5 +337,26 @@ func TestErrors(t *testing.T) {
 	}
 	if _, _, err := (Parser{}).Parse([]byte("<root/>")); err == nil || !strings.Contains(err.Error(), "<scxml>") {
 		t.Errorf("missing root: %v", err)
+	}
+}
+
+// A bare done.invoke matches every invoke of its state, so it is the
+// submachine's completion only when nothing else is invoked there.
+func TestCompletionEvent(t *testing.T) {
+	for src, want := range map[string]string{
+		`<state id="s"><invoke src="m.scxml"/><transition event="done.invoke" target="s"/></state>`:                                "",
+		`<state id="s"><invoke src="m.scxml"/><transition event="done.invoke.*" target="s"/></state>`:                              "",
+		`<state id="s"><invoke id="i" src="m.scxml"/><transition event="done.invoke.j" target="s"/></state>`:                       "done.invoke.j",
+		`<state id="s"><invoke src="m.scxml"/><invoke src="job.py" type="x"/><transition event="done.invoke" target="s"/></state>`: "done.invoke",
+		`<state id="s"><invoke src="job.py" type="x"/><transition event="done.invoke" target="s"/></state>`:                        "done.invoke",
+		`<state id="s"><state id="a"/><transition event="done.state.a" target="s"/></state>`:                                       "done.state.a",
+	} {
+		sm, _, err := Parser{}.Parse([]byte(`<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0">` + src + `</scxml>`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := sm.OutgoingTransitions("s")[0].Event; got != want {
+			t.Errorf("%s: event = %q, want %q", src, got, want)
+		}
 	}
 }

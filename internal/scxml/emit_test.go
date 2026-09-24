@@ -124,6 +124,47 @@ func TestEmitMachineInitialActions(t *testing.T) {
 	}
 }
 
+// A completion transition waits for the done event of what the state runs: a
+// submachine, a region's final state. A simple state completes at once, which
+// is wrong only while a do activity is running.
+func TestEmitCompletion(t *testing.T) {
+	sm := &model.StateMachine{
+		Initial: "c",
+		States: []*model.State{
+			{Name: "c", Kind: model.Normal, Initial: "c1"},
+			{Name: "c1", Parent: "c", Kind: model.Normal},
+			{Name: "s", Kind: model.Normal, Submachine: "help"},
+			{Name: "d", Kind: model.Normal, Do: []string{"invoke(job.py)"}},
+			{Name: "a", Kind: model.Normal},
+		},
+		Transitions: []*model.Transition{
+			{Source: "c", Targets: []string{"s"}},
+			{Source: "s", Targets: []string{"d"}},
+			{Source: "d", Targets: []string{"a"}},
+			{Source: "a", Targets: []string{"c"}},
+		},
+	}
+	out, warnings, err := Emitter{}.Emit(sm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`<transition event="done.state.c" target="s"/>`,
+		`<invoke id="s.submachine" src="help"/>`,
+		`<transition event="done.invoke.s.submachine" target="d"/>`,
+		`<transition target="a"/>`,
+		`<transition target="c"/>`,
+	} {
+		if !strings.Contains(string(out), want) {
+			t.Errorf("missing %s in:\n%s", want, out)
+		}
+	}
+	want := []string{`state "d": SCXML takes its completion transition without waiting for the do activity to end`}
+	if !reflect.DeepEqual([]string(warnings), want) {
+		t.Errorf("warnings = %q, want %q", warnings, want)
+	}
+}
+
 // The extension namespace is declared only when something uses it.
 func TestEmitDeclaresExtensionOnlyWhenUsed(t *testing.T) {
 	if out := emit(t, parseFile(t, "testdata/edge.scxml")); strings.Contains(string(out), "xmlns:tpuml") {

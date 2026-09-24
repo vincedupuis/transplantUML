@@ -62,8 +62,9 @@ in one document.</tpuml:note>
   </parallel>
 
   <state id="sub">
-    <invoke src="child.scxml"/>
+    <invoke id="helper" src="child.scxml"/>
     <transition event="back" target="merge"/>
+    <transition event="done.invoke.helper" target="done"/>
   </state>
 
   <state id="outer">
@@ -72,6 +73,7 @@ in one document.</tpuml:note>
     <tpuml:note about="initial">Not a thing a state lists.</tpuml:note>
     <tpuml:note about="defer">Names no event.</tpuml:note>
     <onexit><log expr="'bye'"/></onexit>
+    <transition event="done.state.outer" target="done"/>
     <state id="in" tpuml:kind="entry-point"><transition target="inner"/></state>
     <state id="out" tpuml:kind="exit-point"><transition target="sub"/></state>
     <state id="inner">

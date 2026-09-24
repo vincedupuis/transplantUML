@@ -49,7 +49,7 @@ symbol, and so on. Warnings go to stderr and never fail the conversion.
 | Variables                              | `Variables` on the machine / the state       | `<datamodel>`                                           | `legend` / `X : name = value`                       |
 | Trigger, guard, effect                 | `Event`, `Cond`, `Actions`                   | `event`, `cond`, executable content                     | `A --> B : ev [ g ] / act`                          |
 | Time trigger `after(5s)`               | `After`                                      | `<send delay(expr)>` in `<onentry>`, `<cancel>` on exit  | `after(5s)`                                         |
-| Completion transition                  | no `Event`, no `After`                       | eventless `<transition>`                                | unlabelled arrow                                    |
+| Completion transition                  | no `Event`, no `After`                       | eventless, or on `done.state` / `done.invoke`           | unlabelled arrow                                    |
 | External / local / internal transition | `Kind`                                       | `type="internal"`; `tpuml:kind="local"` ⚠               | `X : ev / act` for internal; local drawn external ⚠ |
 | Note                                   | `Note` on the machine, a state, a transition | `<tpuml:note>`                                          | `note`, `note on link`                              |
 | Note on behaviour/invariant/deferral   | `EntryNote`, `DoNote`, …, `DeferNotes`       | `<tpuml:note about>` on the state                       | lines of the state's `note`                         |
@@ -303,6 +303,10 @@ and a **do activity** otherwise: `invoke(src)` or `invoke(src, type)` for a plai
   are not treated as actions. `delayexpr` counts as well, and the emitter writes `After` back to whichever of the
   two fits: `delay` when it is a time value such as `5s` or `250ms`, `delayexpr` when it is anything the engine has
   to evaluate.
+- A transition on `done.state.S` in the state `S` is a **completion transition**, since SCXML raises that event when
+  a compound or parallel state completes. So is one on `done.invoke.I` in a submachine state whose `<invoke>` has
+  the id `I`, and one on a bare `done.invoke` there when the submachine is the state's only invoke. The emitter
+  writes a completion transition back on those events, giving the submachine's `<invoke>` the id `S.submachine`.
 
 ### The tpuml extension vocabulary
 
@@ -335,11 +339,15 @@ equivalent, not byte-identical, to the one it came from:
   XML, which are written back as themselves;
 - a time trigger becomes `<send event="after.D" delay="D" id="…">` in `<onentry>`, the matching `<cancel>` in
   `<onexit>`, and a transition on that event;
+- a completion transition waits for `done.state.S` on a compound or parallel state and `done.invoke.S.submachine`
+  on a submachine state; elsewhere it stays eventless, which SCXML takes at once, so a simple state with a do
+  activity warns;
 - comments and anything the parser dropped are not preserved.
 
 Warnings name what SCXML can only approximate: join (the first region to reach it leaves the parallel state),
 terminate (a `<final>`, which runs exit actions), local transitions (written external), deferred events (ignored by
-engines), and free-text do activities (written as `<invoke>` content).
+engines), free-text do activities (written as `<invoke>` content), and a completion transition that cannot wait for
+a do activity.
 
 ## The fsm language
 

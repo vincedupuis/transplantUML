@@ -61,5 +61,7 @@ work --> stop: abort
 work --> in: enter
 left --> sync: l
 sub --> merge: back
+sub --> done
+outer --> done
 out --> sub
 @enduml

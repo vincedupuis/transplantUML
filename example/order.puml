@@ -23,7 +23,7 @@ check --> review: [ total > 1000 ]
 check --> payment: [ total <= 1000 ]
 review --> payment: approve
 review --> rejected: reject
-payment --> paid: done.invoke
+payment --> paid
 payment --> retry: error.payment\n/ attempts = attempts + 1
 retry --> payment: [ attempts < 3 ]
 retry --> rejected: [ attempts >= 3 ]

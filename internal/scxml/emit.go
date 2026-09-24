@@ -132,10 +132,13 @@ func (e *emitter) children(el *etree.Element, parent string) error {
 
 		for _, t := range scxmlTransitions(s, transitions) {
 			tr := child.CreateElement("transition")
-			if t.After != "" {
+			switch {
+			case t.After != "":
 				tr.CreateAttr("event", afterEvent(t.After))
-			} else {
-				setAttr(tr, "event", t.Event)
+			case t.Event == "":
+				setAttr(tr, "event", e.completion(s))
+			default:
+				tr.CreateAttr("event", t.Event)
 			}
 			setAttr(tr, "cond", t.Cond)
 			setAttr(tr, "target", strings.Join(e.targets(t), " "))
@@ -167,6 +170,27 @@ func (e *emitter) initial(el *etree.Element, s *model.State) {
 	tr.CreateAttr("target", s.Initial)
 	executable(tr, s.InitialActions)
 }
+
+// completion returns the event SCXML raises when s completes, which UML's
+// completion transitions wait for. A submachine state completes when the
+// machine it invokes does, a compound or parallel state when it reaches its
+// final state. A simple state completes on entry, when an eventless transition
+// is taken, unless a do activity keeps it busy.
+func (e *emitter) completion(s *model.State) string {
+	switch {
+	case s.Submachine != "":
+		return "done.invoke." + invokeID(s)
+	case s.IsParallel() || (s.IsNormal() && len(e.sm.Children(s.Name)) > 0):
+		return "done.state." + s.Name
+	case len(s.Do) > 0:
+		e.warn.Addf("state %q: SCXML takes its completion transition without waiting for the do activity to end", s.Name)
+	}
+	return ""
+}
+
+// invokeID names the <invoke> of a submachine state, so that a transition can
+// wait for its done.invoke event.
+func invokeID(s *model.State) string { return s.Name + ".submachine" }
 
 // reference warns about an entry or exit point of a submachine state, which
 // is left out: an invoked SCXML machine starts in its own initial state and
@@ -239,7 +263,9 @@ func (e *emitter) pseudo(el *etree.Element, s *model.State) {
 // invokes writes the submachine reference and the do activities as <invoke>.
 func (e *emitter) invokes(el *etree.Element, s *model.State) {
 	if s.Submachine != "" {
-		el.CreateElement("invoke").CreateAttr("src", s.Submachine)
+		inv := el.CreateElement("invoke")
+		inv.CreateAttr("id", invokeID(s))
+		inv.CreateAttr("src", s.Submachine)
 	}
 	for _, do := range s.Do {
 		if child, ok := parseElement(do); ok {

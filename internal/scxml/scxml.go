@@ -119,8 +119,11 @@ func (p *parser) state(el *etree.Element, parent string) {
 	}
 	st.Variables = p.datamodel(el)
 	p.aboutNotes(st, el)
+	var invokeID string // of the submachine, whose done.invoke event is the state's completion
 	for _, inv := range el.SelectElements("invoke") {
-		p.invoke(st, inv)
+		if p.invoke(st, inv) {
+			invokeID = inv.SelectAttrValue("id", "")
+		}
 	}
 
 	timers := timers(el)
@@ -134,6 +137,9 @@ func (p *parser) state(el *etree.Element, parent string) {
 			Cond:    t.SelectAttrValue("cond", ""),
 			Actions: executableContent(t, nil),
 			Note:    note(t),
+		}
+		if completes(st, tr.Event, invokeID) {
+			tr.Event = ""
 		}
 		if timer, ok := timers[tr.Event]; ok {
 			tr.Event, tr.After = "", timer.delay
@@ -199,9 +205,26 @@ func connectorKind(st *model.State, transitions []*model.Transition) model.State
 	return model.Normal
 }
 
+// completes reports whether event is UML's completion event of st. SCXML
+// raises done.state on a compound state when it completes and done.invoke
+// when an invoked machine does. A bare done.invoke matches every invoke of
+// the state, so it means the submachine's only when nothing else is invoked.
+func completes(st *model.State, event, invokeID string) bool {
+	switch {
+	case event == "done.state."+st.Name:
+		return true
+	case st.Submachine == "":
+		return false
+	case invokeID != "" && event == "done.invoke."+invokeID:
+		return true
+	}
+	return len(st.Do) == 0 && (event == "done.invoke" || event == "done.invoke.*")
+}
+
 // invoke maps an <invoke> element: invoking another SCXML document is a
-// submachine state, anything else is a do activity.
-func (p *parser) invoke(st *model.State, inv *etree.Element) {
+// submachine state, anything else is a do activity. It reports whether the
+// element made st a submachine state.
+func (p *parser) invoke(st *model.State, inv *etree.Element) bool {
 	typ := inv.SelectAttrValue("type", "")
 	src := joinNonEmpty(" ", inv.SelectAttrValue("src", ""), inv.SelectAttrValue("srcexpr", ""))
 	isSCXML := typ == "" || typ == "scxml" || strings.HasPrefix(typ, "http://www.w3.org/TR/scxml")
@@ -212,11 +235,13 @@ func (p *parser) invoke(st *model.State, inv *etree.Element) {
 	switch {
 	case simple && isSCXML && st.Submachine == "":
 		st.Submachine = src
+		return true
 	case simple:
 		st.Do = append(st.Do, "invoke("+joinNonEmpty(", ", src, typ)+")")
 	default:
 		st.Do = append(st.Do, rawXML(inv))
 	}
+	return false
 }
 
 // timer is a <send delay> in <onentry> and its <cancel> in <onexit>: the SCXML

@@ -66,8 +66,9 @@ warnings.
   canonical escaping) so the string is stable. What SCXML has no element for comes from the `tpuml` extension
   namespace (`ExtNamespace`; matched by URI, not prefix): `tpuml:kind`, `tpuml:defer`, `tpuml:invariant`,
   `tpuml:stereotype`, `<tpuml:note>` (on a state, `about="entry|exit|do|invariant|defer"` says what it
-  describes). Two idioms are recognised without markup: transient states as choice/fork (`connectorKind`) and
-  `<send delay>`+`<cancel>` as a time trigger (`timers`). Anything else unknown under a state or the root raises a
+  describes). Three idioms are recognised without markup: transient states as choice/fork (`connectorKind`),
+  `<send delay>`+`<cancel>` as a time trigger (`timers`), and `done.state`/`done.invoke` as the completion event
+  (`completes`); the emitter writes completion transitions back on those events. Anything else unknown under a state or the root raises a
   parser warning. `Emitter` (`emit.go`) rebuilds the tree from `Parent` links, writes
   the initial child as an attribute, turns action strings back into `<script>` bodies — except those that are
   XML, which are re-inserted as elements — writes a fork's transitions as one multi-target transition and an
