@@ -470,8 +470,13 @@ regions do. A name is a letter or an underscore followed by letters, digits and 
 which is what keeps those names out of a document's reach. A state whose id in another format carries punctuation therefore has to be
 renamed when the machine is written in this language.
 
-Everything else UML has — variables, stereotypes, notes — has no syntax
-yet.
+The language has no variables, on purpose.
+Declaring data would need types and literals, and those differ from one target language to the next.
+The data lives in the generated code instead, and the document handles it through named actions and predicates:
+`/ initCount` and `/ incrementCount` rather than an assignment, `[tooManyRetries]` rather than a comparison.
+A machine read from another format keeps its `Variables` in the model; only this language cannot declare them.
+
+Stereotypes and notes have no syntax yet.
 
 ### Editor support
 
