@@ -72,10 +72,11 @@ warnings.
 - **`internal/fsm`** — tpuml's own DSL (`fsm name { state s { on ev [guard] / actions goto target } }`), an
   ANTLR4 grammar in `fsm.g4`. `parser/` is generated from it (`make generate`, Go target with `-visitor
   -no-listener`) and committed so the build needs no Java; never edit it by hand, and regenerate it after any
-  grammar change. Kinds use UML's names: `state`, `parallel state` holding `region`s, and the pseudostates
-  `choice`/`junction` (branches, `[else]` becomes `Cond` "else"), `fork`, `join`, `entry point`/`exit point`,
-  declared without `state`. A clause with no trigger is a completion transition. `goto` targets are a state
-  name, `final`, `terminate`, or history as `H`/`H*`, alone or after a state name (`s.H*`); `goto local <target>`
+  grammar change. Kinds use UML's names: `state`, `parallel state` holding `region`s, `submachine` (named after
+  the machine it refers to, so its body holds clauses only), and the pseudostates `choice`/`junction` (branches,
+  `[else]` becomes `Cond` "else"), `fork`, `join`, `entry point`/`exit point`, declared without `state`. A clause
+  with no trigger is a completion transition. `goto` targets are a state name, `final`, `terminate`, or history as
+  `H`/`H*`, alone or after a state name (`s.H*`); `goto local <target>`
   makes a local transition, whose target must be inside the source, and a clause without `goto` is internal; one name
   reaches any state because the names are one namespace for the whole machine, as they are in the model. A state
   may be marked `initial` (`initial state s { … }`), naming its parent's starting child or, at the top level, the

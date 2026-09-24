@@ -93,7 +93,7 @@
 		<key>declaration</key>
 		<dict>
 			<key>match</key>
-			<string>\b(state|region|choice|junction|fork|join)\s+([A-Za-z_]\w*)</string>
+			<string>\b(state|submachine|region|choice|junction|fork|join)\s+([A-Za-z_]\w*)</string>
 			<key>captures</key>
 			<dict>
 				<key>1</key>

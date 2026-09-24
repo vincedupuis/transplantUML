@@ -19,6 +19,10 @@ func (v *BasefsmVisitor) VisitParallel(ctx *ParallelContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasefsmVisitor) VisitSubmachine(ctx *SubmachineContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasefsmVisitor) VisitRegion(ctx *RegionContext) interface{} {
 	return v.VisitChildren(ctx)
 }

@@ -3,6 +3,8 @@ title shop
 [*] --> browsing
 state reorder <<entryPoint>>
 state browsing
+state "support: support" as support
+support : entry / openChat
 state checkout {
     [*] --> address
     state express <<entryPoint>>
@@ -43,6 +45,8 @@ reorder --> checkout: / loadBasket
 browsing --> checkout: buy
 browsing --> express: quickBuy
 browsing --> terminate: fraud
+browsing --> support: help
+support --> browsing
 cancelled --> browsing
 paid --> split: / receipt
 split --> packing

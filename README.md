@@ -148,7 +148,7 @@ it next to it (`<name>.puml`, kept up to date by the tests):
 | [`washing-machine.scxml`](example/washing-machine.scxml) | orthogonal regions, fork and join — and the warnings PlantUML's region limitation produces                            |
 | [`thermostat.json`](example/thermostat.json)             | the same concepts written directly in the model's JSON shape                                                          |
 | [`kiosk.fsm`](example/kiosk.fsm)                         | the `fsm` language: nested states, behaviours, deferred events, guards, time triggers, transition kinds, `goto` forms |
-| [`shop.fsm`](example/shop.fsm)                           | the `fsm` language's state kinds: parallel, choice, junction, fork, join, entry/exit points, history                  |
+| [`shop.fsm`](example/shop.fsm)                           | the `fsm` language's state kinds: parallel, submachine, choice, junction, fork, join, entry/exit points, history      |
 
 Run any of them with `tpuml -i example/<name>` and compare with the `.puml` beside it; add `-F scxml` or `-F json`
 to see the other formats.
@@ -423,6 +423,10 @@ fork split {                          # enters several regions at once
 join merge / close goto done          # waits for every region, then leaves
 entry point express / useSavedCard goto paying
 exit point cancelled goto browsing
+submachine support {                  # runs the machine called support
+  entry / openChat
+  goto browsing                       # leaves when that machine completes
+}
 ```
 
 A parallel state holds regions, its points and its own clauses, and a region holds only states and pseudostates;
@@ -433,6 +437,12 @@ optional actions and a `goto`; a single branch may go on the declaring line inst
 an exit point are a single line. Entry and exit points go in a state, a parallel state or the machine itself: an
 entry point leads into its state past the initial child, an exit point out of it. Every pseudostate may be declared
 wherever a state may, except that a region holds no points.
+
+A submachine state is named after the machine it refers to, which is another `fsm` document.
+The name becomes both the state's name and its `Submachine` reference.
+Its states come from that machine, so its body holds only behaviours, deferred events and transitions.
+It may be marked `initial` and goes wherever a state may.
+Since state names are one namespace, a document can use each submachine once.
 
 A `goto` names its target outright. State names are one namespace for the whole machine — the model keys its
 states by name — so nesting never has to be spelled out, and a target may be declared further down the document:
@@ -453,7 +463,7 @@ regions do. A name is a letter or an underscore followed by letters, digits and 
 which is what keeps those names out of a document's reach. A state whose id in another format carries punctuation therefore has to be
 renamed when the machine is written in this language.
 
-Everything else UML has — submachines, invariants, variables, stereotypes, notes — has no syntax
+Everything else UML has — invariants, variables, stereotypes, notes — has no syntax
 yet.
 
 ### Editor support

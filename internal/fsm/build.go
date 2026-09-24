@@ -58,9 +58,9 @@ func parse(src string) (parser.IFsmContext, error) {
 }
 
 // node mirrors one declaration of the parse tree: a state, a parallel state, a
-// region or a pseudostate. The builder needs the tree twice: once to declare
-// every state, and again to resolve the goto targets, which may name a state
-// declared further down the document.
+// submachine state, a region or a pseudostate. The builder needs the tree
+// twice: once to declare every state, and again to resolve the goto targets,
+// which may name a state declared further down the document.
 type node struct {
 	state  *model.State
 	parent *node                   // nil for the root, whose state is nil too
@@ -97,6 +97,8 @@ func (b *builder) declare(scope *node, ctx antlr.ParserRuleContext) {
 			name, kind, mark = c.Identifier(), model.Normal, c.Initial()
 		case *parser.ParallelContext:
 			name, kind, mark = c.Identifier(), model.Parallel, c.Initial()
+		case *parser.SubmachineContext:
+			name, kind, mark = c.Identifier(), model.Normal, c.Initial()
 		case *parser.RegionContext:
 			name, kind = c.Identifier(), model.Normal
 		case *parser.ChoiceContext:
@@ -118,6 +120,10 @@ func (b *builder) declare(scope *node, ctx antlr.ParserRuleContext) {
 		n := b.add(scope, name, kind, child.(antlr.ParserRuleContext))
 		if n == nil {
 			continue
+		}
+		// The state is named after the machine it refers to.
+		if _, ok := child.(*parser.SubmachineContext); ok {
+			n.state.Submachine = n.state.Name
 		}
 		resting = resting || kind == model.Normal || kind == model.Parallel
 		if mark != nil {
@@ -171,6 +177,10 @@ func (b *builder) walk(scope *node) {
 				b.event(n, ec)
 			}
 		case *parser.ParallelContext:
+			for _, ec := range c.AllEvent() {
+				b.event(n, ec)
+			}
+		case *parser.SubmachineContext:
 			for _, ec := range c.AllEvent() {
 				b.event(n, ec)
 			}

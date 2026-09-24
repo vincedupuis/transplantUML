@@ -94,6 +94,13 @@ func TestGrammarRejects(t *testing.T) {
 		"fsm m { state terminate {} }",
 		"fsm m { state else {} }",
 		"fsm m { state s { on e [else or g] goto s } }",
+		"fsm m { state submachine {} }",
+		"fsm m { submachine s { state t {} } }",           // a submachine state's states are the machine's
+		"fsm m { submachine s { choice c goto s } }",      // and so are its pseudostates
+		"fsm m { submachine s { entry point e goto s } }", //
+		"fsm m { submachine state s {} }",                 // submachine replaces state
+		"fsm m { submachine s }",                          // and keeps its braces
+		"fsm m { parallel state p { submachine s {} } }",  // a parallel state holds regions only
 	} {
 		if _, err := parse(src); err == nil {
 			t.Errorf("%q: accepted, want a syntax error", src)

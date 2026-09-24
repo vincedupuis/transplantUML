@@ -238,6 +238,7 @@ func TestBuildStateKinds(t *testing.T) {
 		{"route", "checkout", model.Choice},
 		{"paid", "checkout", model.Junction},
 		{"split", "", model.Fork},
+		{"support", "", model.Normal}, // a submachine state
 		{"shipping", "", model.Parallel},
 		{"warehouse", "shipping", model.Normal}, // a region
 		{"packing", "warehouse", model.Normal},
@@ -255,6 +256,10 @@ func TestBuildStateKinds(t *testing.T) {
 		if s.Parent != want.parent || s.Kind != want.kind {
 			t.Errorf("state %q: parent %q kind %q, want %q/%q", s.Name, s.Parent, s.Kind, want.parent, want.kind)
 		}
+	}
+	// A submachine state is named after the machine it refers to.
+	if s := sm.State("support"); s.Submachine != "support" || !slices.Equal(s.OnEntry, []string{"openChat"}) {
+		t.Errorf("support: submachine %q entry %v, want support/[openChat]", s.Submachine, s.OnEntry)
 	}
 	// Every region is entered, so the parallel state starts in none of them;
 	// each region starts in its own initial child.
@@ -277,7 +282,8 @@ func TestBuildStateKinds(t *testing.T) {
 		{"paid", "", "split", []string{"receipt"}},
 		{"split", "", "packing", nil}, // one transition per fork line
 		{"split", "", "invoicing", []string{"notify"}},
-		{"packed", "", "merge", nil}, // a completion transition
+		{"support", "", "browsing", nil}, // leaves when the submachine completes
+		{"packed", "", "merge", nil},     // a completion transition
 		{"sent", "paidInFull", "merge", nil},
 		{"merge", "", "done", []string{"close"}},
 	} {
@@ -338,6 +344,18 @@ func TestBuildTwoClausesOnOneLine(t *testing.T) {
 	}
 }
 
+// A submachine state may start its scope, which then starts in the machine it
+// refers to.
+func TestBuildInitialSubmachine(t *testing.T) {
+	sm := build(t, "fsm m { initial state s { initial submachine pay { goto s } } }")
+	if got := sm.State("s").Initial; got != "pay" {
+		t.Errorf("s initial = %q, want pay", got)
+	}
+	if got := sm.State("pay"); got.Parent != "s" || got.Submachine != "pay" {
+		t.Errorf("pay: parent %q submachine %q, want s/pay", got.Parent, got.Submachine)
+	}
+}
+
 // A choice or junction with a single branch may write it on the declaring
 // line. It holds that one branch only, so the next clause belongs to the
 // enclosing state.
@@ -374,6 +392,9 @@ func TestBuildErrors(t *testing.T) {
 		"fsm m { state a { on e goto local b } state b {} }":                                `a local transition stays inside "a", but "b" is not inside it`,
 		"fsm m { state a { state c {} } state b { on e goto local a.H } }":                  `a local transition stays inside "b", but "a.H" is not inside it`,
 		"fsm m { state a { choice c { goto local b } state b {} } }":                        `a local transition stays inside "c", but "b" is not inside it`,
+		"fsm m { submachine a {} state a {} }":                                              `the machine already has a state called "a"`,
+		"fsm m { initial submachine a {} initial state b {} }":                              `already starts in "a"`,
+		"fsm m { submachine a { on e goto H } }":                                            `state "a" has no children, so it has no history`,
 	}
 	for src, want := range cases {
 		_, _, err := Parser{}.Parse([]byte(src))

@@ -16,6 +16,9 @@ type fsmVisitor interface {
 	// Visit a parse tree produced by fsmParser#parallel.
 	VisitParallel(ctx *ParallelContext) interface{}
 
+	// Visit a parse tree produced by fsmParser#submachine.
+	VisitSubmachine(ctx *SubmachineContext) interface{}
+
 	// Visit a parse tree produced by fsmParser#region.
 	VisitRegion(ctx *RegionContext) interface{}
 

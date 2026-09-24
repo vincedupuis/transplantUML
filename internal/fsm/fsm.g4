@@ -4,14 +4,14 @@ grammar fsm;
 fsm
     :   'fsm' Identifier
         '{'
-            (state | parallel | choice | junction | fork | join | point | event)*
+            (state | parallel | submachine | choice | junction | fork | join | point | event)*
         '}' EOF
     ;
 
 state
     :   Initial? 'state' Identifier
         '{'
-            (state | parallel | choice | junction | fork | join | point | event)*
+            (state | parallel | submachine | choice | junction | fork | join | point | event)*
         '}'
     ;
 
@@ -22,10 +22,17 @@ parallel
         '}'
     ;
 
+submachine
+    :   Initial? 'submachine' Identifier
+        '{'
+            event*
+        '}'
+    ;
+
 region
     :   'region' Identifier
         '{'
-            (state | parallel | choice | junction | fork | join)*
+            (state | parallel | submachine | choice | junction | fork | join)*
         '}'
     ;
 
