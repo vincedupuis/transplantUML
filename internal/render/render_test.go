@@ -147,6 +147,7 @@ func TestPlantUMLApproximations(t *testing.T) {
 			{Source: "a.b", Targets: []string{"my-comp"}, Event: "go"},
 			{Source: "h", Targets: []string{"in"}, Note: "default"},
 			{Source: "a.b", Targets: []string{"r"}, Event: "into"},
+			{Source: "in", Targets: []string{"c"}, Event: "end"},
 			{Source: "c", Targets: []string{"done"}},
 		},
 	}

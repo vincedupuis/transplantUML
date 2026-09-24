@@ -63,8 +63,8 @@ func TestGrammarRejects(t *testing.T) {
 		"fsm m { parallel state p { region r { entry point e goto r } } }", // nor points
 		"fsm m { initial region r {} }",
 		"fsm m { initial choice c {} }",      // only a state or a parallel state starts a scope
-		"fsm m { choice c [g] goto c }",      // a choice holds its branches in braces
-		"fsm m { choice c { on e goto c } }", // and a branch has no trigger
+		"fsm m { choice c { on e goto c } }", // a branch has no trigger
+		"fsm m { choice c on e goto c }",     // on its own line either
 		"fsm m { junction j { after(1s) goto j } }",
 		"fsm m { fork f { [g] goto f } }", // no guard leaving a fork
 		"fsm m { fork f { on e goto f } }",

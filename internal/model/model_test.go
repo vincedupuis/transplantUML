@@ -55,6 +55,15 @@ func TestValidateErrors(t *testing.T) {
 		{"submachine on parallel", func(sm *StateMachine) { sm.States[0].Kind = Parallel; sm.States[0].Submachine = "m" }, `only normal states can reference a submachine`},
 		{"event and after", func(sm *StateMachine) { sm.Transitions[0].After = "5s" }, `has both an event and a time trigger`},
 		{"bad transition kind", func(sm *StateMachine) { sm.Transitions[0].Kind = "sideways" }, `unknown kind "sideways"`},
+		{"unreached junction", func(sm *StateMachine) { connect(sm, Junction, 0, 1) }, `a junction needs at least one incoming and one outgoing transition, has 0 and 1`},
+		{"dead-end choice", func(sm *StateMachine) { connect(sm, Choice, 1, 0) }, `a choice needs at least one incoming and one outgoing transition, has 1 and 0`},
+		{"fork to one", func(sm *StateMachine) { connect(sm, Fork, 1, 1) }, `a fork needs exactly one incoming transition and at least two outgoing, has 1 and 1`},
+		{"fork from two", func(sm *StateMachine) { connect(sm, Fork, 2, 2) }, `a fork needs exactly one incoming transition and at least two outgoing, has 2 and 2`},
+		{"join from one", func(sm *StateMachine) { connect(sm, Join, 1, 1) }, `a join needs at least two incoming transitions and exactly one outgoing, has 1 and 1`},
+		{"join to two", func(sm *StateMachine) { connect(sm, Join, 2, 2) }, `a join needs at least two incoming transitions and exactly one outgoing, has 2 and 2`},
+		{"two history defaults", func(sm *StateMachine) {
+			sm.Transitions = append(sm.Transitions, &Transition{Source: "h", Targets: []string{"f"}})
+		}, `a history state has at most one outgoing transition, its default, has 2`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -65,6 +74,32 @@ func TestValidateErrors(t *testing.T) {
 				t.Fatalf("want error containing %q, got %v", c.want, err)
 			}
 		})
+	}
+}
+
+// connect adds a pseudostate "p" of the given kind to the sample, reached from
+// "a" by in transitions and leaving for "a" by out.
+func connect(sm *StateMachine, kind StateKind, in, out int) {
+	sm.States = append(sm.States, &State{Name: "p", Kind: kind})
+	for range in {
+		sm.Transitions = append(sm.Transitions, &Transition{Source: "a", Targets: []string{"p"}, Event: "e"})
+	}
+	for range out {
+		sm.Transitions = append(sm.Transitions, &Transition{Source: "p", Targets: []string{"a"}})
+	}
+}
+
+// A fork may give all its targets to one transition, as SCXML does, and a
+// pseudostate may be reached by being its parent's initial child.
+func TestValidatePseudostateCounts(t *testing.T) {
+	sm := sample()
+	connect(sm, Fork, 1, 0)
+	sm.Transitions = append(sm.Transitions, &Transition{Source: "p", Targets: []string{"a", "b"}})
+	sm.States = append(sm.States, &State{Name: "c", Parent: "b", Kind: Choice})
+	sm.States[1].Initial = "c"
+	sm.Transitions = append(sm.Transitions, &Transition{Source: "c", Targets: []string{"b1"}})
+	if err := sm.Validate(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

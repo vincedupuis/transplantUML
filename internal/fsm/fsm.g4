@@ -31,16 +31,20 @@ region
 
 choice
     :   'choice' Identifier
-        '{'
-            branch*
-        '}'
+        (   '{'
+                branch*
+            '}'
+        |   branch
+        )
     ;
 
 junction
     :   'junction' Identifier
-        '{'
-            branch*
-        '}'
+        (   '{'
+                branch*
+            '}'
+        |   branch
+        )
     ;
 
 fork

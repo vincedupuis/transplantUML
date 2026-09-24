@@ -408,17 +408,17 @@ The other state kinds follow UML's own names. A state is declared with `state`, 
 
 ```
 parallel state shipping {             # every region is active at once
-    region warehouse { initial state packing { … } }
-    region accounting { initial state invoicing { … } }
+  region warehouse { initial state packing { … } }
+  region accounting { initial state invoicing { … } }
 }
 choice route {                        # guards checked on arrival
-    [large] goto review
-    [else] goto paying
+  [large] goto review
+  [else] goto paying
 }
-junction paid { / receipt goto split }  # guards checked before leaving; merges paths
+junction paid / receipt goto split    # guards checked before leaving; merges paths
 fork split {                          # enters several regions at once
-    goto packing
-    / notify goto invoicing
+  goto packing
+  / notify goto invoicing
 }
 join merge / close goto done          # waits for every region, then leaves
 entry point express / useSavedCard goto paying
@@ -428,8 +428,8 @@ exit point cancelled goto browsing
 A parallel state holds regions, its points and its own clauses, and a region holds only states and pseudostates;
 the model keeps each region as an ordinary child state of the parallel one, as SCXML does. A parallel state starts in
 all its regions, so it takes no `initial` child, while each region marks its own. A choice or junction lists its
-branches, each an optional guard — `[else]` being UML's catch-all, which reaches `Cond` as `else` — optional actions
-and a `goto`. A fork lists its lines the same way without guards, one transition each, and a join, an entry point and
+branches in braces, each an optional guard — `[else]` being UML's catch-all, which reaches `Cond` as `else` —
+optional actions and a `goto`; a single branch may go on the declaring line instead, without braces. A fork lists its lines the same way without guards, one transition each, and a join, an entry point and
 an exit point are a single line. Entry and exit points go in a state, a parallel state or the machine itself: an
 entry point leads into its state past the initial child, an exit point out of it. Every pseudostate may be declared
 wherever a state may, except that a region holds no points.

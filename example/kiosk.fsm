@@ -5,47 +5,47 @@
 # state name, "final" and "H".
 
 fsm kiosk {
-    initial state idle {
-        entry / dim
-        on touch / wake goto browsing
+  initial state idle {
+    entry / dim
+    on touch / wake goto browsing
+  }
+
+  state ordering {
+    entry / newBasket
+    exit / clearBasket, unlock
+    on abandon goto idle
+    after(90s) goto idle
+
+    initial state browsing {
+      on add [inStock and (card or cash)] / addLine
+      on remove / dropLine goto browsing
+      on checkout [basket] goto paying
     }
 
-    state ordering {
-        entry / newBasket
-        exit / clearBasket, unlock
-        on abandon goto idle
-        after(90s) goto idle
+    state paying {
+      entry / lockBasket
+      on approved / receipt goto done
+      on declined [retries] / warn goto again
+      on declined [not retries] goto browsing
 
-        initial state browsing {
-            on add [inStock and (card or cash)] / addLine
-            on remove / dropLine goto browsing
-            on checkout [basket] goto paying
-        }
+      initial state authorizing {
+        do / spin
+        on touch / defer
+        on cancel goto browsing
+        after(authTimeout) [retries] / warn goto again
+      }
 
-        state paying {
-            entry / lockBasket
-            on approved / receipt goto done
-            on declined [retries] / warn goto again
-            on declined [not retries] goto browsing
-
-            initial state authorizing {
-                do / spin
-                on touch / defer
-                on cancel goto browsing
-                after(authTimeout) [retries] / warn goto again
-            }
-
-            state again {
-                on card goto authorizing
-            }
-        }
-
-        on resume goto H
-        on back goto local browsing
+      state again {
+        on card goto authorizing
+      }
     }
 
-    state done {
-        entry / print
-        on ack goto final
-    }
+    on resume goto H
+    on back goto local browsing
+  }
+
+  state done {
+    entry / print
+    on ack goto final
+  }
 }

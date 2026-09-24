@@ -338,5 +338,42 @@ func (sm *StateMachine) Validate() error {
 		}
 	}
 
+	// UML's constraints on how many transitions a pseudostate joins. A fork
+	// counts targets, since a document may give it one multi-target transition.
+	// Being a state's initial child counts as the one incoming transition.
+	for _, s := range sm.States {
+		if byName[s.Name] != s {
+			continue
+		}
+		in := len(sm.IncomingTransitions(s.Name))
+		if sm.Initial == s.Name || (s.Parent != "" && byName[s.Parent] != nil && byName[s.Parent].Initial == s.Name) {
+			in++
+		}
+		outgoing := sm.OutgoingTransitions(s.Name)
+		out := len(outgoing)
+		switch s.Kind {
+		case Choice, Junction:
+			if in < 1 || out < 1 {
+				fail("state %q: a %s needs at least one incoming and one outgoing transition, has %d and %d", s.Name, s.Kind, in, out)
+			}
+		case Fork:
+			out = 0
+			for _, t := range outgoing {
+				out += len(t.Targets)
+			}
+			if in != 1 || out < 2 {
+				fail("state %q: a fork needs exactly one incoming transition and at least two outgoing, has %d and %d", s.Name, in, out)
+			}
+		case Join:
+			if in < 2 || out != 1 {
+				fail("state %q: a join needs at least two incoming transitions and exactly one outgoing, has %d and %d", s.Name, in, out)
+			}
+		case HistoryShallow, HistoryDeep:
+			if out > 1 {
+				fail("state %q: a history state has at most one outgoing transition, its default, has %d", s.Name, out)
+			}
+		}
+	}
+
 	return errors.Join(errs...)
 }

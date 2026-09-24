@@ -338,6 +338,19 @@ func TestBuildTwoClausesOnOneLine(t *testing.T) {
 	}
 }
 
+// A choice or junction with a single branch may write it on the declaring
+// line. It holds that one branch only, so the next clause belongs to the
+// enclosing state.
+func TestBuildOneLineBranch(t *testing.T) {
+	sm := build(t, "fsm m { initial state s { on e goto c choice c [g] / a goto t [h] goto t } state t {} }")
+	if got := sm.OutgoingTransitions("c"); len(got) != 1 || got[0].Cond != "g" || !slices.Equal(got[0].Actions, []string{"a"}) {
+		t.Errorf("c transitions = %v, want one guarded by g doing a", got)
+	}
+	if got := sm.OutgoingTransitions("s"); len(got) != 2 || got[1].Cond != "h" {
+		t.Errorf("s transitions = %v, want e and a completion transition guarded by h", got)
+	}
+}
+
 func TestBuildErrors(t *testing.T) {
 	cases := map[string]string{
 		"fsm m { initial state a {} initial state b {} }":                                   `already starts in "a"`,

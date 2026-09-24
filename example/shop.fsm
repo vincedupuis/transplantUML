@@ -5,46 +5,46 @@
 # state.
 
 fsm shop {
-    entry point reorder / loadBasket goto checkout
-    initial state browsing {
-        on buy goto checkout
-        on quickBuy goto express
-        on fraud goto terminate
+  entry point reorder / loadBasket goto checkout
+  initial state browsing {
+    on buy goto checkout
+    on quickBuy goto express
+    on fraud goto terminate
+  }
+  state checkout {
+    entry point express / useSavedCard goto paying
+    exit point cancelled goto browsing
+    initial state address { on next / computeTotal goto route }
+    choice route {
+      [large] goto review
+      [else] goto paying
     }
-    state checkout {
-        entry point express / useSavedCard goto paying
-        exit point cancelled goto browsing
-        initial state address { on next / computeTotal goto route }
-        choice route {
-            [large] goto review
-            [else] goto paying
-        }
-        state review { on approved goto paying }
-        state paying {
-            on cash goto paid
-            on card goto paid
-            on abort goto cancelled
-        }
-        junction paid { / receipt goto split }
+    state review { on approved goto paying }
+    state paying {
+      on cash goto paid
+      on card goto paid
+      on abort goto cancelled
     }
-    fork split {
-        goto packing
-        / notify goto invoicing
+    junction paid / receipt goto split
+  }
+  fork split {
+    goto packing
+    / notify goto invoicing
+  }
+  parallel state shipping {
+    region warehouse {
+      initial state packing { on packed goto packed }
+      state packed { goto merge }
     }
-    parallel state shipping {
-        region warehouse {
-            initial state packing { on packed goto packed }
-            state packed { goto merge }
-        }
-        region accounting {
-            initial state invoicing { on sent goto sent }
-            state sent { [paidInFull] goto merge }
-        }
+    region accounting {
+      initial state invoicing { on sent goto sent }
+      state sent { [paidInFull] goto merge }
     }
-    join merge / close goto done
-    state done {
-        on reopen goto checkout.H*
-        on back goto checkout.H
-        goto final
-    }
+  }
+  join merge / close goto done
+  state done {
+    on reopen goto checkout.H*
+    on back goto checkout.H
+    goto final
+  }
 }
