@@ -455,3 +455,13 @@ renamed when the machine is written in this language.
 
 Everything else UML has — submachines, invariants, variables, stereotypes, notes — has no syntax
 yet.
+
+### Editor support
+
+[`editors/fsm`](editors/fsm) is a VS Code extension that highlights `.fsm` files.
+It also sets `#` as the line comment and pairs braces, brackets and parentheses.
+JetBrains IDEs read the same folder as a TextMate bundle.
+
+- JetBrains: add the `editors/fsm` folder under Settings → Editor → TextMate Bundles.
+- VS Code: link the folder into the extensions directory, then reload the window:
+  `ln -s "$PWD/editors/fsm" ~/.vscode/extensions/tpuml-fsm`.

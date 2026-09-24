@@ -1,0 +1,38 @@
+{
+  "name": "tpuml-fsm",
+  "displayName": "tpuml fsm",
+  "description": "Syntax highlighting for tpuml's fsm state machine language.",
+  "version": "0.1.0",
+  "publisher": "vincedupuis",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vincedupuis/transplantUML"
+  },
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "fsm",
+        "aliases": [
+          "fsm"
+        ],
+        "extensions": [
+          ".fsm"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "fsm",
+        "scopeName": "source.fsm",
+        "path": "./syntaxes/fsm.tmLanguage"
+      }
+    ]
+  }
+}
