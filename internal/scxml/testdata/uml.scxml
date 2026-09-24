@@ -28,6 +28,11 @@ in one document.</tpuml:note>
 
   <state id="work" tpuml:stereotype="worker" tpuml:defer="pause resume" tpuml:invariant="retries >= 0">
     <tpuml:note>Runs the job.</tpuml:note>
+    <!-- Notes on what a state lists say what they are about. -->
+    <tpuml:note about="entry">Starts the clock.</tpuml:note>
+    <tpuml:note about="do">Runs in a worker.</tpuml:note>
+    <tpuml:note about="invariant">Never negative.</tpuml:note>
+    <tpuml:note about="defer" event="pause">Kept until the job ends.</tpuml:note>
     <datamodel>
       <data id="progress" expr="0"/>
     </datamodel>
@@ -62,6 +67,10 @@ in one document.</tpuml:note>
   </state>
 
   <state id="outer" initial="inner">
+    <tpuml:note about="exit">Says goodbye.</tpuml:note>
+    <tpuml:note about="initial">Not a thing a state lists.</tpuml:note>
+    <tpuml:note about="defer">Names no event.</tpuml:note>
+    <onexit><log expr="'bye'"/></onexit>
     <state id="in" tpuml:kind="entry-point"><transition target="inner"/></state>
     <state id="out" tpuml:kind="exit-point"><transition target="sub"/></state>
     <state id="inner">

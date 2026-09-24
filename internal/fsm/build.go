@@ -234,12 +234,7 @@ func (b *builder) walk(scope *node) {
 }
 
 func (b *builder) event(n *node, ec parser.IEventContext) {
-	// The model notes states and transitions, not the behaviours, deferred
-	// events and invariant a state lists.
-	if nt := ec.Note(); nt != nil && (ec.GetName() != nil || ec.Invariant() != nil) {
-		b.failf(nt.GetSymbol(), "the model has no note for %q, put it before the state %q instead", trigger(ec), n.state.Name)
-		return
-	}
+	about := note(ec.Note())
 	// The model holds one condition per state, so a second would be lost.
 	if inv := ec.Invariant(); inv != nil {
 		if n.state.Invariant != "" {
@@ -247,26 +242,38 @@ func (b *builder) event(n *node, ec parser.IEventContext) {
 			return
 		}
 		n.state.Invariant = text(ec.Guard().Expression())
+		n.state.InvariantNote = about
 		return
 	}
 	// The behaviour and defer alternatives are the ones that label a name, and
 	// "entry", "exit" and "do" are keywords, so no Identifier carries that text.
 	if name := ec.GetName(); name != nil {
+		// UML gives a state one entry, one exit and one do behaviour, which
+		// the clauses build up together, so their notes add up too.
 		switch {
 		case ec.Defer() != nil:
 			n.state.Defer = append(n.state.Defer, name.GetText())
+			if about != "" {
+				if n.state.DeferNotes == nil {
+					n.state.DeferNotes = map[string]string{}
+				}
+				n.state.DeferNotes[name.GetText()] = addLines(n.state.DeferNotes[name.GetText()], about)
+			}
 		case name.GetText() == "entry":
 			n.state.OnEntry = append(n.state.OnEntry, effects(ec.Actions())...)
+			n.state.EntryNote = addLines(n.state.EntryNote, about)
 		case name.GetText() == "exit":
 			n.state.OnExit = append(n.state.OnExit, effects(ec.Actions())...)
+			n.state.ExitNote = addLines(n.state.ExitNote, about)
 		default:
 			n.state.Do = append(n.state.Do, effects(ec.Actions())...)
+			n.state.DoNote = addLines(n.state.DoNote, about)
 		}
 		return
 	}
 	// A clause with no goto is UML's internal transition, the one a state
 	// lists in its compartment: no state change, no exit or entry.
-	t := &model.Transition{Source: n.state.Name, Actions: effects(ec.Actions()), Kind: model.Internal, Note: note(ec.Note())}
+	t := &model.Transition{Source: n.state.Name, Actions: effects(ec.Actions()), Kind: model.Internal, Note: about}
 	// No trigger makes a completion transition, which leaves Event and After
 	// empty.
 	if tr := ec.Trigger(); tr != nil {
@@ -469,6 +476,14 @@ func note(t antlr.TerminalNode) string {
 		lines[i] = strings.TrimSpace(line)
 	}
 	return strings.Trim(strings.Join(lines, "\n"), "\n")
+}
+
+// addLines appends more lines to a note, if there are any.
+func addLines(note, more string) string {
+	if note == "" || more == "" {
+		return note + more
+	}
+	return note + "\n" + more
 }
 
 func effects(a parser.IActionsContext) []string {

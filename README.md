@@ -50,6 +50,7 @@ symbol, and so on. Warnings go to stderr and never fail the conversion.
 | Completion transition                  | no `Event`, no `After`                       | eventless `<transition>`                                | unlabelled arrow                                    |
 | External / local / internal transition | `Kind`                                       | `type="internal"`; `tpuml:kind="local"` ⚠               | `X : ev / act` for internal; local drawn external ⚠ |
 | Note                                   | `Note` on the machine, a state, a transition | `<tpuml:note>`                                          | `note`, `note on link`                              |
+| Note on behaviour/invariant/deferral   | `EntryNote`, `DoNote`, …, `DeferNotes`       | `<tpuml:note about>` on the state                       | lines of the state's `note`                         |
 | Stereotype                             | `Stereotype`                                 | `tpuml:stereotype`                                      | `state "«s»\nX" as X <<s>>`                         |
 
 ⚠ = written as an approximation, with a warning. Not modelled: signal vs. call events, change events (`when(…)` —
@@ -196,6 +197,10 @@ type State struct {
   Variables  []Variable
   Stereotype string
   Note       string
+
+  // notes on what the state lists
+  EntryNote, ExitNote, DoNote, InvariantNote string
+  DeferNotes map[string]string // by deferred event
 }
 
 type Transition struct {
@@ -307,6 +312,8 @@ namespace `https://github.com/vincedupuis/transplantUML` (any prefix; `tpuml` be
 | `tpuml:invariant="expr"`                                                     | `<state>`                            | state invariant                           |
 | `tpuml:stereotype="name"`                                                    | `<state>`                            | stereotype                                |
 | `<tpuml:note>text</tpuml:note>`                                              | `<scxml>`, `<state>`, `<transition>` | a note                                    |
+| `<tpuml:note about="entry\|exit\|do\|invariant">text</tpuml:note>`           | `<state>`                            | a note on that behaviour or the invariant |
+| `<tpuml:note about="defer" event="e">text</tpuml:note>`                      | `<state>`                            | a note on deferring `e`                   |
 
 See [`internal/scxml/testdata/uml.scxml`](internal/scxml/testdata/uml.scxml) for a document using all of them.
 
@@ -472,10 +479,13 @@ fsm kiosk {
 
 A note before `fsm` is the machine's, one before a declaration is that state's, and one before a transition, a
 branch or a fork line is that transition's; each reaches `Note`.
+A note before `entry`, `exit` or `do` reaches `EntryNote`, `ExitNote` or `DoNote`, one before an `invariant` reaches
+`InvariantNote`, and one before `on e / defer` reaches `DeferNotes["e"]`.
+A state's `entry` clauses make up its one entry behaviour, as UML has it, so their notes join line by line; the same
+goes for `exit` and `do`.
 It may span lines, and each line loses the indentation that lines it up with the document.
 A backslash escapes the character after it, so `\|` writes a bar and `\\` a backslash.
 A directive takes at most one note.
-The model has no note for a behaviour, a deferred event or an invariant, so a note before one of those is an error.
 
 A `goto` names its target outright. State names are one namespace for the whole machine — the model keys its
 states by name — so nesting never has to be spelled out, and a target may be declared further down the document:

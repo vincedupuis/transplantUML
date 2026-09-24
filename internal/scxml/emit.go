@@ -103,6 +103,7 @@ func (e *emitter) children(el *etree.Element, parent string) error {
 			e.warn.Addf("state %q: SCXML has no deferred events; written as tpuml:defer, which engines ignore", s.Name)
 		}
 		e.note(child, s.Note)
+		e.aboutNotes(child, s)
 		e.datamodel(child, s.Variables)
 
 		transitions := e.sm.OutgoingTransitions(s.Name)
@@ -245,12 +246,43 @@ func (e *emitter) datamodel(el *etree.Element, vars []model.Variable) {
 	}
 }
 
-func (e *emitter) note(el *etree.Element, text string) {
+// note writes a <tpuml:note> under el and returns it, or nil when there is
+// no text.
+func (e *emitter) note(el *etree.Element, text string) *etree.Element {
 	if text == "" {
-		return
+		return nil
 	}
 	e.usesExt = true
-	el.CreateElement(extPrefix + ":note").SetText(text)
+	n := el.CreateElement(extPrefix + ":note")
+	n.SetText(text)
+	return n
+}
+
+// aboutNotes writes the notes on what the state lists beside its own note,
+// each saying what it is about. The parser reads them back; see aboutNotes
+// there.
+func (e *emitter) aboutNotes(el *etree.Element, s *model.State) {
+	about := func(what, text string) *etree.Element {
+		n := e.note(el, text)
+		if n != nil {
+			n.CreateAttr("about", what)
+		}
+		return n
+	}
+	about("entry", s.EntryNote)
+	about("exit", s.ExitNote)
+	about("do", s.DoNote)
+	about("invariant", s.InvariantNote)
+	written := map[string]bool{}
+	for _, ev := range s.Defer {
+		if written[ev] {
+			continue
+		}
+		written[ev] = true
+		if n := about("defer", s.DeferNotes[ev]); n != nil {
+			n.CreateAttr("event", ev)
+		}
+	}
 }
 
 // ext sets a tpuml extension attribute, unless the value is empty.

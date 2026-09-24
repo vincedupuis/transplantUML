@@ -53,6 +53,14 @@ func TestValidateErrors(t *testing.T) {
 		{"final source", func(sm *StateMachine) { sm.Transitions[0].Source = "f" }, `final state "f" cannot have outgoing transitions`},
 		{"terminate source", func(sm *StateMachine) { sm.States[0].Kind = Terminate }, `terminate state "a" cannot have outgoing transitions`},
 		{"submachine on parallel", func(sm *StateMachine) { sm.States[0].Kind = Parallel; sm.States[0].Submachine = "m" }, `only normal states can reference a submachine`},
+		{"entry note alone", func(sm *StateMachine) { sm.States[0].EntryNote = "n" }, `has a note on its entry behaviour but no entry behaviour`},
+		{"exit note alone", func(sm *StateMachine) { sm.States[0].ExitNote = "n" }, `has a note on its exit behaviour but no exit behaviour`},
+		{"do note alone", func(sm *StateMachine) { sm.States[0].DoNote = "n" }, `has a note on its do activity but no do activity`},
+		{"invariant note alone", func(sm *StateMachine) { sm.States[0].InvariantNote = "n" }, `has a note on its invariant but no invariant`},
+		{"note on an event not deferred", func(sm *StateMachine) {
+			sm.States[0].Defer = []string{"p"}
+			sm.States[0].DeferNotes = map[string]string{"p": "n", "q": "n"}
+		}, `has a note on deferring "q" but does not defer it`},
 		{"event and after", func(sm *StateMachine) { sm.Transitions[0].After = "5s" }, `has both an event and a time trigger`},
 		{"bad transition kind", func(sm *StateMachine) { sm.Transitions[0].Kind = "sideways" }, `unknown kind "sideways"`},
 		{"unreached junction", func(sm *StateMachine) { connect(sm, Junction, 0, 1) }, `a junction needs at least one incoming and one outgoing transition, has 0 and 1`},

@@ -20,7 +20,13 @@ work : pause / defer
 work : resume / defer
 work : [ retries >= 0 ]
 work : progress = 0
-note right of work : Runs the job.
+note right of work
+    Runs the job.
+    entry: Starts the clock.
+    do: Runs in a worker.
+    pause / defer: Kept until the job ends.
+    invariant: Never negative.
+end note
 state both {
     state left
     --
@@ -37,6 +43,8 @@ state outer {
     inner --> inner: again
     inner : note
 }
+outer : exit / log('bye')
+note right of outer : exit: Says goodbye.
 state stop <<end>>
 state done <<end>>
 state failed <<end>>

@@ -13,6 +13,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 )
 
@@ -74,6 +75,15 @@ type State struct {
 	Variables  []Variable `json:"variables,omitempty"`  // attributes scoped to this state
 	Stereotype string     `json:"stereotype,omitempty"` // «stereotype» shown on diagrams
 	Note       string     `json:"note,omitempty"`
+
+	// Notes on what the state lists, which UML annotates as elements of
+	// their own: the entry, exit and do behaviours, the invariant and each
+	// deferred event.
+	EntryNote     string            `json:"entryNote,omitempty"`
+	ExitNote      string            `json:"exitNote,omitempty"`
+	DoNote        string            `json:"doNote,omitempty"`
+	InvariantNote string            `json:"invariantNote,omitempty"`
+	DeferNotes    map[string]string `json:"deferNotes,omitempty"` // by deferred event
 }
 
 type Transition struct {
@@ -290,6 +300,25 @@ func (sm *StateMachine) Validate() error {
 		}
 		if s.Submachine != "" && !s.IsNormal() {
 			fail("state %q: only normal states can reference a submachine", s.Name)
+		}
+		for _, n := range []struct {
+			what       string
+			note       string
+			describing bool
+		}{
+			{"entry behaviour", s.EntryNote, len(s.OnEntry) > 0},
+			{"exit behaviour", s.ExitNote, len(s.OnExit) > 0},
+			{"do activity", s.DoNote, len(s.Do) > 0},
+			{"invariant", s.InvariantNote, s.Invariant != ""},
+		} {
+			if n.note != "" && !n.describing {
+				fail("state %q: has a note on its %s but no %s", s.Name, n.what, n.what)
+			}
+		}
+		for _, ev := range slices.Sorted(maps.Keys(s.DeferNotes)) {
+			if !slices.Contains(s.Defer, ev) {
+				fail("state %q: has a note on deferring %q but does not defer it", s.Name, ev)
+			}
 		}
 	}
 

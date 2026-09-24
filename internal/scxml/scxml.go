@@ -23,7 +23,10 @@
 // (choice, junction, fork, join, entry-point, exit-point, terminate, or
 // normal to suppress the idiom detection) or, on a transition, local;
 // tpuml:defer lists deferred events; tpuml:invariant and tpuml:stereotype
-// annotate a state; and a <tpuml:note> child holds a note.
+// annotate a state; and a <tpuml:note> child holds a note, which on a state
+// may say with about="entry|exit|do|invariant|defer" (and event="…" for
+// defer) that it describes one of the state's behaviours, its invariant or a
+// deferred event instead.
 package scxml
 
 import (
@@ -115,6 +118,7 @@ func (p *parser) state(el *etree.Element, parent string) {
 		st.Initial = initialOf(el)
 	}
 	st.Variables = p.datamodel(el)
+	p.aboutNotes(st, el)
 	for _, inv := range el.SelectElements("invoke") {
 		p.invoke(st, inv)
 	}
@@ -359,20 +363,73 @@ func isExt(el *etree.Element) bool {
 	return el.Space != "" && el.NamespaceURI() == ExtNamespace
 }
 
-// note returns the text of el's <tpuml:note> child, one trimmed line per
-// source line, or "".
+// note returns the text of el's own <tpuml:note> child, or "". A note with
+// an about attribute describes something the state lists instead; see
+// aboutNotes.
 func note(el *etree.Element) string {
-	for _, c := range el.ChildElements() {
-		if c.Tag != "note" || !isExt(c) {
-			continue
+	for _, c := range notes(el) {
+		if c.SelectAttr("about") == nil {
+			return noteText(c)
 		}
-		var lines []string
-		for _, line := range strings.Split(strings.TrimSpace(c.Text()), "\n") {
-			lines = append(lines, strings.TrimSpace(line))
-		}
-		return strings.Join(lines, "\n")
 	}
 	return ""
+}
+
+// aboutNotes reads the notes on what a state lists, which SCXML writes as
+// attributes (tpuml:invariant, tpuml:defer) or as several elements that make
+// up one UML behaviour (<onentry>, <onexit>, <invoke>), so none has an
+// element of its own to hold a note. They sit beside the state's own note,
+// saying what they are about.
+func (p *parser) aboutNotes(st *model.State, el *etree.Element) {
+	for _, c := range notes(el) {
+		about := c.SelectAttr("about")
+		if about == nil {
+			continue
+		}
+		text := noteText(c)
+		switch about.Value {
+		case "entry":
+			st.EntryNote = text
+		case "exit":
+			st.ExitNote = text
+		case "do":
+			st.DoNote = text
+		case "invariant":
+			st.InvariantNote = text
+		case "defer":
+			ev := c.SelectAttrValue("event", "")
+			if ev == "" {
+				p.warn.Addf("state %q: a note about a deferred event names no event and was dropped", st.Name)
+				continue
+			}
+			if st.DeferNotes == nil {
+				st.DeferNotes = map[string]string{}
+			}
+			st.DeferNotes[ev] = text
+		default:
+			p.warn.Addf("state %q: a note about %q is not supported and was dropped", st.Name, about.Value)
+		}
+	}
+}
+
+// notes returns el's <tpuml:note> children.
+func notes(el *etree.Element) []*etree.Element {
+	var out []*etree.Element
+	for _, c := range el.ChildElements() {
+		if c.Tag == "note" && isExt(c) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// noteText returns a note's text, one trimmed line per source line.
+func noteText(el *etree.Element) string {
+	var lines []string
+	for _, line := range strings.Split(strings.TrimSpace(el.Text()), "\n") {
+		lines = append(lines, strings.TrimSpace(line))
+	}
+	return strings.Join(lines, "\n")
 }
 
 // known reports whether el is one of the named SCXML elements or a tpuml

@@ -14,7 +14,9 @@ an alias: `state "a.b" as a_b`. A user stereotype is kept as <<stereotype>>
 for skinparams and shown as «stereotype» in the label, since PlantUML does
 not print it. Parallel regions are separated with "--". State behaviours
 (entry/do/exit, deferred events, invariant, variables) are description lines;
-on a final state, which ignores them, they go into its note.
+on a final state, which ignores them, they go into its note. The notes on
+those behaviours join the state's own note, each labelled with what it
+describes.
 
 Each scope (the top level, a compound state's braces, a parallel region)
 declares its states first and draws transitions after them, and a transition
@@ -117,7 +119,7 @@ state {{ template "decl" . }}
 {{- $lines := list -}}
 {{- range .OnEntry }}{{ $lines = append $lines (printf "entry / %s" .) }}{{ end -}}
 {{- range .OnExit }}{{ $lines = append $lines (printf "exit / %s" .) }}{{ end -}}
-{{- with .Note }}{{ $lines = append $lines . }}{{ end -}}
+{{- with include "stateNote" . }}{{ $lines = append $lines . }}{{ end -}}
 {{- template "note" (dict "id" $id "text" (join "\n" $lines)) -}}
 {{- else if .IsPseudo -}}
 {{- template "note" (dict "id" $id "text" .Note) -}}
@@ -140,8 +142,19 @@ state {{ template "decl" . }}
 {{- range .Variables }}
 {{ $id }} : {{ .Name }}{{ prefix " = " .Value | include "text" }}
 {{- end -}}
-{{- template "note" (dict "id" $id "text" .Note) -}}
+{{- template "note" (dict "id" $id "text" (include "stateNote" .)) -}}
 {{- end -}}
+{{- end -}}
+
+{{- define "stateNote" -}}{{- /* . = *State: its note, then the notes on its behaviours, invariant and deferred events, which PlantUML cannot attach to a description line */ -}}
+{{- $lines := list -}}
+{{- with .Note }}{{ $lines = append $lines . }}{{ end -}}
+{{- with .EntryNote }}{{ $lines = append $lines (printf "entry: %s" .) }}{{ end -}}
+{{- with .DoNote }}{{ $lines = append $lines (printf "do: %s" .) }}{{ end -}}
+{{- with .ExitNote }}{{ $lines = append $lines (printf "exit: %s" .) }}{{ end -}}
+{{- range $event, $note := .DeferNotes }}{{ $lines = append $lines (printf "%s / defer: %s" $event $note) }}{{ end -}}
+{{- with .InvariantNote }}{{ $lines = append $lines (printf "invariant: %s" .) }}{{ end -}}
+{{- join "\n" $lines -}}
 {{- end -}}
 
 {{- define "note" -}}{{- /* . = dict "id" state alias "text" note text (nothing drawn when empty) */ -}}

@@ -15,6 +15,7 @@ state ordering {
         state authorizing
         authorizing : do / spin
         authorizing : touch / defer
+        note right of authorizing : do: Until the bank answers.
         state again
         authorizing --> again: after(authTimeout)\n[ retries ]\n/ warn
         again --> authorizing: card

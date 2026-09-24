@@ -119,7 +119,11 @@ func TestUMLConcepts(t *testing.T) {
 	if err := sm.Validate(); err != nil {
 		t.Fatalf("model does not validate: %v", err)
 	}
-	if want := []string{`state "failed": <donedata> is not supported and was dropped`}; !reflect.DeepEqual([]string(warnings), want) {
+	if want := []string{
+		`state "outer": a note about "initial" is not supported and was dropped`,
+		`state "outer": a note about a deferred event names no event and was dropped`,
+		`state "failed": <donedata> is not supported and was dropped`,
+	}; !reflect.DeepEqual([]string(warnings), want) {
 		t.Errorf("warnings = %q, want %q", warnings, want)
 	}
 
@@ -148,6 +152,14 @@ func TestUMLConcepts(t *testing.T) {
 	}
 	if !reflect.DeepEqual(work.Defer, []string{"pause", "resume"}) {
 		t.Errorf("work.Defer = %q", work.Defer)
+	}
+	// A note about something the state lists sits beside the state's own.
+	if work.EntryNote != "Starts the clock." || work.DoNote != "Runs in a worker." || work.InvariantNote != "Never negative." ||
+		!reflect.DeepEqual(work.DeferNotes, map[string]string{"pause": "Kept until the job ends."}) {
+		t.Errorf("work behaviour notes = %+v", *work)
+	}
+	if got := sm.State("outer").ExitNote; got != "Says goodbye." {
+		t.Errorf("outer exit note = %q", got)
 	}
 	if !reflect.DeepEqual(work.Variables, []model.Variable{{Name: "progress", Value: "0"}}) {
 		t.Errorf("work.Variables = %+v", work.Variables)

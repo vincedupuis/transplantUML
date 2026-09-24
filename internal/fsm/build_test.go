@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"maps"
 	"os"
 	"slices"
 	"strings"
@@ -394,7 +395,8 @@ func TestBuildStereotype(t *testing.T) {
 }
 
 // A note written before a directive belongs to it: the machine, a
-// declaration, a transition, a branch or a fork line. Each line loses its
+// declaration, a transition, a branch, a fork line, a behaviour, a deferred
+// event or an invariant. Each line loses its
 // indentation, and a backslash escapes the character after it.
 func TestBuildNotes(t *testing.T) {
 	sm := build(t, `| Serves one customer at a time,
@@ -406,6 +408,15 @@ func TestBuildNotes(t *testing.T) {
 			on card goto f
 			| Not moving. |
 			on ping / pong
+			| Lights down. |
+			entry / dim
+			| Twice. |
+			entry / beep
+			| Out. | exit / off
+			| Idle loop. | do / blink
+			| Later. | on coin / defer
+			on key / defer
+			| Always. | invariant [powered]
 		}
 		| Splits. |
 		fork f { goto a | Second line. | / log goto b }
@@ -425,6 +436,20 @@ func TestBuildNotes(t *testing.T) {
 		if got := sm.State(name).Note; got != want {
 			t.Errorf("%s note = %q, want %q", name, got, want)
 		}
+	}
+	idle := sm.State("idle")
+	for _, got := range []struct{ what, note, want string }{
+		{"entry", idle.EntryNote, "Lights down.\nTwice."}, // the clauses build one behaviour
+		{"exit", idle.ExitNote, "Out."},
+		{"do", idle.DoNote, "Idle loop."},
+		{"invariant", idle.InvariantNote, "Always."},
+	} {
+		if got.note != got.want {
+			t.Errorf("idle %s note = %q, want %q", got.what, got.note, got.want)
+		}
+	}
+	if want := map[string]string{"coin": "Later."}; !maps.Equal(idle.DeferNotes, want) {
+		t.Errorf("idle defer notes = %v, want %v", idle.DeferNotes, want)
 	}
 	for _, want := range []struct{ source, target, note string }{
 		{"idle", "f", `Bar | and back\slash.`},
@@ -495,10 +520,6 @@ func TestBuildErrors(t *testing.T) {
 		"fsm m { state a { choice c { goto local b } state b {} } }":                        `a local transition stays inside "c", but "b" is not inside it`,
 		"fsm m { submachine a {} state a {} }":                                              `the machine already has a state called "a"`,
 		"fsm m { initial submachine a {} initial state b {} }":                              `already starts in "a"`,
-		"fsm m { state a { | n | entry / x } }":                                             `the model has no note for "entry", put it before the state "a" instead`,
-		"fsm m { state a { | n | do / x } }":                                                `no note for "do"`,
-		"fsm m { state a { | n | on e / defer } }":                                          `no note for "e"`,
-		"fsm m { state a { | n | invariant [x] } }":                                         `no note for "invariant [x]"`,
 		"fsm m { | n | goto a state a {} }":                                                 `put "goto a" inside a state`,
 		"fsm m { state a { invariant [x] invariant [y] } }":                                 `state "a" already has the invariant [x]`,
 		"fsm m { invariant [x] state a {} }":                                                `put "invariant [x]" inside a state`,
