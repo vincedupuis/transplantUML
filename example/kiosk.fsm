@@ -1,8 +1,8 @@
 # Nested states interleaved with the transitions that concern them, the initial
 # child of each compound state, entry, do and exit behaviours, deferred events,
-# boolean guards, time triggers on a delay and on a computed one, external,
-# local and internal transitions, and every form a goto target can take: a
-# state name, "final" and "H".
+# state invariants, boolean guards, time triggers on a delay and on a computed
+# one, external, local and internal transitions, and every form a goto target
+# can take: a state name, "final" and "H".
 
 fsm kiosk {
   initial state idle {
@@ -24,6 +24,7 @@ fsm kiosk {
 
     state paying {
       entry / lockBasket
+      invariant [basket and not (card and cash)]
       on approved / receipt goto done
       on declined [retries] / warn goto again
       on declined [not retries] goto browsing

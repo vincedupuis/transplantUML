@@ -95,12 +95,20 @@ func TestGrammarRejects(t *testing.T) {
 		"fsm m { state else {} }",
 		"fsm m { state s { on e [else or g] goto s } }",
 		"fsm m { state submachine {} }",
-		"fsm m { submachine s { state t {} } }",           // a submachine state's states are the machine's
-		"fsm m { submachine s { choice c goto s } }",      // and so are its pseudostates
-		"fsm m { submachine s { entry point e goto s } }", //
-		"fsm m { submachine state s {} }",                 // submachine replaces state
-		"fsm m { submachine s }",                          // and keeps its braces
-		"fsm m { parallel state p { submachine s {} } }",  // a parallel state holds regions only
+		"fsm m { state invariant {} }",
+		"fsm m { state s { invariant } }",                           // an invariant is a condition
+		"fsm m { state s { invariant [] } }",                        //
+		"fsm m { state s { invariant g } }",                         // in brackets
+		"fsm m { state s { invariant [g] / a } }",                   // and never a transition
+		"fsm m { state s { invariant [else] } }",                    // else guards only a branch
+		"fsm m { state s { on e invariant [g] } }",                  // an invariant is no trigger
+		"fsm m { parallel state p { region r { invariant [g] } } }", // a region holds only states
+		"fsm m { submachine s { state t {} } }",                     // a submachine state's states are the machine's
+		"fsm m { submachine s { choice c goto s } }",                // and so are its pseudostates
+		"fsm m { submachine s { entry point e goto s } }",           //
+		"fsm m { submachine state s {} }",                           // submachine replaces state
+		"fsm m { submachine s }",                                    // and keeps its braces
+		"fsm m { parallel state p { submachine s {} } }",            // a parallel state holds regions only
 	} {
 		if _, err := parse(src); err == nil {
 			t.Errorf("%q: accepted, want a syntax error", src)
@@ -109,8 +117,8 @@ func TestGrammarRejects(t *testing.T) {
 }
 
 // Two alternatives cover every combination of guard, actions and goto that
-// carries an effect or a target, and two more the behaviours of a state and
-// the events it defers; TestGrammarRejects covers the rest.
+// carries an effect or a target, and three more the behaviours of a state,
+// the events it defers and its invariant; TestGrammarRejects covers the rest.
 func TestEventForms(t *testing.T) {
 	for _, body := range []string{
 		"on e / a",
@@ -125,6 +133,8 @@ func TestEventForms(t *testing.T) {
 		"do / poll",
 		"do / poll, refresh",
 		"on pause / defer",
+		"invariant [g]",
+		"invariant [not g or (h and i)]",
 		"after(5s) / a",
 		"after(250ms) goto t",
 		"after(1.5s) [g] / a goto t",

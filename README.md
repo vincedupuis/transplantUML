@@ -147,7 +147,7 @@ it next to it (`<name>.puml`, kept up to date by the tests):
 | [`media-player.scxml`](example/media-player.scxml)       | compound state, deep history, entry/exit points, deferred events, invariant, local and internal transitions           |
 | [`washing-machine.scxml`](example/washing-machine.scxml) | orthogonal regions, fork and join — and the warnings PlantUML's region limitation produces                            |
 | [`thermostat.json`](example/thermostat.json)             | the same concepts written directly in the model's JSON shape                                                          |
-| [`kiosk.fsm`](example/kiosk.fsm)                         | the `fsm` language: nested states, behaviours, deferred events, guards, time triggers, transition kinds, `goto` forms |
+| [`kiosk.fsm`](example/kiosk.fsm)                         | the `fsm` language: nesting, behaviours, deferred events, invariants, guards, time triggers, transition kinds, gotos   |
 | [`shop.fsm`](example/shop.fsm)                           | the `fsm` language's state kinds: parallel, submachine, choice, junction, fork, join, entry/exit points, history      |
 
 Run any of them with `tpuml -i example/<name>` and compare with the `.puml` beside it; add `-F scxml` or `-F json`
@@ -346,6 +346,7 @@ fsm kiosk {
             on checkout [basket] goto paying
         }
         state paying {
+            invariant [basket]
             do / spin
             on touch / defer
             on approved / receipt goto done
@@ -368,6 +369,12 @@ The behaviours of a state are written as UML writes them, without `on`: `entry /
 and `exit / action, action`, each of which may appear more than once and adds to what came before. A deferred
 event keeps the `on`, as `on pause / defer`, since the name before the `/` is the document's own event rather
 than a keyword; it takes no guard and no `goto`, because the model holds only the event's name.
+
+`invariant [condition]` is the state invariant: a condition that stays true for as long as the state is active.
+It is a promise about the machine's data, not a trigger, so nothing fires when it is false.
+A false invariant is a bug, which generated code can assert.
+The condition is written as a guard is and reaches `Invariant` verbatim.
+A state, a parallel state and a submachine state each hold at most one; join several conditions with `and`.
 
 A transition takes UML's three kinds:
 
@@ -463,7 +470,7 @@ regions do. A name is a letter or an underscore followed by letters, digits and 
 which is what keeps those names out of a document's reach. A state whose id in another format carries punctuation therefore has to be
 renamed when the machine is written in this language.
 
-Everything else UML has — invariants, variables, stereotypes, notes — has no syntax
+Everything else UML has — variables, stereotypes, notes — has no syntax
 yet.
 
 ### Editor support

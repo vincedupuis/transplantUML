@@ -76,6 +76,7 @@ branch
 event
     :   name=('entry' | 'exit' | 'do') actions
     |   'on' name=Identifier '/' Defer
+    |   Invariant guard
     |   trigger guard? actions goto?
     |   trigger guard? goto
     |   guard? actions? goto
@@ -126,6 +127,7 @@ goto
     ;
 
 Initial: 'initial';
+Invariant: 'invariant';
 Defer: 'defer';
 Local: 'local';
 Duration: [0-9]+ ('.' [0-9]+)? ('ms' | 's');

@@ -211,6 +211,15 @@ func (b *builder) walk(scope *node) {
 }
 
 func (b *builder) event(n *node, ec parser.IEventContext) {
+	// The model holds one condition per state, so a second would be lost.
+	if inv := ec.Invariant(); inv != nil {
+		if n.state.Invariant != "" {
+			b.failf(inv.GetSymbol(), "state %q already has the invariant [%s], join the conditions with and", n.state.Name, n.state.Invariant)
+			return
+		}
+		n.state.Invariant = text(ec.Guard().Expression())
+		return
+	}
 	// The behaviour and defer alternatives are the ones that label a name, and
 	// "entry", "exit" and "do" are keywords, so no Identifier carries that text.
 	if name := ec.GetName(); name != nil {
@@ -380,8 +389,8 @@ func (b *builder) synthesize(scope *node, suffix string, kind model.StateKind) s
 }
 
 // trigger is what an event clause fires on, as the document writes it: an
-// event name, "entry", "exit", "do", a whole "after(5s)", or the guard or
-// goto of a completion transition.
+// event name, "entry", "exit", "do", a whole "after(5s)", the guard or goto
+// of a completion transition, or a whole invariant clause.
 func trigger(ec parser.IEventContext) string {
 	if name := ec.GetName(); name != nil {
 		return name.GetText()

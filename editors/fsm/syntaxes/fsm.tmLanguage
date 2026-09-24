@@ -105,7 +105,7 @@
 		<key>behaviour</key>
 		<dict>
 			<key>match</key>
-			<string>\b(entry|exit|do)\b</string>
+			<string>\b(entry|exit|do|invariant)\b</string>
 			<key>name</key>
 			<string>keyword.other.behaviour.fsm</string>
 		</dict>

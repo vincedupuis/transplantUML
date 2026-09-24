@@ -219,6 +219,28 @@ func TestBuildBehaviours(t *testing.T) {
 	}
 }
 
+// An invariant reaches the model as the document writes it, spacing
+// included, on a state, a parallel state and a submachine state alike.
+func TestBuildInvariant(t *testing.T) {
+	sm := build(t, `fsm m {
+		initial state a { invariant [cashLoaded  and not (jammed or empty)] on e goto p }
+		parallel state p { invariant [powered] region r { initial submachine s { invariant [ready] } } }
+	}`)
+	for name, want := range map[string]string{
+		"a": "cashLoaded  and not (jammed or empty)",
+		"p": "powered",
+		"s": "ready",
+	} {
+		if got := sm.State(name).Invariant; got != want {
+			t.Errorf("%s invariant = %q, want %q", name, got, want)
+		}
+	}
+	// An invariant is not a transition.
+	if got := sm.OutgoingTransitions("p"); len(got) != 0 {
+		t.Errorf("p transitions = %v, want none", got)
+	}
+}
+
 // shop.fsm declares every state kind, so the model it builds pins down what
 // each declaration and each goto becomes.
 func TestBuildStateKinds(t *testing.T) {
@@ -394,6 +416,8 @@ func TestBuildErrors(t *testing.T) {
 		"fsm m { state a { choice c { goto local b } state b {} } }":                        `a local transition stays inside "c", but "b" is not inside it`,
 		"fsm m { submachine a {} state a {} }":                                              `the machine already has a state called "a"`,
 		"fsm m { initial submachine a {} initial state b {} }":                              `already starts in "a"`,
+		"fsm m { state a { invariant [x] invariant [y] } }":                                 `state "a" already has the invariant [x]`,
+		"fsm m { invariant [x] state a {} }":                                                `put "invariant [x]" inside a state`,
 		"fsm m { submachine a { on e goto H } }":                                            `state "a" has no children, so it has no history`,
 	}
 	for src, want := range cases {
