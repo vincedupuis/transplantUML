@@ -2,8 +2,8 @@
 # child of each compound state, entry, do and exit behaviours, deferred events,
 # state invariants, boolean guards, time triggers on a delay and on a computed
 # one, external, local and internal transitions, every form a goto target can
-# take: a state name, "final" and "H", and notes on the machine, a state, a
-# transition and a do activity.
+# take: a state name, "final" and "H", the default of a history state, and
+# notes on the machine, a state, a transition and a do activity.
 
 | A self-service kiosk:
   browse, pay, take the receipt. |
@@ -48,6 +48,7 @@ fsm kiosk {
     }
 
     on resume goto H
+    H / greet goto browsing
     on back goto local browsing
   }
 

@@ -126,6 +126,14 @@ func TestGrammarRejects(t *testing.T) {
 		"fsm m { submachine state s {} }",                           // submachine replaces state
 		"fsm m { submachine s }",                                    // and keeps its braces
 		"fsm m { parallel state p { submachine s {} } }",            // a parallel state holds regions only
+		"fsm m { H goto a state a {} }",                             // a history belongs to a state
+		"fsm m { parallel state p { H goto p region r {} } }",       // or a region, never a parallel state
+		"fsm m { submachine s { H goto s } }",                       // nor a submachine state
+		"fsm m { state s { H on e goto s } }",                       // a history default has no trigger
+		"fsm m { state s { H [g] goto s } }",                        // nor a guard
+		"fsm m { state s { H / a } }",                               // and always a goto
+		"fsm m { state s { H* } }",                                  //
+		"fsm m { state s { s.H goto s } }",                          // it is declared inside its state
 	} {
 		if _, err := parse(src); err == nil {
 			t.Errorf("%q: accepted, want a syntax error", src)

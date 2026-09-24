@@ -72,6 +72,7 @@ func TestValidateErrors(t *testing.T) {
 		{"two history defaults", func(sm *StateMachine) {
 			sm.Transitions = append(sm.Transitions, &Transition{Source: "h", Targets: []string{"f"}})
 		}, `a history state has at most one outgoing transition, its default, has 2`},
+		{"history default outside", func(sm *StateMachine) { sm.Transitions[1].Targets = []string{"a"} }, `a history state's default leads inside "b", "a" is not inside it`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

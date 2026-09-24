@@ -30,6 +30,7 @@ state ordering {
     paying --> again: declined\n[ retries ]\n/ warn
     paying --> browsing: declined\n[ not retries ]
     authorizing --> browsing: cancel
+    ordering_H --> browsing: / greet
 }
 ordering : entry / newBasket
 ordering : exit / clearBasket

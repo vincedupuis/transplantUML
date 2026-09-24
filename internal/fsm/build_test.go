@@ -358,6 +358,58 @@ func TestBuildEndings(t *testing.T) {
 	}
 }
 
+// An H or H* line gives the history state that goto H or goto H* reaches its
+// default transition, in a state or in a region.
+func TestBuildHistoryDefault(t *testing.T) {
+	sm := build(t, `fsm m {
+		initial state idle { on play goto player.H on edit goto r.H* }
+		state player {
+			H / rewind goto intro
+			initial state intro {}
+			state song {}
+		}
+		parallel state p {
+			region r {
+				H* goto final
+				initial state page { initial state top {} }
+			}
+		}
+	}`)
+	for _, want := range []struct {
+		source, target string
+		kind           model.StateKind
+		actions        []string
+	}{
+		{"player.H", "intro", model.HistoryShallow, []string{"rewind"}},
+		{"r.H-deep", "r.final", model.HistoryDeep, nil},
+	} {
+		if got := sm.State(want.source).Kind; got != want.kind {
+			t.Errorf("%s: kind %q, want %q", want.source, got, want.kind)
+		}
+		out := sm.OutgoingTransitions(want.source)
+		if len(out) != 1 || !slices.Equal(out[0].Targets, []string{want.target}) || !slices.Equal(out[0].Actions, want.actions) {
+			t.Errorf("%s: want one default to %s doing %v, got %v", want.source, want.target, want.actions, out)
+		}
+		if in := sm.IncomingTransitions(want.source); len(in) != 1 {
+			t.Errorf("%s: want the goto to reach the same state, got %d incoming", want.source, len(in))
+		}
+	}
+
+	// The model keeps one default, inside the state whose history it is.
+	for src, want := range map[string]string{
+		"fsm m { initial state a { H goto b initial state c {} } state b {} }": `default leads inside "a", "b" is not inside it`,
+		"fsm m { initial state a { H goto b H goto b initial state b {} } }":   `at most one outgoing transition, its default, has 2`,
+	} {
+		sm, _, err := Parser{}.Parse([]byte(src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := sm.Validate(); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s\n  want error containing %q, got %v", src, want, err)
+		}
+	}
+}
+
 // Line breaks carry no meaning, so a deferred event followed by a goto is two
 // clauses: the deferral and a completion transition.
 func TestBuildTwoClausesOnOneLine(t *testing.T) {
@@ -524,6 +576,8 @@ func TestBuildErrors(t *testing.T) {
 		"fsm m { state a { invariant [x] invariant [y] } }":                                 `state "a" already has the invariant [x]`,
 		"fsm m { invariant [x] state a {} }":                                                `put "invariant [x]" inside a state`,
 		"fsm m { submachine a { on e goto H } }":                                            `state "a" has no children, so it has no history`,
+		"fsm m { state a { H goto a } }":                                                    `state "a" has no children, so it has no history`,
+		"fsm m { parallel state p { region r { H goto p } } }":                              `state "r" has no children, so it has no history`,
 	}
 	for src, want := range cases {
 		_, _, err := Parser{}.Parse([]byte(src))

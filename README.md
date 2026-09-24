@@ -502,7 +502,24 @@ states by name — so nesting never has to be spelled out, and a target may be d
 These are the states the language never declares, so the parser creates them the first time a `goto` asks for one,
 named `<scope>.final`, `<scope>.terminate`, `<state>.H` and `<state>.H-deep`. Leaving through an exit point, `final`
 and `terminate` belong to the scope around the point's state. A parallel state has no history of its own, only its
-regions do. A name is a letter or an underscore followed by letters, digits and underscores — no dots or hyphens,
+regions do.
+
+A history state takes its default transition from a line inside the state it belongs to.
+`H` or `H*` starts the line, followed by optional actions and a `goto`:
+
+```
+state player {
+    H / rewind goto intro         # taken while player has no history yet
+    initial state intro { on next goto song }
+    state song {}
+}
+```
+
+It is the same state `goto H` or `goto H*` reaches, and the one transition leaving it.
+UML gives it no trigger and no guard, and its target has to be inside the state.
+A state or a region declares each kind at most once.
+
+A name is a letter or an underscore followed by letters, digits and underscores — no dots or hyphens,
 which is what keeps those names out of a document's reach. A state whose id in another format carries punctuation therefore has to be
 renamed when the machine is written in this language.
 

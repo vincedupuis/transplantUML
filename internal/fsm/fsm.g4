@@ -11,7 +11,7 @@ fsm
 state
     :   Note? Initial? 'state' Identifier stereotype?
         '{'
-            (state | parallel | submachine | choice | junction | fork | join | point | event)*
+            (state | parallel | submachine | choice | junction | fork | join | point | history | event)*
         '}'
     ;
 
@@ -32,7 +32,7 @@ submachine
 region
     :   Note? 'region' Identifier stereotype?
         '{'
-            (state | parallel | submachine | choice | junction | fork | join)*
+            (state | parallel | submachine | choice | junction | fork | join | history)*
         '}'
     ;
 
@@ -67,6 +67,10 @@ join
 
 point
     :   Note? kind=('entry' | 'exit') 'point' Identifier stereotype? actions? goto
+    ;
+
+history
+    :   kind=('H' | 'H*') actions? goto
     ;
 
 stereotype

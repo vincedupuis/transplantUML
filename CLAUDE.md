@@ -78,7 +78,8 @@ warnings.
   the machine it refers to, so its body holds clauses only), and the pseudostates `choice`/`junction` (branches,
   `[else]` becomes `Cond` "else"), `fork`, `join`, `entry point`/`exit point`, declared without `state`. A clause
   with no trigger is a completion transition. `goto` targets are a state name, `final`, `terminate`, or history as
-  `H`/`H*`, alone or after a state name (`s.H*`); `goto local <target>`
+  `H`/`H*`, alone or after a state name (`s.H*`), and a line `H / actions goto target` inside a state or region
+  gives that history its default transition; `goto local <target>`
   makes a local transition, whose target must be inside the source, and a clause without `goto` is internal; one name
   reaches any state because the names are one namespace for the whole machine, as they are in the model. A state
   may be marked `initial` (`initial state s { … }`), naming its parent's starting child or, at the top level, the

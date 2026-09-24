@@ -401,6 +401,14 @@ func (sm *StateMachine) Validate() error {
 			if out > 1 {
 				fail("state %q: a history state has at most one outgoing transition, its default, has %d", s.Name, out)
 			}
+			// The default is one of the states the history could remember.
+			for _, t := range outgoing {
+				for _, tg := range t.Targets {
+					if byName[tg] != nil && !slices.Contains(sm.Ancestors(tg), s.Parent) {
+						fail("state %q: a history state's default leads inside %q, %q is not inside it", s.Name, s.Parent, tg)
+					}
+				}
+			}
 		}
 	}
 

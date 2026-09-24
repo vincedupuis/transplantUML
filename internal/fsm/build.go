@@ -184,8 +184,15 @@ func (b *builder) walk(scope *node) {
 	for _, n := range scope.order {
 		switch c := n.ctx.(type) {
 		case *parser.StateContext:
+			for _, hc := range c.AllHistory() {
+				b.history(n, hc)
+			}
 			for _, ec := range c.AllEvent() {
 				b.event(n, ec)
+			}
+		case *parser.RegionContext:
+			for _, hc := range c.AllHistory() {
+				b.history(n, hc)
 			}
 		case *parser.ParallelContext:
 			for _, ec := range c.AllEvent() {
@@ -294,6 +301,24 @@ func (b *builder) event(n *node, ec parser.IEventContext) {
 		t.Targets, t.Kind = []string{target}, kind
 	}
 	b.sm.Transitions = append(b.sm.Transitions, t)
+}
+
+// history adds the default transition of the history state an H or H* line
+// declares, the one taken while the state has no history yet. It is the same
+// history state that goto H or goto H* leads to.
+func (b *builder) history(n *node, hc parser.IHistoryContext) {
+	kind := hc.GetKind()
+	if len(n.order) == 0 {
+		b.failf(kind, "%s has no children, so it has no history", describe(n))
+		return
+	}
+	suffix, hk := "H", model.HistoryShallow
+	if kind.GetText() == "H*" {
+		suffix, hk = "H-deep", model.HistoryDeep
+	}
+	b.synthesize(n, suffix, hk)
+	// The history sits inside n, so goto final ends n's own region.
+	b.leave(&node{state: n.synth[suffix], parent: n}, hc.Actions(), hc.Goto_())
 }
 
 // branches adds the transitions leaving a choice or a junction. UML writes the
