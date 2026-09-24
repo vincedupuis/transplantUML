@@ -354,6 +354,8 @@ a do activity.
 tpuml's own input format, a compact alternative to writing SCXML by hand. The grammar is
 [`internal/fsm/fsm.g4`](internal/fsm/fsm.g4); [`example/kiosk.fsm`](example/kiosk.fsm) and
 [`example/shop.fsm`](example/shop.fsm) between them use every construct.
+[`docs/uml-coverage.md`](docs/uml-coverage.md) compares the language with UML state machines, concept by concept,
+with an example of each.
 
 ```
 fsm kiosk {
