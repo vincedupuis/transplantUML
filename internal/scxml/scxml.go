@@ -473,7 +473,7 @@ func known(el *etree.Element, tags ...string) bool {
 	return false
 }
 
-// rawXML renders an element tpuml has no model field for. The result is
+// rawXML renders an element the model has no field for. The result is
 // normalized (indentation removed, canonical escaping) so that the same
 // element always yields the same string, whatever the source document looked
 // like and however many times it went through the emitter.

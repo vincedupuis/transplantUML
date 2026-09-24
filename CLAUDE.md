@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`tpuml` is a Go CLI that converts state machine documents. Any supported input format is parsed into one
+`fsm` is a Go CLI that converts state machine documents. Any supported input format is parsed into one
 format-neutral model (`internal/model`) of a UML state machine, which is then written back out either by a built-in
 emitter (document formats: SCXML, JSON) or through a Go `text/template` (free-form text: PlantUML, code, docs).
 Template rendering is output-only. The bundled `assets/puml.gotmpl` (embedded in the binary, used when `-t` is
@@ -13,14 +13,14 @@ omitted) produces PlantUML.
 The user keeps one source document and generates outputs from it; round-tripping is *not* a goal. The goal is to
 cover as much of UML as possible on the input side and, on the output side, to write what the format can express
 and **warn** (never silently drop) about the rest. Parsers, emitters and `render.Render` all return
-`model.Warnings`; `cmd/tpuml` prints them to stderr as `tpuml: warning: …`.
+`model.Warnings`; `cmd/fsm` prints them to stderr as `fsm: warning: …`.
 
 ## Commands
 
 ```bash
-make build                          # produces ./bin/tpuml (see the Makefile for run/test/fmt/vet/clean)
+make build                          # produces ./bin/fsm (see the Makefile for run/test/fmt/vet/clean)
 go build ./...
-go build ./cmd/tpuml                # produces ./tpuml
+go build ./cmd/fsm                  # produces ./fsm
 make vet                            # go vet -unreachable=false ./... (the generated ANTLR parser trips that check)
 go test ./...
 go test ./internal/scxml -run TestEdgeCases          # one test
@@ -29,16 +29,16 @@ make plantuml                       # download the PlantUML jar into bin/ so Tes
 make generate                       # download the ANTLR jar into bin/ and regenerate internal/fsm/parser from fsm.g4
 
 # End-to-end
-./tpuml -i example/coffee-machine.scxml                 # PlantUML to stdout
-./tpuml -i example/coffee-machine.scxml -F json         # model as JSON
+./fsm -i example/coffee-machine.scxml                   # PlantUML to stdout
+./fsm -i example/coffee-machine.scxml -F json           # model as JSON
 ```
 
 Golden files for the PlantUML template live in `internal/render/testdata/*.puml`; regenerate one with
-`go run ./cmd/tpuml -i <input> -o internal/render/testdata/<name>.puml` after checking the diff is intended.
+`go run ./cmd/fsm -i <input> -o internal/render/testdata/<name>.puml` after checking the diff is intended.
 
 ## Architecture
 
-Pipeline: `cmd/tpuml/main.go` (`run() error`) → `format.ParserFor(name).Parse` → `*model.StateMachine` +
+Pipeline: `cmd/fsm/main.go` (`run() error`) → `format.ParserFor(name).Parse` → `*model.StateMachine` +
 warnings → `sm.Validate()` → `render.Render(sm, tmpl)` **or** `format.EmitterFor(name).Emit(sm)` → output +
 warnings.
 
@@ -75,7 +75,7 @@ warnings.
   `else` branch last with no `cond` (engines take the first enabled transition), declares the extension
   namespace only when used, and warns for join, terminate, local, defer and free-text do activities, and leaves out a
   submachine state's entry and exit points with a warning. States it cannot reach from the top level are an error.
-- **`internal/fsm`** — tpuml's own DSL (`fsm name { state s { on ev [guard] / actions goto target } }`), an
+- **`internal/fsm`** — the command's own DSL (`fsm name { state s { on ev [guard] / actions goto target } }`), an
   ANTLR4 grammar in `fsm.g4`. `parser/` is generated from it (`make generate`, Go target with `-visitor
   -no-listener`) and committed so the build needs no Java; never edit it by hand, and regenerate it after any
   grammar change. Kinds use UML's names: `state`, `parallel state` holding `region`s, `submachine` (named after
@@ -135,6 +135,6 @@ warnings.
   lists in `TestPlantUMLWarnings`, `TestEmitWarnings` and `TestUMLConcepts`.
 - `example/` has one document per group of concepts (see the README table) with its rendered `.puml` beside it.
   `goldens()` in `internal/render/render_test.go` globs the directory, so every `example/*.scxml|json` must have
-  a matching `.puml` (regenerate with `go run ./cmd/tpuml -i example/<name> -o example/<name>.puml`), is checked
+  a matching `.puml` (regenerate with `go run ./cmd/fsm -i example/<name> -o example/<name>.puml`), is checked
   by PlantUML's syntax test, and every `.scxml` there is validated against the W3C schema.
 - `.gitattributes` forces LF line endings.

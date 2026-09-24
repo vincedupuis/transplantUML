@@ -1,4 +1,4 @@
-// Command tpuml converts state machine documents: it parses an input file
+// Command fsm converts state machine documents: it parses an input file
 // into a format-neutral model and renders that model either through a Go
 // template or with a built-in emitter.
 package main
@@ -19,7 +19,7 @@ import (
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout, os.Stderr); err != nil {
-		fmt.Fprintln(os.Stderr, "tpuml:", err)
+		fmt.Fprintln(os.Stderr, "fsm:", err)
 		os.Exit(1)
 	}
 }
@@ -27,7 +27,7 @@ func main() {
 func run(args []string, stdout, stderr io.Writer) error {
 	cmd := newRootCmd(stdout, stderr)
 	if len(args) == 0 {
-		// Bare "tpuml": show the usage rather than complaining about -i.
+		// Bare "fsm": show the usage rather than complaining about -i.
 		args = []string{"--help"}
 	}
 	cmd.SetArgs(args)
@@ -45,9 +45,9 @@ type options struct {
 func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 	var opts options
 	cmd := &cobra.Command{
-		Use:   "tpuml -i input [-f format] [-t template.gotmpl | -F format] [-o output]",
+		Use:   "fsm -i input [-f format] [-t template.gotmpl | -F format] [-o output]",
 		Short: "Convert state machine documents",
-		Long: "tpuml parses a state machine document into a format-neutral model and renders\n" +
+		Long: "fsm parses a state machine document into a format-neutral model and renders\n" +
 			"that model either through a Go template (PlantUML by default) or with a\n" +
 			"built-in emitter.",
 		Args:                  cobra.NoArgs,
@@ -140,6 +140,6 @@ func convert(opts options, stdout, stderr io.Writer) error {
 // the conversion.
 func report(stderr io.Writer, warnings model.Warnings) {
 	for _, w := range warnings {
-		fmt.Fprintln(stderr, "tpuml: warning:", w)
+		fmt.Fprintln(stderr, "fsm: warning:", w)
 	}
 }

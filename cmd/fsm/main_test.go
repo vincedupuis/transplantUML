@@ -73,8 +73,8 @@ func TestWarningsOnStderr(t *testing.T) {
 		t.Errorf("unexpected output:\n%s", out)
 	}
 	for _, want := range []string{
-		"tpuml: warning: state \"failed\": <donedata> is not supported and was dropped\n",
-		"tpuml: warning: state \"stop\": PlantUML has no terminate symbol",
+		"fsm: warning: state \"failed\": <donedata> is not supported and was dropped\n",
+		"fsm: warning: state \"stop\": PlantUML has no terminate symbol",
 	} {
 		if !strings.Contains(stderr, want) {
 			t.Errorf("stderr missing %q:\n%s", want, stderr)

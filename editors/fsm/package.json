@@ -1,7 +1,7 @@
 {
-  "name": "tpuml-fsm",
-  "displayName": "tpuml fsm",
-  "description": "Syntax highlighting for tpuml's fsm state machine language.",
+  "name": "fsm",
+  "displayName": "fsm",
+  "description": "Syntax highlighting for the fsm state machine language.",
   "version": "0.1.0",
   "publisher": "vincedupuis",
   "repository": {

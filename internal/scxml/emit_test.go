@@ -35,7 +35,7 @@ func TestEmitRoundTrip(t *testing.T) {
 }
 
 // Regenerate with:
-// go run ./cmd/tpuml -i internal/scxml/testdata/<name>.scxml -F scxml -o internal/scxml/testdata/<name>.emitted.scxml
+// go run ./cmd/fsm -i internal/scxml/testdata/<name>.scxml -F scxml -o internal/scxml/testdata/<name>.emitted.scxml
 func TestEmitGolden(t *testing.T) {
 	for _, name := range []string{"edge", "uml"} {
 		want, err := os.ReadFile("testdata/" + name + ".emitted.scxml")

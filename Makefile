@@ -1,4 +1,4 @@
-BINARY := tpuml
+BINARY := fsm
 
 # PlantUML jar used by TestPlantUMLSyntax (internal/render/plantuml_test.go).
 # The test skips when neither `plantuml` is on PATH nor PLANTUML_JAR is set.

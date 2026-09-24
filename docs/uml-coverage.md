@@ -1,7 +1,7 @@
 # The fsm DSL against UML state machines
 
-This compares tpuml's fsm language (`internal/fsm/fsm.g4`) with UML 2.5.1, chapter 14 (State Machines).
-Every supported example parses with `tpuml`.
+This compares the fsm language (`internal/fsm/fsm.g4`) with UML 2.5.1, chapter 14 (State Machines).
+Every supported example parses with the `fsm` command.
 
 Legend: ✅ supported · ⚠️ partial · ❌ not in the DSL
 

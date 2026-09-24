@@ -1,6 +1,6 @@
 # transplantUML
 
-**transplantUML** (`tpuml`) converts state machine documents. It parses an input file into a format-neutral model
+**transplantUML** (`fsm`) converts state machine documents. It parses an input file into a format-neutral model
 of a UML state machine, then writes that model back out: with a built-in emitter, in any of the supported document
 formats (SCXML, JSON), or through a Go template — so you can produce PlantUML, source code, documentation, or any
 other text.
@@ -18,7 +18,7 @@ symbol, and so on. Warnings go to stderr and never fail the conversion.
 - **Any text output** through the Go templating engine plus the [sprig](https://masterminds.github.io/sprig/) function
   library, with a built-in PlantUML template.
 - **Formats**: `scxml` and `json` are each accepted as input (`-f`) and produced as output (`-F`); `fsm`,
-  tpuml's own compact language, is input only.
+  the command's own compact language, is input only.
 - **Nothing dropped silently**: the parser warns about input it has no place for, and each output warns about
   model features it can only approximate.
 - **Validation**: dangling targets, unknown parents, duplicate ids, and similar mistakes are reported before anything
@@ -65,7 +65,7 @@ use a guard on a completion transition), protocol state machines.
 ## Installation
 
 ```bash
-go install github.com/vincedupuis/transplantUML/cmd/tpuml@latest
+go install github.com/vincedupuis/transplantUML/cmd/fsm@latest
 ```
 
 or from a clone:
@@ -73,7 +73,7 @@ or from a clone:
 ```bash
 git clone https://github.com/vincedupuis/transplantUML.git
 cd transplantUML
-make build          # produces ./bin/tpuml, or: go build ./cmd/tpuml
+make build          # produces ./bin/fsm, or: go build ./cmd/fsm
 ```
 
 The Makefile also has `run` (`make run ARGS="-i example/coffee-machine.scxml"`), `test`, `fmt`, `vet`, `clean` and
@@ -96,7 +96,7 @@ output against something other than the project itself and skip when their tool 
 ## Usage
 
 ```
-tpuml -i input [-f format] [-t template.gotmpl | -F format] [-o output]
+fsm -i input [-f format] [-t template.gotmpl | -F format] [-o output]
 ```
 
 | Flag                    | Meaning                                                                                               |
@@ -110,10 +110,10 @@ tpuml -i input [-f format] [-t template.gotmpl | -F format] [-o output]
 
 Each flag has a long form; `-F`/`--output-format` is distinct from `-f`/`--input-format` (flags are case-sensitive).
 
-Warnings are printed to stderr as `tpuml: warning: …`, one per line, and do not change the exit status:
+Warnings are printed to stderr as `fsm: warning: …`, one per line, and do not change the exit status:
 
 ```
-$ tpuml -i machine.scxml -F scxml > out.scxml
+$ fsm -i machine.scxml -F scxml > out.scxml
 tpuml: warning: state "work": SCXML has no deferred events; written as tpuml:defer, which engines ignore
 ```
 
@@ -121,25 +121,25 @@ tpuml: warning: state "work": SCXML has no deferred events; written as tpuml:def
 
 ```bash
 # SCXML -> PlantUML with the built-in template
-tpuml -i example/coffee-machine.scxml -o coffee.puml
+fsm -i example/coffee-machine.scxml -o coffee.puml
 
 # SCXML -> your own template
-tpuml -i example/coffee-machine.scxml -t my-template.gotmpl -o coffee.md
+fsm -i example/coffee-machine.scxml -t my-template.gotmpl -o coffee.md
 
 # SCXML -> JSON model, then JSON -> PlantUML (round trip)
-tpuml -i example/coffee-machine.scxml -F json -o coffee.json
-tpuml -i coffee.json -o coffee.puml
+fsm -i example/coffee-machine.scxml -F json -o coffee.json
+fsm -i coffee.json -o coffee.puml
 
 # JSON -> SCXML, and SCXML -> normalized SCXML
-tpuml -i coffee.json -F scxml -o coffee.scxml
-tpuml -i example/coffee-machine.scxml -F scxml
+fsm -i coffee.json -F scxml -o coffee.scxml
+fsm -i example/coffee-machine.scxml -F scxml
 ```
 
 `coffee.puml` can be visualized with [PlantUML Online](https://plantuml.online).
 
 ### Example documents
 
-[`example/`](example/) holds one document per group of UML concepts, each with the PlantUML `tpuml` renders from
+[`example/`](example/) holds one document per group of UML concepts, each with the PlantUML `fsm` renders from
 it next to it (`<name>.puml`, kept up to date by the tests):
 
 | Document                                                 | Demonstrates                                                                                                          |
@@ -153,7 +153,7 @@ it next to it (`<name>.puml`, kept up to date by the tests):
 | [`kiosk.fsm`](example/kiosk.fsm)                         | the `fsm` language: nesting, behaviours, deferred events, invariants, guards, time triggers, transition kinds, notes  |
 | [`shop.fsm`](example/shop.fsm)                           | the `fsm` language's state kinds (parallel, submachine, all pseudostates, history, named finals) and stereotypes      |
 
-Run any of them with `tpuml -i example/<name>` and compare with the `.puml` beside it; add `-F scxml` or `-F json`
+Run any of them with `fsm -i example/<name>` and compare with the `.puml` beside it; add `-F scxml` or `-F json`
 to see the other formats.
 
 ## Model
@@ -310,7 +310,7 @@ and a **do activity** otherwise: `invoke(src)` or `invoke(src, type)` for a plai
 
 ### The tpuml extension vocabulary
 
-SCXML permits attributes and elements from other namespaces everywhere, and engines ignore them. `tpuml` uses the
+SCXML permits attributes and elements from other namespaces everywhere, and engines ignore them. `fsm` uses the
 namespace `https://github.com/vincedupuis/transplantUML` (any prefix; `tpuml` below) for what SCXML cannot say:
 
 | Extension                                                                    | On                                   | Meaning                                   |
@@ -351,7 +351,7 @@ a do activity.
 
 ## The fsm language
 
-tpuml's own input format, a compact alternative to writing SCXML by hand. The grammar is
+The command's own input format, a compact alternative to writing SCXML by hand. The grammar is
 [`internal/fsm/fsm.g4`](internal/fsm/fsm.g4); [`example/kiosk.fsm`](example/kiosk.fsm) and
 [`example/shop.fsm`](example/shop.fsm) between them use every construct.
 [`docs/uml-coverage.md`](docs/uml-coverage.md) compares the language with UML state machines, concept by concept,
@@ -621,4 +621,4 @@ JetBrains IDEs read the same folder as a TextMate bundle.
 
 - JetBrains: add the `editors/fsm` folder under Settings → Editor → TextMate Bundles.
 - VS Code: link the folder into the extensions directory, then reload the window:
-  `ln -s "$PWD/editors/fsm" ~/.vscode/extensions/tpuml-fsm`.
+  `ln -s "$PWD/editors/fsm" ~/.vscode/extensions/fsm`.

@@ -61,7 +61,7 @@ func goldens(t *testing.T) map[string]string {
 }
 
 // Golden-file tests for the built-in PlantUML template. Regenerate a golden
-// file with: go run ./cmd/tpuml -i <input> -o <golden>.puml
+// file with: go run ./cmd/fsm -i <input> -o <golden>.puml
 func TestPlantUMLGolden(t *testing.T) {
 	for input, golden := range goldens(t) {
 		t.Run(filepath.Base(input), func(t *testing.T) {

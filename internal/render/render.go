@@ -38,7 +38,7 @@ import (
 )
 
 func Render(sm *model.StateMachine, tmplSrc string) (string, model.Warnings, error) {
-	tmpl := template.New("tpuml")
+	tmpl := template.New("fsm")
 	var warnings model.Warnings
 
 	funcs := template.FuncMap{
