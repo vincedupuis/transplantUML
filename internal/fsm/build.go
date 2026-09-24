@@ -3,6 +3,7 @@ package fsm
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/antlr4-go/antlr/v4"
 	"github.com/vincedupuis/transplantUML/internal/fsm/parser"
@@ -215,7 +216,9 @@ func (b *builder) event(n *node, ec parser.IEventContext) {
 		}
 		return
 	}
-	t := &model.Transition{Source: n.state.Name, Actions: effects(ec.Actions())}
+	// A clause with no goto is UML's internal transition, the one a state
+	// lists in its compartment: no state change, no exit or entry.
+	t := &model.Transition{Source: n.state.Name, Actions: effects(ec.Actions()), Kind: model.Internal}
 	// No trigger makes a completion transition, which leaves Event and After
 	// empty.
 	if tr := ec.Trigger(); tr != nil {
@@ -229,11 +232,11 @@ func (b *builder) event(n *node, ec parser.IEventContext) {
 		t.Cond = text(g.Expression())
 	}
 	if gt := ec.Goto_(); gt != nil {
-		target, ok := b.target(n, gt)
+		target, kind, ok := b.destination(n, gt)
 		if !ok {
 			return
 		}
-		t.Targets = []string{target}
+		t.Targets, t.Kind = []string{target}, kind
 	}
 	b.sm.Transitions = append(b.sm.Transitions, t)
 }
@@ -264,11 +267,26 @@ func (b *builder) leave(n *node, ac parser.IActionsContext, gt parser.IGotoConte
 }
 
 func (b *builder) transition(n *node, ac parser.IActionsContext, gt parser.IGotoContext) (*model.Transition, bool) {
-	target, ok := b.target(n, gt)
+	target, kind, ok := b.destination(n, gt)
 	if !ok {
 		return nil, false
 	}
-	return &model.Transition{Source: n.state.Name, Targets: []string{target}, Actions: effects(ac)}, true
+	return &model.Transition{Source: n.state.Name, Targets: []string{target}, Actions: effects(ac), Kind: kind}, true
+}
+
+// destination resolves a goto to its target and the transition's kind:
+// external, UML's default, or local when the goto says so. UML allows a local
+// transition only into its own source, which it then never leaves.
+func (b *builder) destination(n *node, g parser.IGotoContext) (string, model.TransitionKind, bool) {
+	target, ok := b.target(n, g)
+	if !ok || g.Local() == nil {
+		return target, "", ok
+	}
+	if !slices.Contains(b.sm.Ancestors(target), n.state.Name) {
+		b.failf(g.Local().GetSymbol(), "a local transition stays inside %q, but %q is not inside it", n.state.Name, target)
+		return "", "", false
+	}
+	return target, model.Local, true
 }
 
 // target names the state a goto leads to, creating the final, terminate or
@@ -286,8 +304,6 @@ func (b *builder) target(n *node, g parser.IGotoContext) (string, bool) {
 		return target.state.Name, true
 	}
 	switch last {
-	case ".":
-		return n.state.Name, true
 	case "final":
 		return b.ending(n, g, "final", model.Final)
 	case "terminate":

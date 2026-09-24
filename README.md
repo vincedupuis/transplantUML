@@ -139,16 +139,16 @@ tpuml -i example/coffee-machine.scxml -F scxml
 [`example/`](example/) holds one document per group of UML concepts, each with the PlantUML `tpuml` renders from
 it next to it (`<name>.puml`, kept up to date by the tests):
 
-| Document                                                 | Demonstrates                                                                                                |
-|----------------------------------------------------------|-------------------------------------------------------------------------------------------------------------|
-| [`coffee-machine.scxml`](example/coffee-machine.scxml)   | the basics: flat states and event-triggered transitions                                                     |
-| [`traffic-light.scxml`](example/traffic-light.scxml)     | time triggers `after(30s)`, variables, entry/exit actions, guarded and internal transitions, notes          |
-| [`order.scxml`](example/order.scxml)                     | choice (recognised without markup), junction, submachine state, do activity, stereotype, terminate          |
-| [`media-player.scxml`](example/media-player.scxml)       | compound state, deep history, entry/exit points, deferred events, invariant, local and internal transitions |
-| [`washing-machine.scxml`](example/washing-machine.scxml) | orthogonal regions, fork and join — and the warnings PlantUML's region limitation produces                  |
-| [`thermostat.json`](example/thermostat.json)             | the same concepts written directly in the model's JSON shape                                                |
-| [`kiosk.fsm`](example/kiosk.fsm)                         | the `fsm` language: nested states, behaviours, deferred events, guards, time triggers, `goto` forms         |
-| [`shop.fsm`](example/shop.fsm)                           | the `fsm` language's state kinds: parallel, choice, junction, fork, join, entry/exit points, history        |
+| Document                                                 | Demonstrates                                                                                                          |
+|----------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| [`coffee-machine.scxml`](example/coffee-machine.scxml)   | the basics: flat states and event-triggered transitions                                                               |
+| [`traffic-light.scxml`](example/traffic-light.scxml)     | time triggers `after(30s)`, variables, entry/exit actions, guarded and internal transitions, notes                    |
+| [`order.scxml`](example/order.scxml)                     | choice (recognised without markup), junction, submachine state, do activity, stereotype, terminate                    |
+| [`media-player.scxml`](example/media-player.scxml)       | compound state, deep history, entry/exit points, deferred events, invariant, local and internal transitions           |
+| [`washing-machine.scxml`](example/washing-machine.scxml) | orthogonal regions, fork and join — and the warnings PlantUML's region limitation produces                            |
+| [`thermostat.json`](example/thermostat.json)             | the same concepts written directly in the model's JSON shape                                                          |
+| [`kiosk.fsm`](example/kiosk.fsm)                         | the `fsm` language: nested states, behaviours, deferred events, guards, time triggers, transition kinds, `goto` forms |
+| [`shop.fsm`](example/shop.fsm)                           | the `fsm` language's state kinds: parallel, choice, junction, fork, join, entry/exit points, history                  |
 
 Run any of them with `tpuml -i example/<name>` and compare with the `.puml` beside it; add `-F scxml` or `-F json`
 to see the other formats.
@@ -369,6 +369,26 @@ and `exit / action, action`, each of which may appear more than once and adds to
 event keeps the `on`, as `on pause / defer`, since the name before the `/` is the document's own event rather
 than a keyword; it takes no guard and no `goto`, because the model holds only the event's name.
 
+A transition takes UML's three kinds:
+
+```
+state player {
+    entry / powerOn
+    exit / powerOff
+    on reset goto player          # external: leaves player and enters it again
+    on stop goto local stopped    # local: stays inside player
+    on volume / adjust            # internal: no goto, no state change
+    initial state stopped { on play goto playing }
+    state playing {}
+}
+```
+
+A `goto` is external, UML's default: the transition leaves its source, so its exit and entry behaviours run, even
+when the target is the source itself or one of its children. `goto local <target>` makes it local: it stays inside
+its source, whose exit and entry behaviours do not run, so its target has to be inside the source — one of its
+states or its history. A clause without a `goto` is internal: it runs its actions and changes no state, as the
+transitions UML lists in a state's compartment do. The model's targetless transition is this one.
+
 `after(<delay>)` in place of `on <event>` makes the clause a time trigger, filling `After`: it fires that long
 after its state is entered, and takes the same guard, actions and `goto`. A delay is either a number and a unit,
 `ms` or `s` — the time value SCXML accepts — as in `after(250ms)` and `after(1.5s)`, or a name, as in
@@ -420,18 +440,18 @@ states by name — so nesting never has to be spelled out, and a target may be d
 | Target      | Resolves to                                                                     |
 |-------------|---------------------------------------------------------------------------------|
 | `b`         | the state called `b`, wherever it sits                                          |
-| `.`         | the declaring state itself                                                      |
 | `final`     | the final state of the scope holding the declaring state, created on use        |
 | `terminate` | the terminate pseudostate of that same scope, which ends the whole machine      |
 | `H`, `H*`   | the shallow or deep history of the declaring state, created on use              |
 | `b.H`, `b.H*` | the shallow or deep history of the state called `b`, created on use           |
+| `local b`, `local H`, `local b.H` | the same state, reached by a local transition                          |
 
 These are the states the language never declares, so the parser creates them the first time a `goto` asks for one,
 named `<scope>.final`, `<scope>.terminate`, `<state>.H` and `<state>.H-deep`. Leaving through an exit point, `final`
 and `terminate` belong to the scope around the point's state. A parallel state has no history of its own, only its
 regions do. A name is a letter or an underscore followed by letters, digits and underscores — no dots or hyphens,
-which is what keeps those names out of a document's reach and `goto .` a keyword rather than a name. A state whose id in another format carries punctuation therefore has to be
+which is what keeps those names out of a document's reach. A state whose id in another format carries punctuation therefore has to be
 renamed when the machine is written in this language.
 
-Everything else UML has — transition kinds, submachines, invariants, variables, stereotypes, notes — has no syntax
+Everything else UML has — submachines, invariants, variables, stereotypes, notes — has no syntax
 yet.

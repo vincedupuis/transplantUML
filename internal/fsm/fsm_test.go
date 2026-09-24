@@ -79,6 +79,11 @@ func TestGrammarRejects(t *testing.T) {
 		"fsm m { state s { on e goto .H } }",
 		"fsm m { state s { on e goto s.final } }",
 		"fsm m { state s { on e goto H.s } }",
+		"fsm m { state s { on e goto . } }",           // a state names itself
+		"fsm m { state s { on e goto local final } }", // final and terminate sit outside the source
+		"fsm m { state s { on e goto local terminate } }",
+		"fsm m { state s { on e local goto s } }", // local qualifies the target
+		"fsm m { state local {} }",
 		"fsm m { state parallel {} }", // the new keywords are not names
 		"fsm m { state region {} }",
 		"fsm m { state choice {} }",
@@ -132,7 +137,6 @@ func TestEventForms(t *testing.T) {
 // for a state the document never declares, or the history of a named state.
 func TestGotoTargets(t *testing.T) {
 	for _, target := range []string{
-		".",
 		"final",
 		"terminate",
 		"H",
@@ -140,6 +144,9 @@ func TestGotoTargets(t *testing.T) {
 		"t",
 		"t.H",
 		"t.H*",
+		"local t",
+		"local H",
+		"local t.H*",
 	} {
 		if _, err := parse("fsm m { state s { on e goto " + target + " } }"); err != nil {
 			t.Errorf("goto %s: %v", target, err)

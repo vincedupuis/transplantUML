@@ -74,14 +74,16 @@ func TestBuildCoffee(t *testing.T) {
 
 	for _, want := range []struct {
 		source, event, target, cond string
+		kind                        model.TransitionKind
 	}{
-		{"idle", "coin", "brewing", ""},                           // bare sibling path
-		{"brewing", "cancel", "brewing", ""},                      // goto .
-		{"brewing", "error", "final", ""},                         // goto final
-		{"brewing", "resume", "brewing.H", ""},                    // goto H
-		{"heating", "hot", "pouring", ""},                         // ../pouring
-		{"pouring", "done", "idle", "not empty and (cup or mug)"}, // /idle
-		{"pouring", "tick", "", ""},                               // targetless
+		{"idle", "coin", "brewing", "", ""},                           // a sibling
+		{"brewing", "cancel", "brewing", "", ""},                      // itself, exited and re-entered
+		{"brewing", "restart", "heating", "", model.Local},            // goto local
+		{"brewing", "error", "final", "", ""},                         // goto final
+		{"brewing", "resume", "brewing.H", "", ""},                    // goto H
+		{"heating", "hot", "pouring", "", ""},                         // a sibling
+		{"pouring", "done", "idle", "not empty and (cup or mug)", ""}, // out of the parent
+		{"pouring", "tick", "", "", model.Internal},                   // no goto
 	} {
 		i := slices.IndexFunc(sm.Transitions, func(t *model.Transition) bool {
 			return t.Source == want.source && t.Event == want.event
@@ -95,8 +97,8 @@ func TestBuildCoffee(t *testing.T) {
 		if len(tr.Targets) > 0 {
 			target = tr.Targets[0]
 		}
-		if target != want.target || tr.Cond != want.cond {
-			t.Errorf("%s on %s: target %q cond %q, want %q/%q", want.source, want.event, target, tr.Cond, want.target, want.cond)
+		if target != want.target || tr.Cond != want.cond || tr.Kind != want.kind {
+			t.Errorf("%s on %s: target %q cond %q kind %q, want %q/%q/%q", want.source, want.event, target, tr.Cond, tr.Kind, want.target, want.cond, want.kind)
 		}
 	}
 }
@@ -120,6 +122,43 @@ func TestBuildTargets(t *testing.T) {
 		i := slices.IndexFunc(sm.Transitions, func(t *model.Transition) bool { return t.Source == want.source })
 		if i < 0 || !slices.Equal(sm.Transitions[i].Targets, []string{want.target}) {
 			t.Errorf("from %s: want target %q, got %v", want.source, want.target, sm.Transitions[i].Targets)
+		}
+	}
+}
+
+// A goto is external, as UML's default is, unless it says local, which reaches
+// any state inside the source, its history included. A clause without a goto
+// is internal.
+func TestBuildTransitionKinds(t *testing.T) {
+	const src = `fsm m {
+		initial state a {
+			initial state b { initial state c {} }
+			on ext goto c
+			on loc goto local c
+			on hist goto local H*
+			on self goto a
+			on stay / log
+		}
+	}`
+	sm := build(t, src)
+	for _, want := range []struct {
+		event, target string
+		kind          model.TransitionKind
+	}{
+		{"ext", "c", ""},
+		{"loc", "c", model.Local},
+		{"hist", "a.H-deep", model.Local},
+		{"self", "a", ""},
+		{"stay", "", model.Internal},
+	} {
+		i := slices.IndexFunc(sm.Transitions, func(t *model.Transition) bool { return t.Event == want.event })
+		if i < 0 {
+			t.Errorf("missing transition on %s", want.event)
+			continue
+		}
+		tr := sm.Transitions[i]
+		if strings.Join(tr.Targets, " ") != want.target || tr.Kind != want.kind {
+			t.Errorf("on %s: targets %v kind %q, want %q/%q", want.event, tr.Targets, tr.Kind, want.target, want.kind)
 		}
 	}
 }
@@ -318,6 +357,10 @@ func TestBuildErrors(t *testing.T) {
 		"fsm m { parallel state p { region r { state s {} } } state a { on e goto p.H } }":  `parallel state "p" has no history of its own`,
 		"fsm m { parallel state p { region r { state s {} } on e goto H* } }":               `parallel state "p" has no history of its own`,
 		"fsm m { parallel state p { entry point e goto final region r {} } }":               `parallel state "p" holds only regions`,
+		"fsm m { state a { on e goto local a } }":                                           `a local transition stays inside "a", but "a" is not inside it`,
+		"fsm m { state a { on e goto local b } state b {} }":                                `a local transition stays inside "a", but "b" is not inside it`,
+		"fsm m { state a { state c {} } state b { on e goto local a.H } }":                  `a local transition stays inside "b", but "a.H" is not inside it`,
+		"fsm m { state a { choice c { goto local b } state b {} } }":                        `a local transition stays inside "c", but "b" is not inside it`,
 	}
 	for src, want := range cases {
 		_, _, err := Parser{}.Parse([]byte(src))

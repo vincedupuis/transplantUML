@@ -6,7 +6,8 @@ fsm coffee {
     }
     state brewing {
         do / heat
-        on cancel goto .
+        on cancel goto brewing
+        on restart goto local heating
         on error goto final
         initial state heating {
             on hot goto pouring

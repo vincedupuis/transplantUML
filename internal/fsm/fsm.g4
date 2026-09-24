@@ -109,12 +109,14 @@ single_expression
     ;
 
 goto
-    :   'goto' ('.' | 'final' | 'terminate' | Identifier)
-    |   'goto' (Identifier '.')? ('H' | 'H*')
+    :   'goto' ('final' | 'terminate')
+    |   'goto' Local? Identifier
+    |   'goto' Local? (Identifier '.')? ('H' | 'H*')
     ;
 
 Initial: 'initial';
 Defer: 'defer';
+Local: 'local';
 Duration: [0-9]+ ('.' [0-9]+)? ('ms' | 's');
 Identifier: [a-zA-Z_] [a-zA-Z0-9_]*;
 Comment: '#' ( ~[\r\n] )* -> skip;

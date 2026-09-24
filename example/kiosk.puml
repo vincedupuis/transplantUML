@@ -34,6 +34,7 @@ idle --> browsing: touch\n/ wake
 ordering --> idle: abandon
 ordering --> idle: after(90s)
 ordering --> ordering_H: resume
+ordering --> browsing: back
 paying --> done: approved\n/ receipt
 done --> final: ack
 @enduml
