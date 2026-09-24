@@ -47,7 +47,8 @@ warnings.
   distinguished by `Kind` (`normal`, `parallel`, `final`, `terminate`, `history-shallow`, `history-deep`, and the
   connectors `choice`, `junction`, `fork`, `join`, `entry-point`, `exit-point`); a history state's default
   transition is an ordinary `Transition` whose `Source` is the history state. `Initial` is a property
-  (`StateMachine.Initial`, `State.Initial`), not a synthetic transition. An entry or exit point whose parent is a submachine state is UML's
+  (`StateMachine.Initial`, `State.Initial`, with the transition's effect in `InitialActions`), not a synthetic
+  transition. An entry or exit point whose parent is a submachine state is UML's
   connection point reference to the referenced machine's point of that name (`IsReference`). States also carry `Do`, `Defer`,
   `Submachine`, `Invariant`, `Variables`, `Stereotype`, `Note`, and a note on each thing they list (`EntryNote`,
   `ExitNote`, `DoNote`, `InvariantNote`, `DeferNotes` by event); transitions carry `After` (time trigger), `Kind`
@@ -89,7 +90,8 @@ warnings.
   reaches any state because the names are one namespace for the whole machine, as they are in the model. A state
   may be marked `initial` (`initial state s { … }`), as may a choice or a junction since UML lets the
   initial transition lead to one, naming its parent's starting child or, at the top level, the
-  machine's. `build.go` holds `Parser` and the `builder` that walks the parse tree into the
+  machine's; a line `initial / actions goto s` says the same and is the only way to give the initial
+  transition an effect (`InitialActions`). `build.go` holds `Parser` and the `builder` that walks the parse tree into the
   model: `declare` creates every state first, in document order, then `walk` resolves the transitions, because a
   `goto` may name a state declared further down. The unnamed final, terminate and history states have no name
   to declare, so `synthesize` creates them on first use, from a `goto` or an unnamed declaration, as

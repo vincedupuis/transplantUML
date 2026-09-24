@@ -59,7 +59,12 @@ in one document.</tpuml:note>
     <invoke src="child.scxml"/>
     <transition event="back" target="merge"/>
   </state>
-  <state id="outer" initial="inner">
+  <state id="outer">
+    <initial>
+      <transition target="inner">
+        <script>log('hi')</script>
+      </transition>
+    </initial>
     <tpuml:note about="exit">Says goodbye.</tpuml:note>
     <onexit>
       <script>log('bye')</script>

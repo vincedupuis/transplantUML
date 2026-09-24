@@ -631,6 +631,30 @@ func TestBuildSubmachinePoints(t *testing.T) {
 	}
 }
 
+// An initial line is UML's initial pseudostate with its transition, which may
+// carry an effect. Its goto may name a child declared further down.
+func TestBuildInitialLine(t *testing.T) {
+	sm := build(t, `fsm m {
+		initial / boot, greet goto idle
+		state idle {
+			initial goto a
+			state a {}
+		}
+		parallel state p {
+			region r { initial / reset goto b state b {} }
+		}
+	}`)
+	if sm.Initial != "idle" || !slices.Equal(sm.InitialActions, []string{"boot", "greet"}) {
+		t.Errorf("machine initial = %q with %q, want idle with boot, greet", sm.Initial, sm.InitialActions)
+	}
+	if got := sm.State("idle"); got.Initial != "a" || got.InitialActions != nil {
+		t.Errorf("idle initial = %q with %q, want a with none", got.Initial, got.InitialActions)
+	}
+	if got := sm.State("r"); got.Initial != "b" || !slices.Equal(got.InitialActions, []string{"reset"}) {
+		t.Errorf("r initial = %q with %q, want b with reset", got.Initial, got.InitialActions)
+	}
+}
+
 // A choice or junction with a single branch may write it on the declaring
 // line. It holds that one branch only, so the next clause belongs to the
 // enclosing state.
@@ -670,6 +694,10 @@ func TestBuildErrors(t *testing.T) {
 		"fsm m { submachine a {} state a {} }":                                              `the machine already has a state called "a"`,
 		"fsm m { initial submachine a {} initial state b {} }":                              `already starts in "a"`,
 		"fsm m { initial state a {} initial choice c goto a }":                              `already starts in "a"`,
+		"fsm m { initial goto a initial state a {} }":                                       `already starts in "a"`,
+		"fsm m { initial goto a initial goto a state a {} }":                                `already starts in "a"`,
+		"fsm m { initial goto b state a { state b {} } }":                                   `the machine has no child called "b" to start in`,
+		"fsm m { state a { initial goto z } }":                                              `state "a" has no child called "z" to start in`,
 		"fsm m { | n | goto a state a {} }":                                                 `put "goto a" inside a state`,
 		"fsm m { state a { invariant [x] invariant [y] } }":                                 `state "a" already has the invariant [x]`,
 		"fsm m { invariant [x] state a {} }":                                                `put "invariant [x]" inside a state`,

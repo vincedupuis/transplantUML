@@ -47,6 +47,8 @@ func TestValidateErrors(t *testing.T) {
 		{"bad source", func(sm *StateMachine) { sm.Transitions[0].Source = "zzz" }, `unknown source "zzz"`},
 		{"bad target", func(sm *StateMachine) { sm.Transitions[0].Targets = []string{"zzz"} }, `unknown target "zzz"`},
 		{"cycle", func(sm *StateMachine) { sm.States[1].Parent = "b1" }, `forms a cycle`},
+		{"root initial actions", func(sm *StateMachine) { sm.Initial = ""; sm.InitialActions = []string{"x"} }, `the machine has initial actions but no initial state`},
+		{"initial actions", func(sm *StateMachine) { sm.States[0].InitialActions = []string{"x"} }, `state "a": has initial actions but no initial state`},
 		{"submachine child", func(sm *StateMachine) { sm.States[1].Submachine = "b" }, `submachine state "b" holds only the entry and exit points it references, not a normal state`},
 		{"reference entry leaving", func(sm *StateMachine) {
 			sm.States = append(sm.States, &State{Name: "s", Kind: Normal, Submachine: "s"}, &State{Name: "in", Parent: "s", Kind: EntryPoint})

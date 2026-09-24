@@ -110,6 +110,20 @@ func TestEmitReferences(t *testing.T) {
 	}
 }
 
+// <scxml> takes no <initial> element, so the machine's initial transition
+// cannot carry actions.
+func TestEmitMachineInitialActions(t *testing.T) {
+	sm := &model.StateMachine{Initial: "a", InitialActions: []string{"boot"}, States: []*model.State{{Name: "a", Kind: model.Normal}}}
+	_, warnings, err := Emitter{}.Emit(sm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{`the machine's initial transition: SCXML has no <initial> element on <scxml>; its actions boot are not written`}
+	if !reflect.DeepEqual([]string(warnings), want) {
+		t.Errorf("warnings = %q, want %q", warnings, want)
+	}
+}
+
 // The extension namespace is declared only when something uses it.
 func TestEmitDeclaresExtensionOnlyWhenUsed(t *testing.T) {
 	if out := emit(t, parseFile(t, "testdata/edge.scxml")); strings.Contains(string(out), "xmlns:tpuml") {

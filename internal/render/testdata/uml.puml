@@ -34,7 +34,7 @@ state both {
 }
 state "sub: child.scxml" as sub
 state outer {
-    [*] --> inner
+    [*] --> inner: / log('hi')
     state in <<entryPoint>>
     state out <<exitPoint>>
     state inner

@@ -63,10 +63,10 @@ func (Parser) Parse(src []byte) (*model.StateMachine, model.Warnings, error) {
 
 	p := &parser{sm: &model.StateMachine{
 		Name:        root.SelectAttrValue("name", ""),
-		Initial:     initialOf(root),
 		States:      make([]*model.State, 0),
 		Transitions: make([]*model.Transition, 0),
 	}}
+	p.sm.Initial, _ = initialOf(root) // <scxml> takes no <initial> element, so no actions
 	p.sm.Variables = p.datamodel(root)
 	p.sm.Note = note(root)
 	p.walk(root, "")
@@ -115,7 +115,7 @@ func (p *parser) state(el *etree.Element, parent string) {
 		Note:       note(el),
 	}
 	if kind == model.Normal {
-		st.Initial = initialOf(el)
+		st.Initial, st.InitialActions = initialOf(el)
 	}
 	st.Variables = p.datamodel(el)
 	p.aboutNotes(st, el)
@@ -292,22 +292,24 @@ func targets(attr string) []string {
 
 // initialOf resolves the initial child of a <scxml> or <state> element: the
 // initial attribute, else the <initial> element's transition target, else the
-// first state-like child in document order (per the SCXML spec).
-func initialOf(el *etree.Element) string {
+// first state-like child in document order (per the SCXML spec). It also
+// returns the executable content of the <initial> element's transition, UML's
+// effect of the initial transition.
+func initialOf(el *etree.Element) (string, []string) {
 	if v := el.SelectAttrValue("initial", ""); v != "" {
-		return v
+		return v, nil
 	}
 	if init := el.SelectElement("initial"); init != nil {
 		if t := init.SelectElement("transition"); t != nil {
-			return t.SelectAttrValue("target", "")
+			return t.SelectAttrValue("target", ""), executableContent(t, nil)
 		}
 	}
 	for _, child := range el.ChildElements() {
 		if _, ok := stateKinds[child.Tag]; ok && child.Tag != "history" {
-			return child.SelectAttrValue("id", "")
+			return child.SelectAttrValue("id", ""), nil
 		}
 	}
-	return ""
+	return "", nil
 }
 
 // executableContent converts the children of an <onentry>, <onexit> or

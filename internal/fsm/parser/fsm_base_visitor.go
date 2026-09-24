@@ -63,6 +63,10 @@ func (v *BasefsmVisitor) VisitHistory(ctx *HistoryContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasefsmVisitor) VisitStart(ctx *StartContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasefsmVisitor) VisitStereotype(ctx *StereotypeContext) interface{} {
 	return v.VisitChildren(ctx)
 }

@@ -44,6 +44,9 @@ func (Emitter) Emit(sm *model.StateMachine) ([]byte, model.Warnings, error) {
 	root.CreateAttr("version", "1.0")
 	setAttr(root, "name", sm.Name)
 	setAttr(root, "initial", sm.Initial)
+	if len(sm.InitialActions) > 0 {
+		e.warn.Addf("the machine's initial transition: SCXML has no <initial> element on <scxml>; its actions %s are not written", strings.Join(sm.InitialActions, ", "))
+	}
 
 	canonical(doc)
 	doc.Indent(2)
@@ -98,7 +101,7 @@ func (e *emitter) children(el *etree.Element, parent string) error {
 		if s.IsDeepHistory() {
 			child.CreateAttr("type", "deep") // shallow is the SCXML default
 		}
-		setAttr(child, "initial", s.Initial)
+		e.initial(child, s)
 		e.pseudo(child, s)
 		e.ext(child, "stereotype", s.Stereotype)
 		e.ext(child, "invariant", s.Invariant)
@@ -151,6 +154,18 @@ func (e *emitter) children(el *etree.Element, parent string) error {
 		}
 	}
 	return nil
+}
+
+// initial writes the child s starts in: as the initial attribute, or as an
+// <initial> element when the initial transition has an effect.
+func (e *emitter) initial(el *etree.Element, s *model.State) {
+	if len(s.InitialActions) == 0 {
+		setAttr(el, "initial", s.Initial)
+		return
+	}
+	tr := el.CreateElement("initial").CreateElement("transition")
+	tr.CreateAttr("target", s.Initial)
+	executable(tr, s.InitialActions)
 }
 
 // reference warns about an entry or exit point of a submachine state, which

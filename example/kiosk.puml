@@ -4,7 +4,7 @@ note as machineNote
     A self-service kiosk:
     browse, pay, take the receipt.
 end note
-[*] --> idle
+[*] --> idle: / boot
 state idle
 idle : entry / dim
 state ordering {

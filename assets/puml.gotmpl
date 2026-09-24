@@ -39,7 +39,7 @@ title {{ . }}
 
 {{- define "scope" -}}{{- /* . = scope name ("" = top level): its initial, its states, then its transitions */ -}}
 {{- with InitialOf . }}
-[*] --> {{ template "id" . }}
+[*] --> {{ template "id" . }}{{ with InitialActionsOf $ }}: {{ prefix "/ " (join "; " .) | include "text" }}{{ end }}
 {{- end -}}
 {{- range Children . -}}
 {{- template "state" . -}}

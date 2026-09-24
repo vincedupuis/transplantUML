@@ -47,12 +47,13 @@ const (
 // StateMachine is the root of the model. Hierarchy is expressed through
 // State.Parent rather than nesting; the root has the empty name "".
 type StateMachine struct {
-	Name        string        `json:"name,omitempty"`
-	Initial     string        `json:"initial,omitempty"`
-	Variables   []Variable    `json:"variables,omitempty"` // context attributes guards and actions refer to
-	Note        string        `json:"note,omitempty"`
-	States      []*State      `json:"states"`
-	Transitions []*Transition `json:"transitions"`
+	Name           string        `json:"name,omitempty"`
+	Initial        string        `json:"initial,omitempty"`
+	InitialActions []string      `json:"initialActions,omitempty"` // effect of the initial transition
+	Variables      []Variable    `json:"variables,omitempty"`      // context attributes guards and actions refer to
+	Note           string        `json:"note,omitempty"`
+	States         []*State      `json:"states"`
+	Transitions    []*Transition `json:"transitions"`
 }
 
 // Variable is a context attribute of the state machine (or of one state).
@@ -62,19 +63,20 @@ type Variable struct {
 }
 
 type State struct {
-	Name       string     `json:"name"`
-	Parent     string     `json:"parent,omitempty"` // "" means top level
-	Kind       StateKind  `json:"kind"`
-	Initial    string     `json:"initial,omitempty"`    // compound states only
-	OnEntry    []string   `json:"onEntry,omitempty"`    // entry behaviour
-	OnExit     []string   `json:"onExit,omitempty"`     // exit behaviour
-	Do         []string   `json:"do,omitempty"`         // do activity, runs while the state is active
-	Defer      []string   `json:"defer,omitempty"`      // events queued rather than consumed while here
-	Submachine string     `json:"submachine,omitempty"` // referenced state machine (submachine state)
-	Invariant  string     `json:"invariant,omitempty"`  // condition that holds while the state is active
-	Variables  []Variable `json:"variables,omitempty"`  // attributes scoped to this state
-	Stereotype string     `json:"stereotype,omitempty"` // «stereotype» shown on diagrams
-	Note       string     `json:"note,omitempty"`
+	Name           string     `json:"name"`
+	Parent         string     `json:"parent,omitempty"` // "" means top level
+	Kind           StateKind  `json:"kind"`
+	Initial        string     `json:"initial,omitempty"`        // compound states only
+	InitialActions []string   `json:"initialActions,omitempty"` // effect of the transition to Initial
+	OnEntry        []string   `json:"onEntry,omitempty"`        // entry behaviour
+	OnExit         []string   `json:"onExit,omitempty"`         // exit behaviour
+	Do             []string   `json:"do,omitempty"`             // do activity, runs while the state is active
+	Defer          []string   `json:"defer,omitempty"`          // events queued rather than consumed while here
+	Submachine     string     `json:"submachine,omitempty"`     // referenced state machine (submachine state)
+	Invariant      string     `json:"invariant,omitempty"`      // condition that holds while the state is active
+	Variables      []Variable `json:"variables,omitempty"`      // attributes scoped to this state
+	Stereotype     string     `json:"stereotype,omitempty"`     // «stereotype» shown on diagrams
+	Note           string     `json:"note,omitempty"`
 
 	// Notes on what the state lists, which UML annotates as elements of
 	// their own: the entry, exit and do behaviours, the invariant and each
@@ -194,6 +196,18 @@ func (sm *StateMachine) InitialOf(name string) string {
 	return ""
 }
 
+// InitialActionsOf returns the effect of the initial transition of the named
+// state, or of the machine itself when name is "".
+func (sm *StateMachine) InitialActionsOf(name string) []string {
+	if name == "" {
+		return sm.InitialActions
+	}
+	if s := sm.State(name); s != nil {
+		return s.InitialActions
+	}
+	return nil
+}
+
 // Ancestors returns the names of the state's parent, grandparent and so on up
 // to the top level, nearest first. Unknown or top-level states have none.
 func (sm *StateMachine) Ancestors(name string) []string {
@@ -296,6 +310,9 @@ func (sm *StateMachine) Validate() error {
 		} else if s.IsHistory() {
 			fail("state %q: history states must be nested in a state", s.Name)
 		}
+		if s.Initial == "" && len(s.InitialActions) > 0 {
+			fail("state %q: has initial actions but no initial state", s.Name)
+		}
 		if s.Initial != "" {
 			init, ok := byName[s.Initial]
 			switch {
@@ -355,6 +372,9 @@ func (sm *StateMachine) Validate() error {
 		} else if init.Parent != "" {
 			fail("initial state %q is not a top-level state", sm.Initial)
 		}
+	}
+	if sm.Initial == "" && len(sm.InitialActions) > 0 {
+		fail("the machine has initial actions but no initial state")
 	}
 
 	for i, t := range sm.Transitions {

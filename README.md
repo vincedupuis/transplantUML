@@ -32,6 +32,7 @@ symbol, and so on. Warnings go to stderr and never fail the conversion.
 | Orthogonal state, regions              | `parallel`, children are the regions         | `<parallel>`                                            | regions separated by `--`                           |
 | Submachine state                       | `Submachine`                                 | `<invoke src>`                                          | `state "X: ref" as X`                               |
 | Initial                                | `Initial` on the machine / the state         | `initial` attr, `<initial>`                             | `[*] -->`                                           |
+| Effect of the initial transition       | `InitialActions` on the machine / the state  | `<initial><transition>` content (on a state only ⚠)     | `[*] --> X : / act`                                 |
 | Final                                  | `final`                                      | `<final>`                                               | `state X <<end>>`                                   |
 | Terminate                              | `terminate`                                  | `<final>` ⚠                                             | `state X <<end>>` ⚠                                 |
 | Shallow / deep history                 | `history-shallow`, `history-deep`            | `<history>`                                             | `<<history>>`, `<<history*>>`                       |
@@ -171,12 +172,13 @@ type StateKind string
 type TransitionKind string
 
 type StateMachine struct {
-  Name        string
-  Initial     string     // top-level initial state
-  Variables   []Variable // context attributes
-  Note        string
-  States      []*State
-  Transitions []*Transition
+  Name           string
+  Initial        string     // top-level initial state
+  InitialActions []string   // effect of the initial transition
+  Variables      []Variable // context attributes
+  Note           string
+  States         []*State
+  Transitions    []*Transition
 }
 
 type Variable struct {
@@ -185,19 +187,20 @@ type Variable struct {
 }
 
 type State struct {
-  Name       string
-  Parent     string // "" = top level
-  Kind       StateKind
-  Initial    string   // for compound states
-  OnEntry    []string // entry behaviour
-  OnExit     []string // exit behaviour
-  Do         []string // do activity
-  Defer      []string // deferred events
-  Submachine string   // referenced machine, for submachine states
-  Invariant  string
-  Variables  []Variable
-  Stereotype string
-  Note       string
+  Name           string
+  Parent         string // "" = top level
+  Kind           StateKind
+  Initial        string   // for compound states
+  InitialActions []string // effect of the transition to Initial
+  OnEntry        []string // entry behaviour
+  OnExit         []string // exit behaviour
+  Do             []string // do activity
+  Defer          []string // deferred events
+  Submachine     string   // referenced machine, for submachine states
+  Invariant      string
+  Variables      []Variable
+  Stereotype     string
+  Note           string
 
   // notes on what the state lists
   EntryNote, ExitNote, DoNote, InvariantNote string
@@ -238,6 +241,7 @@ Templates use Go's [`text/template`](https://pkg.go.dev/text/template) syntax. A
 | `HistoryOf parent`           | the history pseudo-states declared under a state                         |
 | `IsReference name`           | whether the state is an entry or exit point of a submachine state        |
 | `InitialOf name`             | initial child of a state, or of the machine for `""`                     |
+| `InitialActionsOf name`      | effect of that initial transition                                        |
 | `Ancestors name`             | parent, grandparent, … of a state, nearest first                         |
 | `CommonAncestor name...`     | innermost state containing all the named states (`""` = top level)       |
 | `ScopeOf transition`         | innermost state containing a transition's source and targets             |
@@ -325,7 +329,8 @@ Everything the model holds is written, natively where SCXML has the element and 
 otherwise; the namespace is declared only when it is used. The document validates against the W3C schema. It is
 equivalent, not byte-identical, to the one it came from:
 
-- the initial child is always written as an `initial` attribute, never as an `<initial>` element;
+- the initial child is written as an `initial` attribute, or as an `<initial>` element when its transition has an
+  effect; `<scxml>` takes no `<initial>` element, so the machine's own initial effect is left out with a warning;
 - executable content becomes `<script>` bodies holding the text the parser produced, except for elements it kept as
   XML, which are written back as themselves;
 - a time trigger becomes `<send event="after.D" delay="D" id="…">` in `<onentry>`, the matching `<cancel>` in
@@ -430,6 +435,19 @@ state review {
   }
   state quick { … }
   state thorough { … }
+}
+```
+
+The initial transition may also be written on a line of its own, `initial`, optional actions and a `goto`.
+That is UML's initial pseudostate with its one transition, and the only way to give that transition an effect.
+UML allows it no trigger and no guard; a conditional start goes through an initial choice or junction instead.
+The `goto` names a child of the scope that holds the line, possibly declared further down.
+The line counts as the scope's `initial`, so it does not go with a marked child.
+
+```
+fsm kiosk {
+  initial / boot goto idle            # starts in idle, running boot on the way
+  state idle { … }
 }
 ```
 

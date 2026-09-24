@@ -85,7 +85,10 @@ func (b *builder) failf(tok antlr.Token, format string, args ...any) {
 // declare creates a state for every declaration directly inside ctx, in
 // document order, and then for theirs, depth first.
 func (b *builder) declare(scope *node, ctx antlr.ParserRuleContext) {
-	var initial antlr.Token
+	var (
+		initial antlr.Token
+		starts  []*parser.StartContext
+	)
 	resting := false // whether scope holds a state it could start in
 	for _, child := range ctx.GetChildren() {
 		var (
@@ -94,6 +97,9 @@ func (b *builder) declare(scope *node, ctx antlr.ParserRuleContext) {
 			mark antlr.TerminalNode // the initial keyword, if any
 		)
 		switch c := child.(type) {
+		case *parser.StartContext:
+			starts = append(starts, c) // its goto may name a child declared further down
+			continue
 		case *parser.StateContext:
 			name, kind, mark = c.Identifier(), model.Normal, c.Initial()
 		case *parser.ParallelContext:
@@ -165,9 +171,33 @@ func (b *builder) declare(scope *node, ctx antlr.ParserRuleContext) {
 		}
 		b.declare(n, n.ctx)
 	}
+	for _, c := range starts {
+		if initial != nil {
+			b.failf(c.Initial().GetSymbol(), "%s already starts in %q", describe(scope), initial.GetText())
+			continue
+		}
+		b.start(scope, c)
+		initial = c.Identifier().GetSymbol()
+	}
 	// Every region of a parallel state is entered, so it starts in none.
 	if initial == nil && resting && (scope.state == nil || !scope.state.IsParallel()) {
 		b.warnings.Addf("%s has no initial state", describe(scope))
+	}
+}
+
+// start resolves an initial line: UML's initial pseudostate, whose one
+// transition leads to the state scope starts in and may carry an effect.
+func (b *builder) start(scope *node, c *parser.StartContext) {
+	id := c.Identifier()
+	target, ok := b.states[id.GetText()]
+	if !ok || target.parent != scope {
+		b.failf(id.GetSymbol(), "%s has no child called %q to start in", describe(scope), id.GetText())
+		return
+	}
+	if scope.state != nil {
+		scope.state.Initial, scope.state.InitialActions = target.state.Name, effects(c.Actions())
+	} else {
+		b.sm.Initial, b.sm.InitialActions = target.state.Name, effects(c.Actions())
 	}
 }
 

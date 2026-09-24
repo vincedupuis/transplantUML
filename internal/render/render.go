@@ -11,6 +11,7 @@
 //	HistoryOf parent            -> []*State
 //	IsReference name            -> bool       (an entry or exit point of a submachine state)
 //	InitialOf name              -> string     ("" for the machine's initial)
+//	InitialActionsOf name       -> []string   (effect of that initial transition)
 //	Ancestors name              -> []string   (parent, grandparent, ... nearest first)
 //	CommonAncestor name...      -> string     (innermost state containing them all, "" for the top level)
 //	ScopeOf transition          -> string     (innermost state containing its source and targets)
@@ -81,6 +82,7 @@ func Render(sm *model.StateMachine, tmplSrc string) (string, model.Warnings, err
 		"HistoryOf":           sm.HistoryOf,
 		"IsReference":         sm.IsReference,
 		"InitialOf":           sm.InitialOf,
+		"InitialActionsOf":    sm.InitialActionsOf,
 		"Ancestors":           sm.Ancestors,
 		"CommonAncestor":      sm.CommonAncestor,
 		"ScopeOf":             sm.ScopeOf,

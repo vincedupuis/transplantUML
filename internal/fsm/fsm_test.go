@@ -62,9 +62,13 @@ func TestGrammarRejects(t *testing.T) {
 		"fsm m { parallel state p { region r { on e goto r } } }",          // and has no events
 		"fsm m { parallel state p { region r { entry point e goto r } } }", // nor points
 		"fsm m { initial region r {} }",
-		"fsm m { initial fork f { goto f } }", // a fork cannot be the starting child
-		"fsm m { choice c { on e goto c } }",  // a branch has no trigger
-		"fsm m { choice c on e goto c }",      // on its own line either
+		"fsm m { initial fork f { goto f } }",                       // a fork cannot be the starting child
+		"fsm m { initial [g] goto a state a {} }",                   // the initial transition has no guard
+		"fsm m { initial on e goto a state a {} }",                  // nor a trigger
+		"fsm m { initial goto final }",                              // and names a state
+		"fsm m { parallel state p { initial goto r region r {} } }", // a parallel state starts in all its regions
+		"fsm m { choice c { on e goto c } }",                        // a branch has no trigger
+		"fsm m { choice c on e goto c }",                            // on its own line either
 		"fsm m { junction j { after(1s) goto j } }",
 		"fsm m { fork f { [g] goto f } }", // no guard leaving a fork
 		"fsm m { fork f { on e goto f } }",

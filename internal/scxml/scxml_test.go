@@ -3,6 +3,7 @@ package scxml
 import (
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -157,6 +158,9 @@ func TestUMLConcepts(t *testing.T) {
 	if work.EntryNote != "Starts the clock." || work.DoNote != "Runs in a worker." || work.InvariantNote != "Never negative." ||
 		!reflect.DeepEqual(work.DeferNotes, map[string]string{"pause": "Kept until the job ends."}) {
 		t.Errorf("work behaviour notes = %+v", *work)
+	}
+	if got := sm.State("outer"); got.Initial != "inner" || !slices.Equal(got.InitialActions, []string{"log('hi')"}) {
+		t.Errorf("outer initial = %q with %q, want inner with the log", got.Initial, got.InitialActions)
 	}
 	if got := sm.State("outer").ExitNote; got != "Says goodbye." {
 		t.Errorf("outer exit note = %q", got)

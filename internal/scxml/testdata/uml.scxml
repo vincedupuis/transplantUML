@@ -66,7 +66,8 @@ in one document.</tpuml:note>
     <transition event="back" target="merge"/>
   </state>
 
-  <state id="outer" initial="inner">
+  <state id="outer">
+    <initial><transition target="inner"><log expr="'hi'"/></transition></initial>
     <tpuml:note about="exit">Says goodbye.</tpuml:note>
     <tpuml:note about="initial">Not a thing a state lists.</tpuml:note>
     <tpuml:note about="defer">Names no event.</tpuml:note>
