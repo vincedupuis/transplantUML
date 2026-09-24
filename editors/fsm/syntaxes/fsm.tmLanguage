@@ -20,6 +20,7 @@
 		<dict><key>include</key><string>#parallel</string></dict>
 		<dict><key>include</key><string>#point</string></dict>
 		<dict><key>include</key><string>#declaration</string></dict>
+		<dict><key>include</key><string>#stereotype</string></dict>
 		<dict><key>include</key><string>#behaviour</string></dict>
 		<dict><key>include</key><string>#trigger</string></dict>
 		<dict><key>include</key><string>#after</string></dict>
@@ -100,6 +101,20 @@
 				<dict><key>name</key><string>storage.type.state.fsm</string></dict>
 				<key>2</key>
 				<dict><key>name</key><string>entity.name.type.state.fsm</string></dict>
+			</dict>
+		</dict>
+		<key>stereotype</key>
+		<dict>
+			<key>match</key>
+			<string>(&lt;&lt;)\s*([A-Za-z_]\w*)\s*(&gt;&gt;)</string>
+			<key>captures</key>
+			<dict>
+				<key>1</key>
+				<dict><key>name</key><string>punctuation.definition.stereotype.begin.fsm</string></dict>
+				<key>2</key>
+				<dict><key>name</key><string>storage.modifier.stereotype.fsm</string></dict>
+				<key>3</key>
+				<dict><key>name</key><string>punctuation.definition.stereotype.end.fsm</string></dict>
 			</dict>
 		</dict>
 		<key>behaviour</key>

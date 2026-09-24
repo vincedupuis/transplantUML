@@ -5,7 +5,7 @@ state reorder <<entryPoint>>
 state browsing
 state "support: support" as support
 support : entry / openChat
-state checkout {
+state "«secure»\ncheckout" as checkout <<secure>> {
     [*] --> address
     state express <<entryPoint>>
     state cancelled <<exitPoint>>

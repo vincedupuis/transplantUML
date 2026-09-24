@@ -9,35 +9,35 @@ fsm
     ;
 
 state
-    :   Initial? 'state' Identifier
+    :   Initial? 'state' Identifier stereotype?
         '{'
             (state | parallel | submachine | choice | junction | fork | join | point | event)*
         '}'
     ;
 
 parallel
-    :   Initial? 'parallel' 'state' Identifier
+    :   Initial? 'parallel' 'state' Identifier stereotype?
         '{'
             (region | point | event)*
         '}'
     ;
 
 submachine
-    :   Initial? 'submachine' Identifier
+    :   Initial? 'submachine' Identifier stereotype?
         '{'
             event*
         '}'
     ;
 
 region
-    :   'region' Identifier
+    :   'region' Identifier stereotype?
         '{'
             (state | parallel | submachine | choice | junction | fork | join)*
         '}'
     ;
 
 choice
-    :   'choice' Identifier
+    :   'choice' Identifier stereotype?
         (   '{'
                 branch*
             '}'
@@ -46,7 +46,7 @@ choice
     ;
 
 junction
-    :   'junction' Identifier
+    :   'junction' Identifier stereotype?
         (   '{'
                 branch*
             '}'
@@ -55,18 +55,22 @@ junction
     ;
 
 fork
-    :   'fork' Identifier
+    :   'fork' Identifier stereotype?
         '{'
             (actions? goto)*
         '}'
     ;
 
 join
-    :   'join' Identifier actions? goto
+    :   'join' Identifier stereotype? actions? goto
     ;
 
 point
-    :   kind=('entry' | 'exit') 'point' Identifier actions? goto
+    :   kind=('entry' | 'exit') 'point' Identifier stereotype? actions? goto
+    ;
+
+stereotype
+    :   '<<' Identifier '>>'
     ;
 
 branch

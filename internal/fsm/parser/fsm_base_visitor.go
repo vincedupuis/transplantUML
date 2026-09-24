@@ -47,6 +47,10 @@ func (v *BasefsmVisitor) VisitPoint(ctx *PointContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasefsmVisitor) VisitStereotype(ctx *StereotypeContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasefsmVisitor) VisitBranch(ctx *BranchContext) interface{} {
 	return v.VisitChildren(ctx)
 }

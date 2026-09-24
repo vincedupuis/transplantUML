@@ -148,7 +148,7 @@ it next to it (`<name>.puml`, kept up to date by the tests):
 | [`washing-machine.scxml`](example/washing-machine.scxml) | orthogonal regions, fork and join — and the warnings PlantUML's region limitation produces                            |
 | [`thermostat.json`](example/thermostat.json)             | the same concepts written directly in the model's JSON shape                                                          |
 | [`kiosk.fsm`](example/kiosk.fsm)                         | the `fsm` language: nesting, behaviours, deferred events, invariants, guards, time triggers, transition kinds, gotos   |
-| [`shop.fsm`](example/shop.fsm)                           | the `fsm` language's state kinds: parallel, submachine, choice, junction, fork, join, entry/exit points, history      |
+| [`shop.fsm`](example/shop.fsm)                           | the `fsm` language's state kinds (parallel, submachine, all pseudostates, history) and stereotypes                    |
 
 Run any of them with `tpuml -i example/<name>` and compare with the `.puml` beside it; add `-F scxml` or `-F json`
 to see the other formats.
@@ -451,6 +451,12 @@ Its states come from that machine, so its body holds only behaviours, deferred e
 It may be marked `initial` and goes wherever a state may.
 Since state names are one namespace, a document can use each submachine once.
 
+A stereotype follows the declared name in UML's notation, as in `state checkout <<secure>> { … }` or
+`choice route <<audited>> { … }`.
+It sorts a state into a category of your own and changes nothing about how the machine behaves.
+Every declaration may carry one, and its name reaches `Stereotype` without the brackets.
+PlantUML draws none on a pseudostate or a region, and warns instead.
+
 A `goto` names its target outright. State names are one namespace for the whole machine — the model keys its
 states by name — so nesting never has to be spelled out, and a target may be declared further down the document:
 
@@ -476,7 +482,7 @@ The data lives in the generated code instead, and the document handles it throug
 `/ initCount` and `/ incrementCount` rather than an assignment, `[tooManyRetries]` rather than a comparison.
 A machine read from another format keeps its `Variables` in the model; only this language cannot declare them.
 
-Stereotypes and notes have no syntax yet.
+Notes have no syntax yet.
 
 ### Editor support
 

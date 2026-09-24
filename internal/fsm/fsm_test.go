@@ -96,6 +96,16 @@ func TestGrammarRejects(t *testing.T) {
 		"fsm m { state s { on e [else or g] goto s } }",
 		"fsm m { state submachine {} }",
 		"fsm m { state invariant {} }",
+		"fsm m { state s <<>> {} }",                                 // a stereotype names something
+		"fsm m { state s <<a b>> {} }",                              // one thing
+		"fsm m { state s <<a, b>> {} }",                             //
+		"fsm m { state s <<a> {} }",                                 // between << and >>
+		"fsm m { state s <<\"a\">> {} }",                            // as a name
+		"fsm m { <<a>> state s {} }",                                // after the declared name
+		"fsm m { state <<a>> s {} }",                                //
+		"fsm m { initial state s {} <<a>> }",                        // not after the body
+		"fsm m { state s <<a>> <<b>> {} }",                          // at most once
+		"fsm m { state s { on e goto t <<a>> } }",                   // on a declaration only
 		"fsm m { state s { invariant } }",                           // an invariant is a condition
 		"fsm m { state s { invariant [] } }",                        //
 		"fsm m { state s { invariant g } }",                         // in brackets

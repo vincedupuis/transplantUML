@@ -37,6 +37,9 @@ type fsmVisitor interface {
 	// Visit a parse tree produced by fsmParser#point.
 	VisitPoint(ctx *PointContext) interface{}
 
+	// Visit a parse tree produced by fsmParser#stereotype.
+	VisitStereotype(ctx *StereotypeContext) interface{}
+
 	// Visit a parse tree produced by fsmParser#branch.
 	VisitBranch(ctx *BranchContext) interface{}
 

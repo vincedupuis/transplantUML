@@ -125,6 +125,10 @@ func (b *builder) declare(scope *node, ctx antlr.ParserRuleContext) {
 		if _, ok := child.(*parser.SubmachineContext); ok {
 			n.state.Submachine = n.state.Name
 		}
+		// Every declaration may carry a stereotype after its name.
+		if st := child.(interface{ Stereotype() parser.IStereotypeContext }).Stereotype(); st != nil {
+			n.state.Stereotype = st.Identifier().GetText()
+		}
 		resting = resting || kind == model.Normal || kind == model.Parallel
 		if mark != nil {
 			if initial != nil {

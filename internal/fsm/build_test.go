@@ -279,6 +279,9 @@ func TestBuildStateKinds(t *testing.T) {
 			t.Errorf("state %q: parent %q kind %q, want %q/%q", s.Name, s.Parent, s.Kind, want.parent, want.kind)
 		}
 	}
+	if got := sm.State("checkout").Stereotype; got != "secure" {
+		t.Errorf("checkout stereotype = %q, want secure", got)
+	}
 	// A submachine state is named after the machine it refers to.
 	if s := sm.State("support"); s.Submachine != "support" || !slices.Equal(s.OnEntry, []string{"openChat"}) {
 		t.Errorf("support: submachine %q entry %v, want support/[openChat]", s.Submachine, s.OnEntry)
@@ -363,6 +366,30 @@ func TestBuildTwoClausesOnOneLine(t *testing.T) {
 	}
 	if got := sm.OutgoingTransitions("s"); len(got) != 1 || got[0].Trigger() != "" || !slices.Equal(got[0].Targets, []string{"t"}) {
 		t.Errorf("transitions = %v, want one completion transition to t", got)
+	}
+}
+
+// Every declaration may carry a stereotype, which reaches the model without
+// its brackets.
+func TestBuildStereotype(t *testing.T) {
+	sm := build(t, `fsm m {
+		initial state a <<s1>> { on e goto f }
+		fork f <<s8>> { goto sub goto x }
+		parallel state p <<s2>> {
+			entry point in <<s3>> goto x
+			region r <<s4>> { initial submachine sub <<s5>> { goto c } choice c <<s6>> goto k }
+			region r2 { initial state x { goto k } }
+		}
+		join k <<s9>> goto j
+		junction j <<s7>> goto a
+	}`)
+	for name, want := range map[string]string{
+		"a": "s1", "p": "s2", "in": "s3", "r": "s4", "sub": "s5",
+		"c": "s6", "j": "s7", "f": "s8", "k": "s9",
+	} {
+		if got := sm.State(name).Stereotype; got != want {
+			t.Errorf("%s stereotype = %q, want %q", name, got, want)
+		}
 	}
 }
 
