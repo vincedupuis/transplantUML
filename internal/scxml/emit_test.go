@@ -129,6 +129,45 @@ func TestEmitExecutableContent(t *testing.T) {
 	}
 }
 
+// An SCXML engine takes the first enabled transition in document order, so a
+// fork's transitions are written as one, and an else branch comes last with
+// no guard.
+func TestEmitForkAndElse(t *testing.T) {
+	sm := &model.StateMachine{
+		Initial: "c",
+		States: []*model.State{
+			{Name: "c", Kind: model.Choice},
+			{Name: "f", Kind: model.Fork},
+			{Name: "p", Kind: model.Parallel},
+			{Name: "r1", Parent: "p", Kind: model.Normal},
+			{Name: "r2", Parent: "p", Kind: model.Normal},
+		},
+		Transitions: []*model.Transition{
+			{Source: "c", Cond: "else", Targets: []string{"p"}},
+			{Source: "c", Cond: "ready", Targets: []string{"f"}},
+			{Source: "f", Targets: []string{"r1"}, Actions: []string{"a"}},
+			{Source: "f", Targets: []string{"r2"}, Actions: []string{"b"}},
+		},
+	}
+	out := string(emit(t, sm))
+	for _, want := range []string{
+		`<state id="c" tpuml:kind="choice">
+    <transition cond="ready" target="f"/>
+    <transition target="p"/>
+  </state>`,
+		`<state id="f" tpuml:kind="fork">
+    <transition target="r1 r2">
+      <script>a</script>
+      <script>b</script>
+    </transition>
+  </state>`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("emitted SCXML is missing\n%s\n%s", want, out)
+		}
+	}
+}
+
 func TestEmitErrors(t *testing.T) {
 	cases := map[string]*model.StateMachine{
 		"not reachable": {

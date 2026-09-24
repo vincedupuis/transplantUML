@@ -180,15 +180,144 @@ func TestBuildBehaviours(t *testing.T) {
 	}
 }
 
+// shop.fsm declares every state kind, so the model it builds pins down what
+// each declaration and each goto becomes.
+func TestBuildStateKinds(t *testing.T) {
+	src, err := os.ReadFile("../../example/shop.fsm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sm := build(t, string(src))
+
+	for _, want := range []struct {
+		name, parent string
+		kind         model.StateKind
+	}{
+		{"reorder", "", model.EntryPoint}, // a point of the machine itself
+		{"express", "checkout", model.EntryPoint},
+		{"cancelled", "checkout", model.ExitPoint},
+		{"route", "checkout", model.Choice},
+		{"paid", "checkout", model.Junction},
+		{"split", "", model.Fork},
+		{"shipping", "", model.Parallel},
+		{"warehouse", "shipping", model.Normal}, // a region
+		{"packing", "warehouse", model.Normal},
+		{"merge", "", model.Join},
+		{"terminate", "", model.Terminate},                 // goto terminate, beside browsing
+		{"checkout.H", "checkout", model.HistoryShallow},   // goto checkout.H
+		{"checkout.H-deep", "checkout", model.HistoryDeep}, // goto checkout.H*
+		{"final", "", model.Final},
+	} {
+		s := sm.State(want.name)
+		if s == nil {
+			t.Errorf("missing state %q", want.name)
+			continue
+		}
+		if s.Parent != want.parent || s.Kind != want.kind {
+			t.Errorf("state %q: parent %q kind %q, want %q/%q", s.Name, s.Parent, s.Kind, want.parent, want.kind)
+		}
+	}
+	// Every region is entered, so the parallel state starts in none of them;
+	// each region starts in its own initial child.
+	if got := sm.State("shipping").Initial; got != "" {
+		t.Errorf("shipping initial = %q, want none", got)
+	}
+	if got := sm.State("warehouse").Initial; got != "packing" {
+		t.Errorf("warehouse initial = %q, want packing", got)
+	}
+
+	for _, want := range []struct {
+		source, cond, target string
+		actions              []string
+	}{
+		{"reorder", "", "checkout", []string{"loadBasket"}},
+		{"express", "", "paying", []string{"useSavedCard"}},
+		{"cancelled", "", "browsing", nil},
+		{"route", "large", "review", nil},
+		{"route", "else", "paying", nil}, // UML's catch-all guard
+		{"paid", "", "split", []string{"receipt"}},
+		{"split", "", "packing", nil}, // one transition per fork line
+		{"split", "", "invoicing", []string{"notify"}},
+		{"packed", "", "merge", nil}, // a completion transition
+		{"sent", "paidInFull", "merge", nil},
+		{"merge", "", "done", []string{"close"}},
+	} {
+		i := slices.IndexFunc(sm.Transitions, func(t *model.Transition) bool {
+			return t.Source == want.source && slices.Equal(t.Targets, []string{want.target})
+		})
+		if i < 0 {
+			t.Errorf("missing transition %s -> %s", want.source, want.target)
+			continue
+		}
+		tr := sm.Transitions[i]
+		if tr.Trigger() != "" || tr.Cond != want.cond || !slices.Equal(tr.Actions, want.actions) {
+			t.Errorf("%s -> %s: trigger %q cond %q actions %v, want none/%q/%v",
+				want.source, want.target, tr.Trigger(), tr.Cond, tr.Actions, want.cond, want.actions)
+		}
+	}
+}
+
+// goto final and goto terminate end the region the transition's source sits
+// in, and an exit point leads out of its state, so for one of those they end
+// the region around that state.
+func TestBuildEndings(t *testing.T) {
+	sm := build(t, `fsm m {
+		initial state a {
+			exit point out goto final
+			initial state b { on e goto terminate on f goto final }
+		}
+	}`)
+	for _, want := range []struct {
+		source, target, parent string
+	}{
+		{"out", "final", ""},
+		{"b", "a.terminate", "a"},
+		{"b", "a.final", "a"},
+	} {
+		i := slices.IndexFunc(sm.Transitions, func(t *model.Transition) bool {
+			return t.Source == want.source && slices.Equal(t.Targets, []string{want.target})
+		})
+		if i < 0 {
+			t.Errorf("missing transition %s -> %s", want.source, want.target)
+			continue
+		}
+		if got := sm.State(want.target).Parent; got != want.parent {
+			t.Errorf("%s: parent %q, want %q", want.target, got, want.parent)
+		}
+	}
+}
+
+// Line breaks carry no meaning, so a deferred event followed by a goto is two
+// clauses: the deferral and a completion transition.
+func TestBuildTwoClausesOnOneLine(t *testing.T) {
+	sm := build(t, "fsm m { initial state s { on e / defer goto t } state t {} }")
+	if got := sm.State("s").Defer; !slices.Equal(got, []string{"e"}) {
+		t.Errorf("s defer = %v, want [e]", got)
+	}
+	if got := sm.OutgoingTransitions("s"); len(got) != 1 || got[0].Trigger() != "" || !slices.Equal(got[0].Targets, []string{"t"}) {
+		t.Errorf("transitions = %v, want one completion transition to t", got)
+	}
+}
+
 func TestBuildErrors(t *testing.T) {
 	cases := map[string]string{
-		"fsm m { initial state a {} initial state b {} }":         `already starts in "a"`,
-		"fsm m { state a {} state a {} }":                         `the machine already has a state called "a"`,
-		"fsm m { state p { state a {} } state q { state a {} } }": `the machine already has a state called "a"`,
-		"fsm m { state a { on e goto nope } }":                    `the machine has no state called "nope"`,
-		"fsm m { state a { on e goto H } }":                       `state "a" has no children, so it has no history`,
-		"fsm m { on e goto a state a {} }":                        `the machine itself has no behaviour`,
-		"fsm m { after(5s) goto a state a {} }":                   `put "after(5s)" inside a state`,
+		"fsm m { initial state a {} initial state b {} }":                                   `already starts in "a"`,
+		"fsm m { state a {} state a {} }":                                                   `the machine already has a state called "a"`,
+		"fsm m { state p { state a {} } state q { state a {} } }":                           `the machine already has a state called "a"`,
+		"fsm m { state a { on e goto nope } }":                                              `the machine has no state called "nope"`,
+		"fsm m { state a { on e goto H } }":                                                 `state "a" has no children, so it has no history`,
+		"fsm m { on e goto a state a {} }":                                                  `the machine itself has no behaviour`,
+		"fsm m { after(5s) goto a state a {} }":                                             `put "after(5s)" inside a state`,
+		"fsm m { goto a state a {} }":                                                       `put "goto a" inside a state`,
+		"fsm m { state a {} choice a {} }":                                                  `the machine already has a state called "a"`,
+		"fsm m { parallel state p { region a {} region b {} } fork a { goto a } }":          `the machine already has a state called "a"`,
+		"fsm m { parallel state p { region r { initial state a {} initial state b {} } } }": `state "r" already starts in "a"`,
+		"fsm m { state a { on e goto nope.H } }":                                            `the machine has no state called "nope"`,
+		"fsm m { state a { on e goto b.H* } state b {} }":                                   `state "b" has no children, so it has no history`,
+		"fsm m { choice c { goto H } }":                                                     `state "c" has no children, so it has no history`,
+		"fsm m { parallel state p { region r { state s {} } } state a { on e goto p.H } }":  `parallel state "p" has no history of its own`,
+		"fsm m { parallel state p { region r { state s {} } on e goto H* } }":               `parallel state "p" has no history of its own`,
+		"fsm m { parallel state p { entry point e goto final region r {} } }":               `parallel state "p" holds only regions`,
 	}
 	for src, want := range cases {
 		_, _, err := Parser{}.Parse([]byte(src))
@@ -210,5 +339,18 @@ func TestBuildNoInitial(t *testing.T) {
 		if !slices.ContainsFunc(warnings, func(got string) bool { return strings.Contains(got, w) }) {
 			t.Errorf("missing warning %q, got %v", w, warnings)
 		}
+	}
+}
+
+// A region starts in its initial child like any state, while a parallel state
+// enters all its regions, and a scope holding only pseudostates has no state
+// to start in.
+func TestBuildNoInitialRegion(t *testing.T) {
+	_, warnings, err := Parser{}.Parse([]byte("fsm m { initial parallel state p { region r { state a {} } } choice c { goto p } }"))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if want := []string{`state "r" has no initial state`}; !slices.Equal(warnings, want) {
+		t.Errorf("warnings = %v, want %v", warnings, want)
 	}
 }

@@ -47,7 +47,6 @@ func TestValidateErrors(t *testing.T) {
 		{"bad source", func(sm *StateMachine) { sm.Transitions[0].Source = "zzz" }, `unknown source "zzz"`},
 		{"bad target", func(sm *StateMachine) { sm.Transitions[0].Targets = []string{"zzz"} }, `unknown target "zzz"`},
 		{"cycle", func(sm *StateMachine) { sm.States[1].Parent = "b1" }, `forms a cycle`},
-		{"root entry point", func(sm *StateMachine) { sm.States[0].Kind = EntryPoint }, `entry-point states must be nested`},
 		{"choice with actions", func(sm *StateMachine) { sm.States[0].Kind = Choice; sm.States[0].OnEntry = []string{"x"} }, `cannot have entry/exit actions`},
 		{"final with do", func(sm *StateMachine) { sm.States[4].Do = []string{"x"} }, `cannot have do activities`},
 		{"choice with trigger", func(sm *StateMachine) { sm.States[0].Kind = Choice }, `cannot have a trigger`},
@@ -136,9 +135,6 @@ func TestPredicates(t *testing.T) {
 	}
 	if s := (&State{Kind: Terminate}); !s.IsPseudo() || s.IsConnector() || !s.IsTerminate() {
 		t.Errorf("terminate predicates wrong")
-	}
-	if s := (&State{Kind: EntryPoint}); !s.IsBoundary() {
-		t.Errorf("entry points are boundary states")
 	}
 	tr := &Transition{}
 	if !tr.IsExternal() || tr.IsLocal() || tr.IsInternal() {

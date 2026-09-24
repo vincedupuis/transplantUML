@@ -1,0 +1,54 @@
+@startuml
+title shop
+[*] --> browsing
+state reorder <<entryPoint>>
+state browsing
+state checkout {
+    [*] --> address
+    state express <<entryPoint>>
+    state cancelled <<exitPoint>>
+    state address
+    state route <<choice>>
+    state review
+    state paying
+    state paid <<start>>
+    state "checkout.H-deep" as checkout_H_deep <<history*>>
+    state "checkout.H" as checkout_H <<history>>
+    express --> paying: / useSavedCard
+    address --> route: next\n/ computeTotal
+    route --> review: [ large ]
+    route --> paying: [ else ]
+    review --> paying: approved
+    paying --> paid: cash
+    paying --> paid: card
+    paying --> cancelled: abort
+}
+state split <<fork>>
+state shipping {
+    [*] --> packing
+    state packing
+    state packed
+    packing --> packed: packed
+    --
+    [*] --> invoicing
+    state invoicing
+    state sent
+    invoicing --> sent: sent
+}
+state merge <<join>>
+state done
+state terminate <<end>>
+state final <<end>>
+reorder --> checkout: / loadBasket
+browsing --> checkout: buy
+browsing --> express: quickBuy
+browsing --> terminate: fraud
+cancelled --> browsing
+paid --> split: / receipt
+split --> packing
+packed --> merge
+merge --> done: / close
+done --> checkout_H_deep: reopen
+done --> checkout_H: back
+done --> final
+@enduml

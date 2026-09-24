@@ -148,6 +148,7 @@ it next to it (`<name>.puml`, kept up to date by the tests):
 | [`washing-machine.scxml`](example/washing-machine.scxml) | orthogonal regions, fork and join — and the warnings PlantUML's region limitation produces                  |
 | [`thermostat.json`](example/thermostat.json)             | the same concepts written directly in the model's JSON shape                                                |
 | [`kiosk.fsm`](example/kiosk.fsm)                         | the `fsm` language: nested states, behaviours, deferred events, guards, time triggers, `goto` forms         |
+| [`shop.fsm`](example/shop.fsm)                           | the `fsm` language's state kinds: parallel, choice, junction, fork, join, entry/exit points, history        |
 
 Run any of them with `tpuml -i example/<name>` and compare with the `.puml` beside it; add `-F scxml` or `-F json`
 to see the other formats.
@@ -210,9 +211,8 @@ type Transition struct {
 ```
 
 `State` has the predicates `IsNormal`, `IsParallel`, `IsFinal`, `IsTerminate`, `IsHistory`, `IsDeepHistory`,
-`IsConnector` (choice, junction, fork, join, entry/exit point), `IsPseudo` (anything but normal and parallel) and
-`IsBoundary` (history and entry/exit points, which must be nested). `Transition` has `IsExternal`, `IsLocal`,
-`IsInternal` and `Trigger()`, which returns the event or `after(delay)`.
+`IsConnector` (choice, junction, fork, join, entry/exit point) and `IsPseudo` (anything but normal and parallel).
+`Transition` has `IsExternal`, `IsLocal`, `IsInternal` and `Trigger()`, which returns the event or `after(delay)`.
 
 The JSON emitted by `-F json` is this structure with camelCase keys (`onEntry`, `targets`, …); empty
 optional fields are omitted and `kind` defaults to `normal` when reading. JSON holds the whole model, so it never
@@ -330,7 +330,8 @@ engines), and free-text do activities (written as `<invoke>` content).
 ## The fsm language
 
 tpuml's own input format, a compact alternative to writing SCXML by hand. The grammar is
-[`internal/fsm/fsm.g4`](internal/fsm/fsm.g4); [`example/kiosk.fsm`](example/kiosk.fsm) uses every construct.
+[`internal/fsm/fsm.g4`](internal/fsm/fsm.g4); [`example/kiosk.fsm`](example/kiosk.fsm) and
+[`example/shop.fsm`](example/shop.fsm) between them use every construct.
 
 ```
 fsm kiosk {
@@ -359,7 +360,9 @@ fsm kiosk {
 
 States and the clauses that concern them may be interleaved, so a transition can sit next to the children it
 affects. A transition is `on <event> [guard] / action, action goto <target>`, where the guard and the actions are
-optional but at least one of the actions and the `goto` must be present.
+optional but at least one of the actions and the `goto` must be present. Leaving out the trigger, as in
+`[guard] / action goto <target>`, makes a completion transition, which fires once the state has finished — its do
+activity is over, or its regions have reached their final states; it needs the `goto`.
 
 The behaviours of a state are written as UML writes them, without `on`: `entry / action, action`, `do / activity`
 and `exit / action, action`, each of which may appear more than once and adds to what came before. A deferred
@@ -381,20 +384,54 @@ and literals therefore have no syntax. What stands between the brackets reaches 
 `initial` marks the child its parent starts in, or the machine's starting state at the top level. Declaring two in
 one scope is an error; declaring none is a warning.
 
+The other state kinds follow UML's own names. A state is declared with `state`, the pseudostates without it:
+
+```
+parallel state shipping {             # every region is active at once
+    region warehouse { initial state packing { … } }
+    region accounting { initial state invoicing { … } }
+}
+choice route {                        # guards checked on arrival
+    [large] goto review
+    [else] goto paying
+}
+junction paid { / receipt goto split }  # guards checked before leaving; merges paths
+fork split {                          # enters several regions at once
+    goto packing
+    / notify goto invoicing
+}
+join merge / close goto done          # waits for every region, then leaves
+entry point express / useSavedCard goto paying
+exit point cancelled goto browsing
+```
+
+A parallel state holds regions, its points and its own clauses, and a region holds only states and pseudostates;
+the model keeps each region as an ordinary child state of the parallel one, as SCXML does. A parallel state starts in
+all its regions, so it takes no `initial` child, while each region marks its own. A choice or junction lists its
+branches, each an optional guard — `[else]` being UML's catch-all, which reaches `Cond` as `else` — optional actions
+and a `goto`. A fork lists its lines the same way without guards, one transition each, and a join, an entry point and
+an exit point are a single line. Entry and exit points go in a state, a parallel state or the machine itself: an
+entry point leads into its state past the initial child, an exit point out of it. Every pseudostate may be declared
+wherever a state may, except that a region holds no points.
+
 A `goto` names its target outright. State names are one namespace for the whole machine — the model keys its
 states by name — so nesting never has to be spelled out, and a target may be declared further down the document:
 
-| Target  | Resolves to                                                             |
-|---------|-------------------------------------------------------------------------|
-| `b`     | the state called `b`, wherever it sits                                   |
-| `.`     | the declaring state itself                                               |
-| `final` | the final state of the scope holding the declaring state, created on use |
-| `H`     | the shallow history of the declaring state, created on use               |
+| Target      | Resolves to                                                                     |
+|-------------|---------------------------------------------------------------------------------|
+| `b`         | the state called `b`, wherever it sits                                          |
+| `.`         | the declaring state itself                                                      |
+| `final`     | the final state of the scope holding the declaring state, created on use        |
+| `terminate` | the terminate pseudostate of that same scope, which ends the whole machine      |
+| `H`, `H*`   | the shallow or deep history of the declaring state, created on use              |
+| `b.H`, `b.H*` | the shallow or deep history of the state called `b`, created on use           |
 
-`final` and `H` are the two states the language never declares, so the parser creates them the first time a `goto`
-asks for one, named `<scope>.final` and `<state>.H`. A name is a letter or an underscore followed by letters,
-digits and underscores — no dots or hyphens, which is what keeps those two names out of a document's reach and
-`goto .` a keyword rather than a name. A state whose id in another format carries punctuation therefore has to be
+These are the states the language never declares, so the parser creates them the first time a `goto` asks for one,
+named `<scope>.final`, `<scope>.terminate`, `<state>.H` and `<state>.H-deep`. Leaving through an exit point, `final`
+and `terminate` belong to the scope around the point's state. A parallel state has no history of its own, only its
+regions do. A name is a letter or an underscore followed by letters, digits and underscores — no dots or hyphens,
+which is what keeps those names out of a document's reach and `goto .` a keyword rather than a name. A state whose id in another format carries punctuation therefore has to be
 renamed when the machine is written in this language.
 
-Everything else UML has — state kinds, variables, notes — has no syntax yet.
+Everything else UML has — transition kinds, submachines, invariants, variables, stereotypes, notes — has no syntax
+yet.

@@ -110,12 +110,6 @@ func (s *State) IsConnector() bool {
 // diagram draws as a symbol rather than a box.
 func (s *State) IsPseudo() bool { return !s.IsNormal() && !s.IsParallel() }
 
-// IsBoundary reports whether the state only makes sense nested in a compound
-// state: history states and entry/exit points.
-func (s *State) IsBoundary() bool {
-	return s.IsHistory() || s.Kind == EntryPoint || s.Kind == ExitPoint
-}
-
 func (t *Transition) IsExternal() bool { return t.Kind == "" || t.Kind == External }
 func (t *Transition) IsLocal() bool    { return t.Kind == Local }
 func (t *Transition) IsInternal() bool { return t.Kind == Internal }
@@ -276,8 +270,6 @@ func (sm *StateMachine) Validate() error {
 			}
 		} else if s.IsHistory() {
 			fail("state %q: history states must be nested in a state", s.Name)
-		} else if s.IsBoundary() {
-			fail("state %q: %s states must be nested in a state", s.Name, s.Kind)
 		}
 		if s.Initial != "" {
 			init, ok := byName[s.Initial]

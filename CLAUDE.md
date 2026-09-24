@@ -66,23 +66,27 @@ warnings.
   (`connectorKind`) and `<send delay>`+`<cancel>` as a time trigger (`timers`). Anything else unknown under a
   state or the root raises a parser warning. `Emitter` (`emit.go`) rebuilds the tree from `Parent` links, writes
   the initial child as an attribute, turns action strings back into `<script>` bodies — except those that are
-  XML, which are re-inserted as elements — declares the extension namespace only when used, and warns for join,
-  terminate, local, defer and free-text do activities. States it cannot reach from the top level are an error.
+  XML, which are re-inserted as elements — writes a fork's transitions as one multi-target transition and an
+  `else` branch last with no `cond` (engines take the first enabled transition), declares the extension
+  namespace only when used, and warns for join, terminate, local, defer and free-text do activities. States it cannot reach from the top level are an error.
 - **`internal/fsm`** — tpuml's own DSL (`fsm name { state s { on ev [guard] / actions goto target } }`), an
   ANTLR4 grammar in `fsm.g4`. `parser/` is generated from it (`make generate`, Go target with `-visitor
   -no-listener`) and committed so the build needs no Java; never edit it by hand, and regenerate it after any
-  grammar change. `goto` targets are a state name, `.` (self), `final` or `H` (history); one name reaches any
-  state because the names are one namespace for the whole machine, as they are in the model. A state may be
-  marked `initial` (`initial state s { … }`), naming its parent's starting child or, at the top level, the
+  grammar change. Kinds use UML's names: `state`, `parallel state` holding `region`s, and the pseudostates
+  `choice`/`junction` (branches, `[else]` becomes `Cond` "else"), `fork`, `join`, `entry point`/`exit point`,
+  declared without `state`. A clause with no trigger is a completion transition. `goto` targets are a state
+  name, `.` (self), `final`, `terminate`, or history as `H`/`H*`, alone or after a state name (`s.H*`); one name
+  reaches any state because the names are one namespace for the whole machine, as they are in the model. A state
+  may be marked `initial` (`initial state s { … }`), naming its parent's starting child or, at the top level, the
   machine's. `build.go` holds `Parser` and the `builder` that walks the parse tree into the
-  model: `declare` creates every state first, then `walk` resolves the transitions, because a `goto` may name a
-  state declared further down. `final` and `H` have no declaration syntax, so `synthesize` creates them on first
-  use as `<scope>.final` and `<state>.H` (an Identifier holds letters, digits and `_` only, so no document can
-  declare those names itself). The builder reports only what the model
-  cannot hold — two `initial` children in one scope would
-  collapse into one `State.Initial`, a repeated state name would collapse the builder's own index, and the machine
-  has nowhere to put a top-level `on` clause —
-  and `model.Validate()` does the rest.
+  model: `declare` creates every state first, in document order, then `walk` resolves the transitions, because a
+  `goto` may name a state declared further down. `final`, `terminate` and history have no declaration syntax, so
+  `synthesize` creates them on first use as `<scope>.final`, `<scope>.terminate`, `<state>.H` and
+  `<state>.H-deep` (an Identifier holds letters, digits and `_` only, so no document can declare those names
+  itself). The builder reports only what the model cannot hold or would misplace — two `initial` children in one
+  scope would collapse into one `State.Initial`, a repeated state name would collapse the builder's own index,
+  the machine has nowhere to put a top-level `on` clause, and a history or final state made directly inside a
+  parallel state would become a region — and `model.Validate()` does the rest.
 - **`internal/jsonsm`** — the model's own JSON shape (struct tags in `model`). Parser uses
   `DisallowUnknownFields`; round-trip equality with the SCXML parser is tested.
 - **`internal/render`** — registers sprig plus project helpers (`include`, `prefix`, `surround`, `joinNonEmpty`,

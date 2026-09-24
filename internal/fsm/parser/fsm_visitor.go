@@ -13,6 +13,30 @@ type fsmVisitor interface {
 	// Visit a parse tree produced by fsmParser#state.
 	VisitState(ctx *StateContext) interface{}
 
+	// Visit a parse tree produced by fsmParser#parallel.
+	VisitParallel(ctx *ParallelContext) interface{}
+
+	// Visit a parse tree produced by fsmParser#region.
+	VisitRegion(ctx *RegionContext) interface{}
+
+	// Visit a parse tree produced by fsmParser#choice.
+	VisitChoice(ctx *ChoiceContext) interface{}
+
+	// Visit a parse tree produced by fsmParser#junction.
+	VisitJunction(ctx *JunctionContext) interface{}
+
+	// Visit a parse tree produced by fsmParser#fork.
+	VisitFork(ctx *ForkContext) interface{}
+
+	// Visit a parse tree produced by fsmParser#join.
+	VisitJoin(ctx *JoinContext) interface{}
+
+	// Visit a parse tree produced by fsmParser#point.
+	VisitPoint(ctx *PointContext) interface{}
+
+	// Visit a parse tree produced by fsmParser#branch.
+	VisitBranch(ctx *BranchContext) interface{}
+
 	// Visit a parse tree produced by fsmParser#event.
 	VisitEvent(ctx *EventContext) interface{}
 

@@ -28,27 +28,67 @@ func TestGrammarAccepts(t *testing.T) {
 
 func TestGrammarRejects(t *testing.T) {
 	for _, src := range []string{
-		"fsm {}",                                    // missing name
-		"fsm m { state s { entry goto s } }",        // entry cannot leave the state
-		"fsm m { state s { on entry / a } }",        // a behaviour is not a trigger
-		"fsm m { state s { do goto s } }",           // a do activity is not a transition
-		"fsm m { state s { on e [g] / defer } }",    // no guard on a deferred event
-		"fsm m { state s { on e / defer goto s } }", // and no target
-		"fsm m { state s { defer e } }",             // a deferred event names its event first
-		"fsm m { state s { on e [] } }",             // empty guard
-		"fsm m { state s { on e goto } }",           // goto without a target
-		"fsm m { state s { on e } }",                // neither effect nor target
-		"fsm m { state s { on e [g] } }",            // a guard alone is not a transition
-		"fsm m { state s { on e goto a/b } }",       // a target is a name, not a path
-		"fsm m { state s { after(5s) } }",           // neither effect nor target
-		"fsm m { state s { after 5s goto s } }",     // a delay sits in parentheses
-		"fsm m { state s { after(5) goto s } }",     // a delay carries its unit
-		"fsm m { state s { after(5m) goto s } }",    // and the unit is ms or s
-		"fsm m { state s { after() goto s } }",      // a delay is not optional
+		"fsm {}",                                 // missing name
+		"fsm m { state s { entry } }",            // a behaviour needs its actions
+		"fsm m { state s { exit } }",             //
+		"fsm m { state s { do } }",               //
+		"fsm m { state s { entry goto s } }",     // entry cannot leave the state
+		"fsm m { state s { on entry / a } }",     // a behaviour is not a trigger
+		"fsm m { state s { do goto s } }",        // a do activity is not a transition
+		"fsm m { state s { on e [g] / defer } }", // no guard on a deferred event
+		"fsm m { state s { defer e } }",          // a deferred event names its event first
+		"fsm m { state s { on e [] } }",          // empty guard
+		"fsm m { state s { on e goto } }",        // goto without a target
+		"fsm m { state s { on e } }",             // neither effect nor target
+		"fsm m { state s { on e [g] } }",         // a guard alone is not a transition
+		"fsm m { state s { on e goto a/b } }",    // a target is a name, not a path
+		"fsm m { state s { after(5s) } }",        // neither effect nor target
+		"fsm m { state s { after 5s goto s } }",  // a delay sits in parentheses
+		"fsm m { state s { after(5) goto s } }",  // a delay carries its unit
+		"fsm m { state s { after(5m) goto s } }", // and the unit is ms or s
+		"fsm m { state s { after() goto s } }",   // a delay is not optional
 		"fsm m { state s { on after(5s) goto s } }",
 		"fsm m { initial }", // initial modifies a state
 		"fsm m { state s { initial on e / a } }",
 		"fsm m { state initial {} }", // initial is a keyword, not a name
+		"fsm m { state s { / a } }",  // a completion transition needs its goto
+		"fsm m { state s { [g] } }",
+		"fsm m { state s { on e [else] goto s } }",                         // else guards only a choice or junction branch
+		"fsm m { state s { [else] goto s } }",                              //
+		"fsm m { parallel state p { state s {} } }",                        // a parallel state holds regions
+		"fsm m { parallel p { region r {} } }",                             // and is written "parallel state"
+		"fsm m { region r {} }",                                            // a region sits only in a parallel state
+		"fsm m { state s { region r {} } }",                                //
+		"fsm m { parallel state p { region r { on e goto r } } }",          // and has no events
+		"fsm m { parallel state p { region r { entry point e goto r } } }", // nor points
+		"fsm m { initial region r {} }",
+		"fsm m { initial choice c {} }",      // only a state or a parallel state starts a scope
+		"fsm m { choice c [g] goto c }",      // a choice holds its branches in braces
+		"fsm m { choice c { on e goto c } }", // and a branch has no trigger
+		"fsm m { junction j { after(1s) goto j } }",
+		"fsm m { fork f { [g] goto f } }", // no guard leaving a fork
+		"fsm m { fork f { on e goto f } }",
+		"fsm m { join j { goto j } }",        // a join is one line
+		"fsm m { join j [g] goto j }",        // with no guard
+		"fsm m { join j }",                   // and a goto
+		"fsm m { entry point e { goto e } }", // a point is one line too
+		"fsm m { entry point e [g] goto e }",
+		"fsm m { exit point e }",
+		"fsm m { point e goto e }",
+		"fsm m { state s { on e goto s.x } }", // after a dot comes H or H*
+		"fsm m { state s { on e goto .H } }",
+		"fsm m { state s { on e goto s.final } }",
+		"fsm m { state s { on e goto H.s } }",
+		"fsm m { state parallel {} }", // the new keywords are not names
+		"fsm m { state region {} }",
+		"fsm m { state choice {} }",
+		"fsm m { state junction {} }",
+		"fsm m { state fork {} }",
+		"fsm m { state join {} }",
+		"fsm m { state point {} }",
+		"fsm m { state terminate {} }",
+		"fsm m { state else {} }",
+		"fsm m { state s { on e [else or g] goto s } }",
 	} {
 		if _, err := parse(src); err == nil {
 			t.Errorf("%q: accepted, want a syntax error", src)
@@ -68,7 +108,6 @@ func TestEventForms(t *testing.T) {
 		"on e [g] goto t",
 		"on e / a goto t",
 		"on e [g] / a goto t",
-		"entry",
 		"entry / a",
 		"exit / a, b",
 		"do / poll",
@@ -78,6 +117,10 @@ func TestEventForms(t *testing.T) {
 		"after(250ms) goto t",
 		"after(1.5s) [g] / a goto t",
 		"after(retryDelay) goto t",
+		"goto t",
+		"[g] goto t",
+		"/ a goto t",
+		"[g] / a goto t",
 	} {
 		if _, err := parse("fsm m { state s { " + body + " } state t {} }"); err != nil {
 			t.Errorf("%q: %v", body, err)
@@ -85,14 +128,18 @@ func TestEventForms(t *testing.T) {
 	}
 }
 
-// Every goto target form lexes: a state name, or one of the three keywords
-// standing for a state the document never declares.
+// Every goto target form lexes: a state name, one of the keywords standing
+// for a state the document never declares, or the history of a named state.
 func TestGotoTargets(t *testing.T) {
 	for _, target := range []string{
 		".",
 		"final",
+		"terminate",
 		"H",
+		"H*",
 		"t",
+		"t.H",
+		"t.H*",
 	} {
 		if _, err := parse("fsm m { state s { on e goto " + target + " } }"); err != nil {
 			t.Errorf("goto %s: %v", target, err)

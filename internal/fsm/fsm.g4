@@ -4,22 +4,70 @@ grammar fsm;
 fsm
     :   'fsm' Identifier
         '{'
-            (state | event)*
+            (state | parallel | choice | junction | fork | join | point | event)*
         '}' EOF
     ;
 
 state
     :   Initial? 'state' Identifier
         '{'
-            (state | event)*
+            (state | parallel | choice | junction | fork | join | point | event)*
         '}'
     ;
 
+parallel
+    :   Initial? 'parallel' 'state' Identifier
+        '{'
+            (region | point | event)*
+        '}'
+    ;
+
+region
+    :   'region' Identifier
+        '{'
+            (state | parallel | choice | junction | fork | join)*
+        '}'
+    ;
+
+choice
+    :   'choice' Identifier
+        '{'
+            branch*
+        '}'
+    ;
+
+junction
+    :   'junction' Identifier
+        '{'
+            branch*
+        '}'
+    ;
+
+fork
+    :   'fork' Identifier
+        '{'
+            (actions? goto)*
+        '}'
+    ;
+
+join
+    :   'join' Identifier actions? goto
+    ;
+
+point
+    :   kind=('entry' | 'exit') 'point' Identifier actions? goto
+    ;
+
+branch
+    :   ('[' 'else' ']' | guard)? actions? goto
+    ;
+
 event
-    :   name=('entry' | 'exit' | 'do') actions?
+    :   name=('entry' | 'exit' | 'do') actions
     |   'on' name=Identifier '/' Defer
     |   trigger guard? actions goto?
     |   trigger guard? goto
+    |   guard? actions? goto
     ;
 
 trigger
@@ -61,7 +109,8 @@ single_expression
     ;
 
 goto
-    :   'goto' ('.' | 'final' | 'H' | Identifier)
+    :   'goto' ('.' | 'final' | 'terminate' | Identifier)
+    |   'goto' (Identifier '.')? ('H' | 'H*')
     ;
 
 Initial: 'initial';

@@ -15,6 +15,38 @@ func (v *BasefsmVisitor) VisitState(ctx *StateContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasefsmVisitor) VisitParallel(ctx *ParallelContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasefsmVisitor) VisitRegion(ctx *RegionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasefsmVisitor) VisitChoice(ctx *ChoiceContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasefsmVisitor) VisitJunction(ctx *JunctionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasefsmVisitor) VisitFork(ctx *ForkContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasefsmVisitor) VisitJoin(ctx *JoinContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasefsmVisitor) VisitPoint(ctx *PointContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasefsmVisitor) VisitBranch(ctx *BranchContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasefsmVisitor) VisitEvent(ctx *EventContext) interface{} {
 	return v.VisitChildren(ctx)
 }

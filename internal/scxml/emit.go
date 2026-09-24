@@ -122,7 +122,7 @@ func (e *emitter) children(el *etree.Element, parent string) error {
 		actions(child, "onexit", onexit)
 		e.invokes(child, s)
 
-		for _, t := range transitions {
+		for _, t := range scxmlTransitions(s, transitions) {
 			tr := child.CreateElement("transition")
 			if t.After != "" {
 				tr.CreateAttr("event", afterEvent(t.After))
@@ -146,6 +146,34 @@ func (e *emitter) children(el *etree.Element, parent string) error {
 		}
 	}
 	return nil
+}
+
+// scxmlTransitions rewrites the transitions leaving s into the forms an SCXML
+// engine runs the way UML means them. An engine takes the first enabled
+// transition in document order, so a fork's transitions become one transition
+// to all their targets, and a branch guarded by "else" loses its guard and
+// moves after its siblings.
+func scxmlTransitions(s *model.State, transitions []*model.Transition) []*model.Transition {
+	if s.Kind == model.Fork && len(transitions) > 1 {
+		fork := &model.Transition{Source: s.Name}
+		for _, t := range transitions {
+			fork.Targets = append(fork.Targets, t.Targets...)
+			fork.Actions = append(fork.Actions, t.Actions...)
+		}
+		return []*model.Transition{fork}
+	}
+	out := make([]*model.Transition, 0, len(transitions))
+	var otherwise []*model.Transition
+	for _, t := range transitions {
+		if t.Cond != "else" {
+			out = append(out, t)
+			continue
+		}
+		unguarded := *t
+		unguarded.Cond = ""
+		otherwise = append(otherwise, &unguarded)
+	}
+	return append(out, otherwise...)
 }
 
 // pseudo tags the kinds SCXML has no element for and warns where the SCXML
