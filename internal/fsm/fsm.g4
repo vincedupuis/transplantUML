@@ -2,42 +2,42 @@
 grammar fsm;
 
 fsm
-    :   'fsm' Identifier
+    :   Note? 'fsm' Identifier
         '{'
             (state | parallel | submachine | choice | junction | fork | join | point | event)*
         '}' EOF
     ;
 
 state
-    :   Initial? 'state' Identifier stereotype?
+    :   Note? Initial? 'state' Identifier stereotype?
         '{'
             (state | parallel | submachine | choice | junction | fork | join | point | event)*
         '}'
     ;
 
 parallel
-    :   Initial? 'parallel' 'state' Identifier stereotype?
+    :   Note? Initial? 'parallel' 'state' Identifier stereotype?
         '{'
             (region | point | event)*
         '}'
     ;
 
 submachine
-    :   Initial? 'submachine' Identifier stereotype?
+    :   Note? Initial? 'submachine' Identifier stereotype?
         '{'
             event*
         '}'
     ;
 
 region
-    :   'region' Identifier stereotype?
+    :   Note? 'region' Identifier stereotype?
         '{'
             (state | parallel | submachine | choice | junction | fork | join)*
         '}'
     ;
 
 choice
-    :   'choice' Identifier stereotype?
+    :   Note? 'choice' Identifier stereotype?
         (   '{'
                 branch*
             '}'
@@ -46,7 +46,7 @@ choice
     ;
 
 junction
-    :   'junction' Identifier stereotype?
+    :   Note? 'junction' Identifier stereotype?
         (   '{'
                 branch*
             '}'
@@ -55,18 +55,18 @@ junction
     ;
 
 fork
-    :   'fork' Identifier stereotype?
+    :   Note? 'fork' Identifier stereotype?
         '{'
-            (actions? goto)*
+            (Note? actions? goto)*
         '}'
     ;
 
 join
-    :   'join' Identifier stereotype? actions? goto
+    :   Note? 'join' Identifier stereotype? actions? goto
     ;
 
 point
-    :   kind=('entry' | 'exit') 'point' Identifier stereotype? actions? goto
+    :   Note? kind=('entry' | 'exit') 'point' Identifier stereotype? actions? goto
     ;
 
 stereotype
@@ -74,16 +74,18 @@ stereotype
     ;
 
 branch
-    :   ('[' 'else' ']' | guard)? actions? goto
+    :   Note? ('[' 'else' ']' | guard)? actions? goto
     ;
 
 event
-    :   name=('entry' | 'exit' | 'do') actions
-    |   'on' name=Identifier '/' Defer
-    |   Invariant guard
-    |   trigger guard? actions goto?
-    |   trigger guard? goto
-    |   guard? actions? goto
+    :   Note?
+        (   name=('entry' | 'exit' | 'do') actions
+        |   'on' name=Identifier '/' Defer
+        |   Invariant guard
+        |   trigger guard? actions goto?
+        |   trigger guard? goto
+        |   guard? actions? goto
+        )
     ;
 
 trigger
@@ -136,5 +138,6 @@ Defer: 'defer';
 Local: 'local';
 Duration: [0-9]+ ('.' [0-9]+)? ('ms' | 's');
 Identifier: [a-zA-Z_] [a-zA-Z0-9_]*;
+Note: '|' ( '\\' . | ~[|\\] )* '|';
 Comment: '#' ( ~[\r\n] )* -> skip;
 Blank: [ \t\r\n]+ -> channel(HIDDEN);

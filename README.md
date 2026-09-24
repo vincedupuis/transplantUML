@@ -147,7 +147,7 @@ it next to it (`<name>.puml`, kept up to date by the tests):
 | [`media-player.scxml`](example/media-player.scxml)       | compound state, deep history, entry/exit points, deferred events, invariant, local and internal transitions           |
 | [`washing-machine.scxml`](example/washing-machine.scxml) | orthogonal regions, fork and join — and the warnings PlantUML's region limitation produces                            |
 | [`thermostat.json`](example/thermostat.json)             | the same concepts written directly in the model's JSON shape                                                          |
-| [`kiosk.fsm`](example/kiosk.fsm)                         | the `fsm` language: nesting, behaviours, deferred events, invariants, guards, time triggers, transition kinds, gotos   |
+| [`kiosk.fsm`](example/kiosk.fsm)                         | the `fsm` language: nesting, behaviours, deferred events, invariants, guards, time triggers, transition kinds, notes  |
 | [`shop.fsm`](example/shop.fsm)                           | the `fsm` language's state kinds (parallel, submachine, all pseudostates, history) and stereotypes                    |
 
 Run any of them with `tpuml -i example/<name>` and compare with the `.puml` beside it; add `-F scxml` or `-F json`
@@ -457,6 +457,26 @@ It sorts a state into a category of your own and changes nothing about how the m
 Every declaration may carry one, and its name reaches `Stereotype` without the brackets.
 PlantUML draws none on a pseudostate or a region, and warns instead.
 
+A note is text between bars, written before the directive it describes:
+
+```
+| A self-service kiosk:
+  browse, pay, take the receipt. |
+fsm kiosk {
+  | The basket is locked from here on. |
+  state paying { … }
+  | Nobody touched the screen. |
+  after(90s) goto idle
+}
+```
+
+A note before `fsm` is the machine's, one before a declaration is that state's, and one before a transition, a
+branch or a fork line is that transition's; each reaches `Note`.
+It may span lines, and each line loses the indentation that lines it up with the document.
+A backslash escapes the character after it, so `\|` writes a bar and `\\` a backslash.
+A directive takes at most one note.
+The model has no note for a behaviour, a deferred event or an invariant, so a note before one of those is an error.
+
 A `goto` names its target outright. State names are one namespace for the whole machine — the model keys its
 states by name — so nesting never has to be spelled out, and a target may be declared further down the document:
 
@@ -481,8 +501,6 @@ Declaring data would need types and literals, and those differ from one target l
 The data lives in the generated code instead, and the document handles it through named actions and predicates:
 `/ initCount` and `/ incrementCount` rather than an assignment, `[tooManyRetries]` rather than a comparison.
 A machine read from another format keeps its `Variables` in the model; only this language cannot declare them.
-
-Notes have no syntax yet.
 
 ### Editor support
 

@@ -1,9 +1,12 @@
 # Nested states interleaved with the transitions that concern them, the initial
 # child of each compound state, entry, do and exit behaviours, deferred events,
 # state invariants, boolean guards, time triggers on a delay and on a computed
-# one, external, local and internal transitions, and every form a goto target
-# can take: a state name, "final" and "H".
+# one, external, local and internal transitions, every form a goto target can
+# take: a state name, "final" and "H", and notes on the machine, a state and a
+# transition.
 
+| A self-service kiosk:
+  browse, pay, take the receipt. |
 fsm kiosk {
   initial state idle {
     entry / dim
@@ -14,6 +17,7 @@ fsm kiosk {
     entry / newBasket
     exit / clearBasket, unlock
     on abandon goto idle
+    | Nobody touched the screen. |
     after(90s) goto idle
 
     initial state browsing {
@@ -22,6 +26,7 @@ fsm kiosk {
       on checkout [basket] goto paying
     }
 
+    | The basket is locked from here on. |
     state paying {
       entry / lockBasket
       invariant [basket and not (card and cash)]

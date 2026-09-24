@@ -96,6 +96,13 @@ func TestGrammarRejects(t *testing.T) {
 		"fsm m { state s { on e [else or g] goto s } }",
 		"fsm m { state submachine {} }",
 		"fsm m { state invariant {} }",
+		"fsm m { state s | n | {} }",                                // a note comes before its directive
+		"fsm m { state s { on e goto s | n | } }",                   //
+		"fsm m { | a | | b | state s {} }",                          // once
+		"fsm m { state s { | n | } }",                               // and before something
+		"fsm m { | n  state s {} }",                                 // between two bars
+		"| a | | b | fsm m {}",                                      //
+		"fsm m { state s { on e | n | goto s } }",                   // not inside a clause
 		"fsm m { state s <<>> {} }",                                 // a stereotype names something
 		"fsm m { state s <<a b>> {} }",                              // one thing
 		"fsm m { state s <<a, b>> {} }",                             //
@@ -144,6 +151,9 @@ func TestEventForms(t *testing.T) {
 		"do / poll, refresh",
 		"on pause / defer",
 		"invariant [g]",
+		"| n | on e goto t",
+		"| multi\n line | on e / a",
+		"| bar \\| | goto t",
 		"invariant [not g or (h and i)]",
 		"after(5s) / a",
 		"after(250ms) goto t",
@@ -224,6 +234,23 @@ func TestInitialState(t *testing.T) {
 	}
 	if inner[1].Initial() != nil {
 		t.Error("c: marked initial")
+	}
+}
+
+// A note may stand before every directive: the machine, each declaration,
+// each clause, branch and fork line.
+func TestNotesAccepted(t *testing.T) {
+	src := `| m | fsm m {
+		| s | initial state s { | e | entry / a | t | on e goto c }
+		| p | parallel state p { | r | region r { | i | initial state i {} } | x | exit point x goto s }
+		| u | submachine u {}
+		| c | choice c { | b | [g] goto s | o | [else] goto s }
+		| k | junction k | b | goto s
+		| f | fork f { | l | goto i }
+		| j | join j goto s
+	}`
+	if _, err := parse(src); err != nil {
+		t.Fatal(err)
 	}
 }
 

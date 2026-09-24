@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
 	"github.com/vincedupuis/transplantUML/internal/fsm/parser"
@@ -19,7 +20,7 @@ func (Parser) Parse(src []byte) (*model.StateMachine, model.Warnings, error) {
 		return nil, nil, err
 	}
 	b := &builder{
-		sm:     &model.StateMachine{Name: tree.Identifier().GetText()},
+		sm:     &model.StateMachine{Name: tree.Identifier().GetText(), Note: note(tree.Note())},
 		root:   &node{},
 		states: map[string]*node{},
 	}
@@ -125,8 +126,9 @@ func (b *builder) declare(scope *node, ctx antlr.ParserRuleContext) {
 		if _, ok := child.(*parser.SubmachineContext); ok {
 			n.state.Submachine = n.state.Name
 		}
+		n.state.Note = note(leading(n.ctx))
 		// Every declaration may carry a stereotype after its name.
-		if st := child.(interface{ Stereotype() parser.IStereotypeContext }).Stereotype(); st != nil {
+		if st := child.(stereotyped).Stereotype(); st != nil {
 			n.state.Stereotype = st.Identifier().GetText()
 		}
 		resting = resting || kind == model.Normal || kind == model.Parallel
@@ -148,6 +150,11 @@ func (b *builder) declare(scope *node, ctx antlr.ParserRuleContext) {
 	if initial == nil && resting && (scope.state == nil || !scope.state.IsParallel()) {
 		b.warnings.Addf("%s has no initial state", describe(scope))
 	}
+}
+
+// stereotyped is every declaration: each may carry a stereotype.
+type stereotyped interface {
+	Stereotype() parser.IStereotypeContext
 }
 
 // add creates the state a declaration names, or reports that the name is
@@ -195,14 +202,26 @@ func (b *builder) walk(scope *node) {
 		case *parser.ForkContext:
 			// A fork line is an optional actions clause followed by its goto,
 			// so each actions clause belongs to the goto after it.
-			var actions parser.IActionsContext
-			for _, child := range c.GetChildren() {
+			// A note before a line belongs to that line's transition; the
+			// one before the declaration is the fork's own.
+			var (
+				actions parser.IActionsContext
+				line    antlr.TerminalNode
+			)
+			for _, child := range c.GetChildren()[1:] {
 				switch cc := child.(type) {
+				case antlr.TerminalNode:
+					if isNote(cc) {
+						line = cc
+					}
 				case *parser.ActionsContext:
 					actions = cc
 				case *parser.GotoContext:
-					b.leave(n, actions, cc)
-					actions = nil
+					if t, ok := b.transition(n, actions, cc); ok {
+						t.Note = note(line)
+						b.sm.Transitions = append(b.sm.Transitions, t)
+					}
+					actions, line = nil, nil
 				}
 			}
 		case *parser.JoinContext:
@@ -215,6 +234,12 @@ func (b *builder) walk(scope *node) {
 }
 
 func (b *builder) event(n *node, ec parser.IEventContext) {
+	// The model notes states and transitions, not the behaviours, deferred
+	// events and invariant a state lists.
+	if nt := ec.Note(); nt != nil && (ec.GetName() != nil || ec.Invariant() != nil) {
+		b.failf(nt.GetSymbol(), "the model has no note for %q, put it before the state %q instead", trigger(ec), n.state.Name)
+		return
+	}
 	// The model holds one condition per state, so a second would be lost.
 	if inv := ec.Invariant(); inv != nil {
 		if n.state.Invariant != "" {
@@ -241,7 +266,7 @@ func (b *builder) event(n *node, ec parser.IEventContext) {
 	}
 	// A clause with no goto is UML's internal transition, the one a state
 	// lists in its compartment: no state change, no exit or entry.
-	t := &model.Transition{Source: n.state.Name, Actions: effects(ec.Actions()), Kind: model.Internal}
+	t := &model.Transition{Source: n.state.Name, Actions: effects(ec.Actions()), Kind: model.Internal, Note: note(ec.Note())}
 	// No trigger makes a completion transition, which leaves Event and After
 	// empty.
 	if tr := ec.Trigger(); tr != nil {
@@ -272,6 +297,7 @@ func (b *builder) branches(n *node, bcs []parser.IBranchContext) {
 		if !ok {
 			continue
 		}
+		t.Note = note(bc.Note())
 		if g := bc.Guard(); g != nil {
 			t.Cond = text(g.Expression())
 		} else if bc.GetStart().GetText() == "[" {
@@ -394,7 +420,8 @@ func (b *builder) synthesize(scope *node, suffix string, kind model.StateKind) s
 
 // trigger is what an event clause fires on, as the document writes it: an
 // event name, "entry", "exit", "do", a whole "after(5s)", the guard or goto
-// of a completion transition, or a whole invariant clause.
+// of a completion transition, or a whole invariant clause, but never the note
+// before it.
 func trigger(ec parser.IEventContext) string {
 	if name := ec.GetName(); name != nil {
 		return name.GetText()
@@ -402,7 +429,46 @@ func trigger(ec parser.IEventContext) string {
 	if tr := ec.Trigger(); tr != nil {
 		return text(tr)
 	}
+	if nt := ec.Note(); nt != nil {
+		return strings.TrimSpace(strings.TrimPrefix(text(ec), nt.GetText()))
+	}
 	return text(ec)
+}
+
+// leading returns the note written before a declaration, or nil.
+func leading(ctx antlr.ParserRuleContext) antlr.TerminalNode {
+	if t, ok := ctx.GetChild(0).(antlr.TerminalNode); ok && isNote(t) {
+		return t
+	}
+	return nil
+}
+
+// isNote tells a note from the other tokens, none of which starts with a bar.
+func isNote(t antlr.TerminalNode) bool {
+	return strings.HasPrefix(t.GetText(), "|")
+}
+
+// note returns the text between a note's bars. A backslash escapes the
+// character after it, and each line loses the indentation that lines it up
+// with the document, as do the blank lines around the text.
+func note(t antlr.TerminalNode) string {
+	if t == nil {
+		return ""
+	}
+	raw := t.GetText()
+	raw = raw[1 : len(raw)-1]
+	var text strings.Builder
+	for i := 0; i < len(raw); i++ {
+		if raw[i] == '\\' && i+1 < len(raw) {
+			i++
+		}
+		text.WriteByte(raw[i])
+	}
+	lines := strings.Split(text.String(), "\n")
+	for i, line := range lines {
+		lines[i] = strings.TrimSpace(line)
+	}
+	return strings.Trim(strings.Join(lines, "\n"), "\n")
 }
 
 func effects(a parser.IActionsContext) []string {

@@ -1,5 +1,9 @@
 @startuml
 title kiosk
+note as machineNote
+    A self-service kiosk:
+    browse, pay, take the receipt.
+end note
 [*] --> idle
 state idle
 idle : entry / dim
@@ -17,6 +21,7 @@ state ordering {
     }
     paying : entry / lockBasket
     paying : [ basket and not (card and cash) ]
+    note right of paying : The basket is locked from here on.
     state "ordering.H" as ordering_H <<history>>
     browsing : add\n[ inStock and (card or cash) ]\n/ addLine
     browsing --> browsing: remove\n/ dropLine
@@ -34,6 +39,7 @@ state final <<end>>
 idle --> browsing: touch\n/ wake
 ordering --> idle: abandon
 ordering --> idle: after(90s)
+note on link : Nobody touched the screen.
 ordering --> ordering_H: resume
 ordering --> browsing: back
 paying --> done: approved\n/ receipt

@@ -393,6 +393,58 @@ func TestBuildStereotype(t *testing.T) {
 	}
 }
 
+// A note written before a directive belongs to it: the machine, a
+// declaration, a transition, a branch or a fork line. Each line loses its
+// indentation, and a backslash escapes the character after it.
+func TestBuildNotes(t *testing.T) {
+	sm := build(t, `| Serves one customer at a time,
+	                  card first. |
+	fsm m {
+		| Waits. |
+		initial state idle {
+			| Bar \| and back\\slash. |
+			on card goto f
+			| Not moving. |
+			on ping / pong
+		}
+		| Splits. |
+		fork f { goto a | Second line. | / log goto b }
+		parallel state p {
+			| Left. |
+			region ra { initial state a { goto j } }
+			region rb { initial state b { goto j } }
+		}
+		| Both done. |
+		join j goto c
+		choice c { | Big. | [big] goto idle [else] goto idle }
+	}`)
+	if want := "Serves one customer at a time,\ncard first."; sm.Note != want {
+		t.Errorf("machine note = %q, want %q", sm.Note, want)
+	}
+	for name, want := range map[string]string{"idle": "Waits.", "f": "Splits.", "ra": "Left.", "j": "Both done.", "c": "", "a": ""} {
+		if got := sm.State(name).Note; got != want {
+			t.Errorf("%s note = %q, want %q", name, got, want)
+		}
+	}
+	for _, want := range []struct{ source, target, note string }{
+		{"idle", "f", `Bar | and back\slash.`},
+		{"idle", "", "Not moving."}, // an internal transition
+		{"f", "a", ""},
+		{"f", "b", "Second line."},
+		{"c", "idle", "Big."},
+		{"j", "c", ""},
+	} {
+		i := slices.IndexFunc(sm.Transitions, func(t *model.Transition) bool {
+			return t.Source == want.source && (want.target == "" && len(t.Targets) == 0 || slices.Equal(t.Targets, []string{want.target}))
+		})
+		if i < 0 {
+			t.Errorf("missing transition %s -> %s", want.source, want.target)
+		} else if got := sm.Transitions[i].Note; got != want.note {
+			t.Errorf("%s -> %s note = %q, want %q", want.source, want.target, got, want.note)
+		}
+	}
+}
+
 // A submachine state may start its scope, which then starts in the machine it
 // refers to.
 func TestBuildInitialSubmachine(t *testing.T) {
@@ -443,6 +495,11 @@ func TestBuildErrors(t *testing.T) {
 		"fsm m { state a { choice c { goto local b } state b {} } }":                        `a local transition stays inside "c", but "b" is not inside it`,
 		"fsm m { submachine a {} state a {} }":                                              `the machine already has a state called "a"`,
 		"fsm m { initial submachine a {} initial state b {} }":                              `already starts in "a"`,
+		"fsm m { state a { | n | entry / x } }":                                             `the model has no note for "entry", put it before the state "a" instead`,
+		"fsm m { state a { | n | do / x } }":                                                `no note for "do"`,
+		"fsm m { state a { | n | on e / defer } }":                                          `no note for "e"`,
+		"fsm m { state a { | n | invariant [x] } }":                                         `no note for "invariant [x]"`,
+		"fsm m { | n | goto a state a {} }":                                                 `put "goto a" inside a state`,
 		"fsm m { state a { invariant [x] invariant [y] } }":                                 `state "a" already has the invariant [x]`,
 		"fsm m { invariant [x] state a {} }":                                                `put "invariant [x]" inside a state`,
 		"fsm m { submachine a { on e goto H } }":                                            `state "a" has no children, so it has no history`,

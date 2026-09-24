@@ -15,6 +15,7 @@
 	<key>patterns</key>
 	<array>
 		<dict><key>include</key><string>#comment</string></dict>
+		<dict><key>include</key><string>#note</string></dict>
 		<dict><key>include</key><string>#machine</string></dict>
 		<dict><key>include</key><string>#initial</string></dict>
 		<dict><key>include</key><string>#parallel</string></dict>
@@ -102,6 +103,24 @@
 				<key>2</key>
 				<dict><key>name</key><string>entity.name.type.state.fsm</string></dict>
 			</dict>
+		</dict>
+		<key>note</key>
+		<dict>
+			<key>begin</key>
+			<string>\|</string>
+			<key>end</key>
+			<string>\|</string>
+			<key>name</key>
+			<string>comment.block.documentation.note.fsm</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>match</key>
+					<string>\\.</string>
+					<key>name</key>
+					<string>constant.character.escape.fsm</string>
+				</dict>
+			</array>
 		</dict>
 		<key>stereotype</key>
 		<dict>
