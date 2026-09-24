@@ -115,6 +115,8 @@ func (b *builder) declare(scope *node, ctx antlr.ParserRuleContext) {
 			if c.GetKind().GetText() == "exit" {
 				kind = model.ExitPoint
 			}
+		case *parser.ReferenceContext:
+			name, kind = c.Identifier(), model.EntryPoint
 		case *parser.FinalContext:
 			name, kind = c.Identifier(), model.Final
 		case *parser.TerminateContext:
@@ -271,6 +273,10 @@ func (b *builder) walk(scope *node) {
 		case *parser.JoinContext:
 			b.leave(n, c.Actions(), c.Goto_())
 		case *parser.PointContext:
+			if n.state.Kind == model.EntryPoint && n.parent.state != nil && n.parent.state.Submachine != "" {
+				b.failf(c.GetKind(), "entry point %q leads into the machine %q refers to, so it takes no goto", n.state.Name, n.parent.state.Name)
+				break
+			}
 			b.leave(n, c.Actions(), c.Goto_())
 		}
 		b.walk(n)
@@ -440,6 +446,9 @@ func (b *builder) target(n *node, g parser.IGotoContext) (string, bool) {
 		owner = named
 	}
 	switch {
+	case owner.state.Submachine != "":
+		b.failf(g.GetStart(), "submachine state %q has no history of its own, the machine it refers to may", owner.state.Name)
+		return "", false
 	case owner.state.IsParallel():
 		b.failf(g.GetStart(), "parallel state %q has no history of its own, only its regions do", owner.state.Name)
 		return "", false

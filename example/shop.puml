@@ -3,7 +3,10 @@ title shop
 [*] --> browsing
 state reorder <<entryPoint>>
 state browsing
-state "support: support" as support
+state "support: support" as support {
+    state urgent <<entryPoint>>
+    state escalated <<exitPoint>>
+}
 support : entry / openChat
 state "«secure»\ncheckout" as checkout <<secure>> {
     [*] --> address
@@ -57,7 +60,9 @@ browsing --> checkout: buy
 browsing --> express: quickBuy
 browsing --> terminate: fraud
 browsing --> support: help
+browsing --> urgent: emergency
 support --> browsing
+escalated --> checkout: / page
 cancelled --> browsing
 paid --> split: / receipt
 split --> packing

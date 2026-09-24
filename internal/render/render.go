@@ -9,6 +9,7 @@
 //	Children parent             -> []*State   ("" for the top level)
 //	RootStates                  -> []*State
 //	HistoryOf parent            -> []*State
+//	IsReference name            -> bool       (an entry or exit point of a submachine state)
 //	InitialOf name              -> string     ("" for the machine's initial)
 //	Ancestors name              -> []string   (parent, grandparent, ... nearest first)
 //	CommonAncestor name...      -> string     (innermost state containing them all, "" for the top level)
@@ -78,6 +79,7 @@ func Render(sm *model.StateMachine, tmplSrc string) (string, model.Warnings, err
 		"Children":            sm.Children,
 		"RootStates":          sm.RootStates,
 		"HistoryOf":           sm.HistoryOf,
+		"IsReference":         sm.IsReference,
 		"InitialOf":           sm.InitialOf,
 		"Ancestors":           sm.Ancestors,
 		"CommonAncestor":      sm.CommonAncestor,

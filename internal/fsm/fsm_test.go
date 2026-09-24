@@ -122,7 +122,8 @@ func TestGrammarRejects(t *testing.T) {
 		"fsm m { parallel state p { region r { invariant [g] } } }", // a region holds only states
 		"fsm m { submachine s { state t {} } }",                     // a submachine state's states are the machine's
 		"fsm m { submachine s { choice c goto s } }",                // and so are its pseudostates
-		"fsm m { submachine s { entry point e goto s } }",           //
+		"fsm m { submachine s { exit point e } }",                   // its exit point leaves by a goto
+		"fsm m { state s { entry point e } }",                       // only a submachine's entry point has none
 		"fsm m { submachine state s {} }",                           // submachine replaces state
 		"fsm m { submachine s }",                                    // and keeps its braces
 		"fsm m { parallel state p { submachine s {} } }",            // a parallel state holds regions only

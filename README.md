@@ -40,6 +40,7 @@ symbol, and so on. Warnings go to stderr and never fail the conversion.
 | Fork                                   | `fork`                                       | transient state with one multi-target transition        | `<<fork>>`                                          |
 | Join                                   | `join`                                       | transient state, `tpuml:kind="join"` ⚠                  | `<<join>>`                                          |
 | Entry / exit point                     | `entry-point`, `exit-point`                  | transient state inside the compound, `tpuml:kind`       | `<<entryPoint>>`, `<<exitPoint>>`                   |
+| Connection point reference             | entry / exit point whose parent is a submachine state | left out ⚠                                     | `<<entryPoint>>`, `<<exitPoint>>` on its border     |
 | Entry / exit behaviour                 | `OnEntry`, `OnExit`                          | `<onentry>`, `<onexit>`                                 | `X : entry / …`, `X : exit / …`                     |
 | Do activity                            | `Do`                                         | `<invoke>`                                              | `X : do / …`                                        |
 | Deferred events                        | `Defer`                                      | `tpuml:defer` ⚠                                         | `X : ev / defer`                                    |
@@ -235,6 +236,7 @@ Templates use Go's [`text/template`](https://pkg.go.dev/text/template) syntax. A
 | `Children parent`            | direct children of a state (`""` for the top level)                      |
 | `RootStates`                 | same as `Children ""`                                                    |
 | `HistoryOf parent`           | the history pseudo-states declared under a state                         |
+| `IsReference name`           | whether the state is an entry or exit point of a submachine state        |
 | `InitialOf name`             | initial child of a state, or of the machine for `""`                     |
 | `Ancestors name`             | parent, grandparent, … of a state, nearest first                         |
 | `CommonAncestor name...`     | innermost state containing all the named states (`""` = top level)       |
@@ -467,9 +469,26 @@ wherever a state may, except that a region holds no points.
 
 A submachine state is named after the machine it refers to, which is another `fsm` document.
 The name becomes both the state's name and its `Submachine` reference.
-Its states come from that machine, so its body holds only behaviours, deferred events and transitions.
+Its states come from that machine, so its body holds only behaviours, deferred events, transitions and points.
 It may be marked `initial` and goes wherever a state may.
 Since state names are one namespace, a document can use each submachine once.
+
+A point in a submachine body is UML's connection point reference.
+It stands for the entry or exit point of the same name in the machine the submachine refers to.
+An entry point there has no `goto`, since its path continues inside that machine; other states reach it by name.
+An exit point there has its `goto` as usual, taken when that machine leaves through its point.
+
+```
+submachine support {
+  entry point urgent                  # goto urgent enters support there
+  exit point escalated / page goto checkout
+  goto browsing                       # support reached its final state
+}
+```
+
+In the model, an entry or exit point whose parent is a submachine state is such a reference (`IsReference`).
+SCXML cannot enter or leave an invoked machine at a point, so the emitter leaves references out and warns.
+A transition to an entry point then enters the submachine state, and the transitions leaving an exit point are dropped.
 
 A stereotype follows the declared name in UML's notation, as in `state checkout <<secure>> { … }` or
 `choice route <<audited>> { … }`.

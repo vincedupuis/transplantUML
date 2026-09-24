@@ -47,7 +47,8 @@ warnings.
   distinguished by `Kind` (`normal`, `parallel`, `final`, `terminate`, `history-shallow`, `history-deep`, and the
   connectors `choice`, `junction`, `fork`, `join`, `entry-point`, `exit-point`); a history state's default
   transition is an ordinary `Transition` whose `Source` is the history state. `Initial` is a property
-  (`StateMachine.Initial`, `State.Initial`), not a synthetic transition. States also carry `Do`, `Defer`,
+  (`StateMachine.Initial`, `State.Initial`), not a synthetic transition. An entry or exit point whose parent is a submachine state is UML's
+  connection point reference to the referenced machine's point of that name (`IsReference`). States also carry `Do`, `Defer`,
   `Submachine`, `Invariant`, `Variables`, `Stereotype`, `Note`, and a note on each thing they list (`EntryNote`,
   `ExitNote`, `DoNote`, `InvariantNote`, `DeferNotes` by event); transitions carry `After` (time trigger), `Kind`
   (`""`/external, local, internal) and `Note`. `Validate()` is the single place structural rules live; extend it
@@ -70,12 +71,14 @@ warnings.
   the initial child as an attribute, turns action strings back into `<script>` bodies — except those that are
   XML, which are re-inserted as elements — writes a fork's transitions as one multi-target transition and an
   `else` branch last with no `cond` (engines take the first enabled transition), declares the extension
-  namespace only when used, and warns for join, terminate, local, defer and free-text do activities. States it cannot reach from the top level are an error.
+  namespace only when used, and warns for join, terminate, local, defer and free-text do activities, and leaves out a
+  submachine state's entry and exit points with a warning. States it cannot reach from the top level are an error.
 - **`internal/fsm`** — tpuml's own DSL (`fsm name { state s { on ev [guard] / actions goto target } }`), an
   ANTLR4 grammar in `fsm.g4`. `parser/` is generated from it (`make generate`, Go target with `-visitor
   -no-listener`) and committed so the build needs no Java; never edit it by hand, and regenerate it after any
   grammar change. Kinds use UML's names: `state`, `parallel state` holding `region`s, `submachine` (named after
-  the machine it refers to, so its body holds clauses only), and the pseudostates `choice`/`junction` (branches,
+  the machine it refers to, so its body holds clauses and the entry and exit points it references: a
+  connection point reference, whose entry point has no `goto`), and the pseudostates `choice`/`junction` (branches,
   `[else]` becomes `Cond` "else"), `fork`, `join`, `entry point`/`exit point`, declared without `state`. A clause
   with no trigger is a completion transition. `goto` targets are a state name, `final`, `terminate`, or history as
   `H`/`H*`, alone or after a state name (`s.H*`); a line `H <<s>> / actions goto target` inside a state or region

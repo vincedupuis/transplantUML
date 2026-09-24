@@ -43,6 +43,9 @@ type fsmVisitor interface {
 	// Visit a parse tree produced by fsmParser#point.
 	VisitPoint(ctx *PointContext) interface{}
 
+	// Visit a parse tree produced by fsmParser#reference.
+	VisitReference(ctx *ReferenceContext) interface{}
+
 	// Visit a parse tree produced by fsmParser#history.
 	VisitHistory(ctx *HistoryContext) interface{}
 

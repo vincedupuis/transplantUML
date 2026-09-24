@@ -47,6 +47,15 @@ func TestValidateErrors(t *testing.T) {
 		{"bad source", func(sm *StateMachine) { sm.Transitions[0].Source = "zzz" }, `unknown source "zzz"`},
 		{"bad target", func(sm *StateMachine) { sm.Transitions[0].Targets = []string{"zzz"} }, `unknown target "zzz"`},
 		{"cycle", func(sm *StateMachine) { sm.States[1].Parent = "b1" }, `forms a cycle`},
+		{"submachine child", func(sm *StateMachine) { sm.States[1].Submachine = "b" }, `submachine state "b" holds only the entry and exit points it references, not a normal state`},
+		{"reference entry leaving", func(sm *StateMachine) {
+			sm.States = append(sm.States, &State{Name: "s", Kind: Normal, Submachine: "s"}, &State{Name: "in", Parent: "s", Kind: EntryPoint})
+			sm.Transitions = append(sm.Transitions, &Transition{Source: "in", Targets: []string{"a"}})
+		}, `state "in": an entry point of a submachine state leads on inside the machine it refers to`},
+		{"reference exit entered", func(sm *StateMachine) {
+			sm.States = append(sm.States, &State{Name: "s", Kind: Normal, Submachine: "s"}, &State{Name: "out", Parent: "s", Kind: ExitPoint})
+			sm.Transitions = append(sm.Transitions, &Transition{Source: "a", Targets: []string{"out"}, Event: "e"})
+		}, `state "out": an exit point of a submachine state is reached from the machine it refers to`},
 		{"choice with actions", func(sm *StateMachine) { sm.States[0].Kind = Choice; sm.States[0].OnEntry = []string{"x"} }, `cannot have entry/exit actions`},
 		{"final with do", func(sm *StateMachine) { sm.States[4].Do = []string{"x"} }, `cannot have do activities`},
 		{"choice with trigger", func(sm *StateMachine) { sm.States[0].Kind = Choice }, `cannot have a trigger`},
@@ -109,6 +118,31 @@ func TestValidatePseudostateCounts(t *testing.T) {
 	sm.Transitions = append(sm.Transitions, &Transition{Source: "c", Targets: []string{"b1"}})
 	if err := sm.Validate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// A submachine state holds the entry and exit points it references: one
+// entered from this machine, the other left from it.
+func TestValidateReferences(t *testing.T) {
+	sm := sample()
+	sm.States = append(sm.States,
+		&State{Name: "s", Kind: Normal, Submachine: "s"},
+		&State{Name: "in", Parent: "s", Kind: EntryPoint},
+		&State{Name: "out", Parent: "s", Kind: ExitPoint},
+		&State{Name: "own", Parent: "b", Kind: EntryPoint},
+	)
+	sm.Transitions = append(sm.Transitions,
+		&Transition{Source: "a", Targets: []string{"in"}, Event: "e"},
+		&Transition{Source: "out", Targets: []string{"a"}},
+		&Transition{Source: "own", Targets: []string{"b1"}},
+	)
+	if err := sm.Validate(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for name, want := range map[string]bool{"in": true, "out": true, "own": false, "s": false, "zzz": false} {
+		if got := sm.IsReference(name); got != want {
+			t.Errorf("IsReference(%q) = %v, want %v", name, got, want)
+		}
 	}
 }
 

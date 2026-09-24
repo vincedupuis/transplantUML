@@ -88,8 +88,12 @@ func (e *emitter) children(el *etree.Element, parent string) error {
 		if !ok {
 			return fmt.Errorf("state %q: cannot emit unknown kind %q", s.Name, s.Kind)
 		}
-		child := el.CreateElement(tag)
 		e.emitted[s.Name] = true
+		if e.sm.IsReference(s.Name) {
+			e.reference(s)
+			continue
+		}
+		child := el.CreateElement(tag)
 		setAttr(child, "id", s.Name)
 		if s.IsDeepHistory() {
 			child.CreateAttr("type", "deep") // shallow is the SCXML default
@@ -131,7 +135,7 @@ func (e *emitter) children(el *etree.Element, parent string) error {
 				setAttr(tr, "event", t.Event)
 			}
 			setAttr(tr, "cond", t.Cond)
-			setAttr(tr, "target", strings.Join(t.Targets, " "))
+			setAttr(tr, "target", strings.Join(e.targets(t), " "))
 			switch {
 			case t.IsInternal():
 				tr.CreateAttr("type", "internal")
@@ -147,6 +151,30 @@ func (e *emitter) children(el *etree.Element, parent string) error {
 		}
 	}
 	return nil
+}
+
+// reference warns about an entry or exit point of a submachine state, which
+// is left out: an invoked SCXML machine starts in its own initial state and
+// reports only when it is done.
+func (e *emitter) reference(s *model.State) {
+	if s.Kind == model.EntryPoint {
+		e.warn.Addf("state %q: SCXML cannot enter an invoked machine through its entry point; transitions to it enter %q instead", s.Name, s.Parent)
+		return
+	}
+	e.warn.Addf("state %q: SCXML cannot leave an invoked machine through its exit point; the transitions leaving it are not written", s.Name)
+}
+
+// targets returns the transition's targets, with each entry point of a
+// submachine state, which is not written, replaced by that state.
+func (e *emitter) targets(t *model.Transition) []string {
+	out := make([]string, len(t.Targets))
+	for i, tg := range t.Targets {
+		out[i] = tg
+		if e.sm.IsReference(tg) {
+			out[i] = e.sm.State(tg).Parent
+		}
+	}
+	return out
 }
 
 // scxmlTransitions rewrites the transitions leaving s into the forms an SCXML

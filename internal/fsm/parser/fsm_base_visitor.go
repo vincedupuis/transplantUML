@@ -55,6 +55,10 @@ func (v *BasefsmVisitor) VisitPoint(ctx *PointContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasefsmVisitor) VisitReference(ctx *ReferenceContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasefsmVisitor) VisitHistory(ctx *HistoryContext) interface{} {
 	return v.VisitChildren(ctx)
 }

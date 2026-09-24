@@ -25,7 +25,7 @@ parallel
 submachine
     :   Note? Initial? 'submachine' Identifier stereotype?
         '{'
-            event*
+            (point | reference | event)*
         '}'
     ;
 
@@ -75,6 +75,10 @@ join
 
 point
     :   Note? kind=('entry' | 'exit') 'point' Identifier stereotype? actions? goto
+    ;
+
+reference
+    :   Note? 'entry' 'point' Identifier stereotype?
     ;
 
 history

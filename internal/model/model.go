@@ -30,8 +30,8 @@ const (
 	Junction       StateKind = "junction"    // static branch/merge point
 	Fork           StateKind = "fork"        // one incoming, one outgoing transition per region
 	Join           StateKind = "join"        // one incoming per region, one outgoing
-	EntryPoint     StateKind = "entry-point" // named entry port on a compound state
-	ExitPoint      StateKind = "exit-point"  // named exit port on a compound state
+	EntryPoint     StateKind = "entry-point" // named entry port on a compound state, or a reference to one on a submachine state
+	ExitPoint      StateKind = "exit-point"  // named exit port on a compound state, or a reference to one on a submachine state
 	Terminate      StateKind = "terminate"   // ends the whole machine, no exit actions
 )
 
@@ -153,6 +153,19 @@ func (sm *StateMachine) Children(parent string) []*State {
 		}
 	}
 	return out
+}
+
+// IsReference reports whether the named state is an entry or exit point of a
+// submachine state: UML's connection point reference, which stands for the
+// point of the same name in the referenced machine. An entry point's path
+// continues inside that machine, and an exit point is reached from there.
+func (sm *StateMachine) IsReference(name string) bool {
+	s := sm.State(name)
+	if s == nil || (s.Kind != EntryPoint && s.Kind != ExitPoint) || s.Parent == "" {
+		return false
+	}
+	p := sm.State(s.Parent)
+	return p != nil && p.Submachine != ""
 }
 
 // RootStates is shorthand for Children("").
@@ -277,6 +290,8 @@ func (sm *StateMachine) Validate() error {
 				fail("state %q: unknown parent %q", s.Name, s.Parent)
 			case p.IsPseudo():
 				fail("state %q: parent %q is a %s state and cannot have children", s.Name, s.Parent, p.Kind)
+			case p.Submachine != "" && s.Kind != EntryPoint && s.Kind != ExitPoint:
+				fail("state %q: submachine state %q holds only the entry and exit points it references, not a %s state", s.Name, s.Parent, s.Kind)
 			}
 		} else if s.IsHistory() {
 			fail("state %q: history states must be nested in a state", s.Name)
@@ -396,6 +411,14 @@ func (sm *StateMachine) Validate() error {
 		case Join:
 			if in < 2 || out != 1 {
 				fail("state %q: a join needs at least two incoming transitions and exactly one outgoing, has %d and %d", s.Name, in, out)
+			}
+		case EntryPoint:
+			if sm.IsReference(s.Name) && out > 0 {
+				fail("state %q: an entry point of a submachine state leads on inside the machine it refers to, so it has no outgoing transition", s.Name)
+			}
+		case ExitPoint:
+			if sm.IsReference(s.Name) && len(sm.IncomingTransitions(s.Name)) > 0 {
+				fail("state %q: an exit point of a submachine state is reached from the machine it refers to, so it has no incoming transition", s.Name)
 			}
 		case HistoryShallow, HistoryDeep:
 			if out > 1 {

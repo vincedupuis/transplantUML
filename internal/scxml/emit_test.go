@@ -77,6 +77,39 @@ func TestEmitWarnings(t *testing.T) {
 	}
 }
 
+// An invoked SCXML machine has no entry or exit points to use, so a submachine
+// state's references are left out: entering one enters the submachine state,
+// and what leaves one is dropped.
+func TestEmitReferences(t *testing.T) {
+	sm := &model.StateMachine{
+		Initial: "a",
+		States: []*model.State{
+			{Name: "a", Kind: model.Normal},
+			{Name: "s", Kind: model.Normal, Submachine: "help"},
+			{Name: "in", Parent: "s", Kind: model.EntryPoint},
+			{Name: "out", Parent: "s", Kind: model.ExitPoint},
+		},
+		Transitions: []*model.Transition{
+			{Source: "a", Targets: []string{"in"}, Event: "e"},
+			{Source: "out", Targets: []string{"a"}},
+		},
+	}
+	out, warnings, err := Emitter{}.Emit(sm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), `<transition event="e" target="s"/>`) || strings.Contains(string(out), `"in"`) || strings.Contains(string(out), `"out"`) {
+		t.Errorf("references not left out:\n%s", out)
+	}
+	want := []string{
+		`state "in": SCXML cannot enter an invoked machine through its entry point; transitions to it enter "s" instead`,
+		`state "out": SCXML cannot leave an invoked machine through its exit point; the transitions leaving it are not written`,
+	}
+	if !reflect.DeepEqual([]string(warnings), want) {
+		t.Errorf("warnings =\n%s\nwant\n%s", strings.Join(warnings, "\n"), strings.Join(want, "\n"))
+	}
+}
+
 // The extension namespace is declared only when something uses it.
 func TestEmitDeclaresExtensionOnlyWhenUsed(t *testing.T) {
 	if out := emit(t, parseFile(t, "testdata/edge.scxml")); strings.Contains(string(out), "xmlns:tpuml") {

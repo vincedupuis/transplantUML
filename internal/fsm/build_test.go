@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"fmt"
 	"maps"
 	"os"
 	"slices"
@@ -601,6 +602,35 @@ func TestBuildInitialPseudostate(t *testing.T) {
 	}
 }
 
+// A submachine state lists the entry and exit points it uses from the machine
+// it refers to. An entry point is reached like any state, and an exit point's
+// goto final ends the scope around the submachine state.
+func TestBuildSubmachinePoints(t *testing.T) {
+	sm := build(t, `fsm m {
+		initial state s {
+			initial state a { on e goto urgent }
+			submachine help {
+				entry point urgent
+				exit point solved / thank goto a
+				exit point failed goto final
+			}
+		}
+	}`)
+	for name, kind := range map[string]model.StateKind{"urgent": model.EntryPoint, "solved": model.ExitPoint, "failed": model.ExitPoint} {
+		if got := sm.State(name); got == nil || got.Kind != kind || got.Parent != "help" || !sm.IsReference(name) {
+			t.Errorf("%s = %+v, want a %s of help", name, got, kind)
+		}
+	}
+	var got []string
+	for _, tr := range sm.Transitions {
+		got = append(got, fmt.Sprintf("%s -> %s %v", tr.Source, strings.Join(tr.Targets, " "), tr.Actions))
+	}
+	want := []string{"a -> urgent []", "solved -> a [thank]", "failed -> s.final []"}
+	if !slices.Equal(got, want) {
+		t.Errorf("transitions = %q, want %q", got, want)
+	}
+}
+
 // A choice or junction with a single branch may write it on the declaring
 // line. It holds that one branch only, so the next clause belongs to the
 // enclosing state.
@@ -643,7 +673,9 @@ func TestBuildErrors(t *testing.T) {
 		"fsm m { | n | goto a state a {} }":                                                 `put "goto a" inside a state`,
 		"fsm m { state a { invariant [x] invariant [y] } }":                                 `state "a" already has the invariant [x]`,
 		"fsm m { invariant [x] state a {} }":                                                `put "invariant [x]" inside a state`,
-		"fsm m { submachine a { on e goto H } }":                                            `state "a" has no children, so it has no history`,
+		"fsm m { submachine a { on e goto H } }":                                            `submachine state "a" has no history of its own`,
+		"fsm m { submachine a { entry point e } state b { on e goto a.H } }":                `submachine state "a" has no history of its own`,
+		"fsm m { initial state s { on e goto a } submachine a { entry point e goto s } }":   `entry point "e" leads into the machine "a" refers to, so it takes no goto`,
 		"fsm m { state a { H goto a } }":                                                    `state "a" has no children, so it has no history`,
 		"fsm m { state a { H } }":                                                           `state "a" has no children, so it has no history`,
 		"fsm m { state a { H goto b | n | H goto b state b {} } }":                          `state "a" declares H twice`,

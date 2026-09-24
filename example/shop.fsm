@@ -1,9 +1,10 @@
 # Every state kind of the fsm language: a parallel state and its regions, a
-# submachine state, choice and junction with an else branch, fork and join,
-# entry and exit points on a state and on the machine itself, completion
-# transitions, goto terminate and goto final, the shallow and deep history of
-# another state, a named final state, a note on an unnamed terminate and on a
-# history, a choice as a state's initial child, and a stereotype.
+# submachine state and the entry and exit points it references, choice and
+# junction with an else branch, fork and join, entry and exit points on a state
+# and on the machine itself, completion transitions, goto terminate and goto
+# final, the shallow and deep history of another state, a named final state, a
+# note on an unnamed terminate and on a history, a choice as a state's initial
+# child, and a stereotype.
 
 fsm shop {
   entry point reorder / loadBasket goto checkout
@@ -12,9 +13,12 @@ fsm shop {
     on quickBuy goto express
     on fraud goto terminate
     on help goto support
+    on emergency goto urgent
   }
   submachine support {
     entry / openChat
+    entry point urgent
+    exit point escalated / page goto checkout
     goto browsing
   }
   state checkout <<secure>> {
