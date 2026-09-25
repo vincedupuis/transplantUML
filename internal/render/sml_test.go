@@ -90,12 +90,12 @@ func TestSMLGolden(t *testing.T) {
 // The files come in the order an include needs them, named after the machine.
 func TestSMLFiles(t *testing.T) {
 	files, _ := smlFiles(t, &model.StateMachine{})
-	want := []string{"MachineFsmEvents.h", "MachineFsmActions.h", "MachineFsm.h", "MachineFsm.cpp"}
+	want := []string{"FsmTimers.h", "MachineFsmEvents.h", "MachineFsmActions.h", "MachineFsm.h", "MachineFsm.cpp"}
 	if got := fileNames(files); !reflect.DeepEqual(got, want) {
 		t.Errorf("files = %v, want %v", got, want)
 	}
 	files, _ = smlFiles(t, &model.StateMachine{Name: "my-coffee machine"})
-	if got := files[0].Name; got != "MyCoffeeMachineFsmEvents.h" {
+	if got := files[1].Name; got != "MyCoffeeMachineFsmEvents.h" {
 		t.Errorf("first file = %q", got)
 	}
 }
@@ -114,9 +114,7 @@ func TestSMLWarnings(t *testing.T) {
 		`state "sync": Boost.SML has no join; transitions to it end their region (X), and its outgoing transition is taken once every region of "both" has ended`,
 		`the entry behaviour of "work": the action "log('start')" is not a name; it is not written`,
 		`state "work": Boost.SML has no do activities; invoke(job.py, http://example.com/worker) is written as a comment`,
-		`transition work -> check: Boost.SML has no time triggers; written on the event after_5s, which the application raises 5s after entering work`,
 		`transition work -> check: the action "retries = retries + 1" is not a name; it is not written`,
-		`transition work -> check: Boost.SML has no time triggers; written on the event after_retryDelay, which the application raises retryDelay after entering work`,
 		`the exit behaviour of "outer": the action "log('bye')" is not a name; it is not written`,
 	}
 	if !reflect.DeepEqual([]string(warnings), want) {
@@ -281,15 +279,17 @@ func smlToolchain(t *testing.T) (cxx, include string) {
 }
 
 var (
-	pureVirtual = regexp.MustCompile(`(?m)^    virtual (bool|void) ([A-Za-z0-9_]+)\(\)( const)? = 0;$`)
+	pureVirtual = regexp.MustCompile(`(?m)^    virtual (bool|void|std::chrono::milliseconds) ([A-Za-z0-9_]+)\(\)( const)? = 0;$`)
 	className   = regexp.MustCompile(`(?m)^class ([A-Za-z0-9_]+) \{$`)
-	constructor = regexp.MustCompile(`(?m)^    explicit ([A-Za-z0-9_]+)\([A-Za-z0-9_]+& actions((?:, [A-Za-z0-9_]+& [A-Za-z0-9_]+)*)\);$`)
+	constructor = regexp.MustCompile(`(?m)^    explicit ([A-Za-z0-9_]+)\([A-Za-z0-9_]+& actions(, FsmTimers& timers)?((?:, [A-Za-z0-9_]+& [A-Za-z0-9_]+)*)\);$`)
 	machineArg  = regexp.MustCompile(`, ([A-Za-z0-9_]+)& ([A-Za-z0-9_]+)`)
 )
 
-// smlStubs returns the includes of every state machine among files and, for
-// each actions interface, a struct implementing it: its guards return false,
-// and its actions append their name to trace.
+// smlStubs returns the includes of every state machine among files, timers
+// that record which delays start and are cancelled and fire only when told
+// to, and, for each actions interface, a struct implementing it: its guards
+// return false, its actions append their name to trace, and its delays are a
+// second.
 func smlStubs(files []File) string {
 	var b strings.Builder
 	for _, f := range files {
@@ -297,7 +297,27 @@ func smlStubs(files []File) string {
 			b.WriteString("#include \"" + f.Name + "\"\n")
 		}
 	}
-	b.WriteString("\n#include <string>\n#include <vector>\n\nstd::vector<std::string> trace;\n")
+	b.WriteString(`#include "FsmTimers.h"
+
+#include <string>
+#include <vector>
+
+std::vector<std::string> trace;
+
+struct StubTimers : FsmTimers {
+  Id startTimer(std::chrono::milliseconds delay, std::function<void()> fire) override {
+    trace.push_back("start " + std::to_string(delay.count()));
+    delays.push_back(delay.count());
+    fires.push_back(std::move(fire));
+    return fires.size() - 1;
+  }
+  void cancelTimer(Id id) override { trace.push_back("cancel " + std::to_string(delays[id])); }
+  // Fires the timer id, as many times as it is called.
+  void fire(Id id) { fires[id](); }
+  std::vector<long long> delays;
+  std::vector<std::function<void()>> fires;
+};
+`)
 	for _, f := range files {
 		if !strings.HasSuffix(f.Name, "Actions.h") {
 			continue
@@ -305,9 +325,12 @@ func smlStubs(files []File) string {
 		class := className.FindStringSubmatch(f.Content)[1]
 		b.WriteString("\nstruct Stub" + class + " : " + class + " {\n")
 		for _, m := range pureVirtual.FindAllStringSubmatch(f.Content, -1) {
-			if m[1] == "bool" {
+			switch m[1] {
+			case "bool":
 				b.WriteString("  bool " + m[2] + "()" + m[3] + " override { return false; }\n")
-			} else {
+			case "std::chrono::milliseconds":
+				b.WriteString("  std::chrono::milliseconds " + m[2] + "() const override { return std::chrono::seconds{1}; }\n")
+			default:
 				b.WriteString("  void " + m[2] + "() override { trace.push_back(\"" + m[2] + "\"); }\n")
 			}
 		}
@@ -317,8 +340,9 @@ func smlStubs(files []File) string {
 }
 
 // smlConstruct returns the statements that build the state machine fsm.h
-// declares as the variable fsm, from a stub of its actions and a machine of
-// its own for each submachine state.
+// declares as the variable fsm, from a stub of its actions, the stub timers
+// timers when it has time triggers, and a machine of its own for each
+// submachine state.
 func smlConstruct(files []File, fsm string) string {
 	var header string
 	for _, f := range files {
@@ -330,7 +354,11 @@ func smlConstruct(files []File, fsm string) string {
 	var b strings.Builder
 	args := "stub" + fsm + "Actions"
 	b.WriteString("  Stub" + fsm + "Actions " + args + ";\n")
-	for _, arg := range machineArg.FindAllStringSubmatch(m[2], -1) {
+	if m[2] != "" {
+		b.WriteString("  StubTimers timers;\n")
+		args += ", timers"
+	}
+	for _, arg := range machineArg.FindAllStringSubmatch(m[3], -1) {
 		b.WriteString("  Stub" + arg[1] + "Actions " + arg[2] + "Actions;\n")
 		b.WriteString("  " + arg[1] + " " + arg[2] + "{" + arg[2] + "Actions};\n")
 		args += ", " + arg[2]
@@ -604,5 +632,167 @@ ask:
 `
 	if string(out) != want {
 		t.Errorf("the program printed\n%s\nwant\n%s", out, want)
+	}
+}
+
+// oven has timers on a composite state, one with a named delay whose
+// transition is internal, one on a nested state, and a terminate.
+const oven = `fsm oven {
+  initial state idle { on start goto baking }
+  state baking {
+    after(30s) / ding goto idle
+    after(preheat) / ready
+    on open goto idle
+    on burn goto terminate
+    initial state low { on hot goto high }
+    state high { after(250ms) / beep goto low }
+  }
+}`
+
+// A state starts its timers when it is entered and cancels them when it is
+// left, a timer that fired is not cancelled, and one that fires after its
+// state was left, or after the machine was terminated or stopped, does
+// nothing.
+func TestSMLTimersRun(t *testing.T) {
+	cxx, include := smlToolchain(t)
+	sm, _, err := fsmParser.Parse([]byte(oven))
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, _ := smlFiles(t, sm)
+	main := smlStubs(files) + `
+#include <cstdio>
+
+void step(const char* what) {
+  std::printf("%s:", what);
+  for (const auto& action : trace) {
+    std::printf(" %s", action.c_str());
+  }
+  std::printf("\n");
+  trace.clear();
+}
+
+int main() {
+` + smlConstruct(files, "OvenFsm") + `  fsm.enterFsm();
+  step("enter");
+  fsm.start();
+  step("start");
+  fsm.hot();
+  step("hot");
+  timers.fire(2);
+  step("fire 250ms");
+  timers.fire(2);
+  step("fire 250ms again");
+  timers.fire(1);
+  step("fire preheat");
+  fsm.hot();
+  fsm.open();
+  step("hot, open");
+  timers.fire(0);
+  step("fire the 30s of the first visit");
+  fsm.start();
+  fsm.burn();
+  step("start, burn");
+  timers.fire(4);
+  step("fire the 30s before burn");
+  fsm.enterFsm();
+  fsm.start();
+  fsm.stopFsm();
+  step("enter, start, stopFsm");
+  fsm.enterFsm();
+  fsm.start();
+  timers.fire(8);
+  step("enter, start, fire 30s");
+}
+`
+	dir := t.TempDir()
+	sources := smlWrite(t, dir, files, main)
+	program := filepath.Join(dir, "program")
+	args := append([]string{"-std=c++20", "-Wall", "-Wextra", "-Werror", "-I", include, "-o", program}, sources...)
+	if out, err := exec.Command(cxx, args...).CombinedOutput(); err != nil {
+		t.Fatalf("the rendered files do not compile: %v\n%s", err, out)
+	}
+	out, err := exec.Command(program).CombinedOutput()
+	if err != nil {
+		t.Fatalf("the program failed: %v\n%s", err, out)
+	}
+	want := `enter:
+start: start 30000 start 1000
+hot: start 250
+fire 250ms: beep
+fire 250ms again:
+fire preheat: ready
+hot, open: start 250 cancel 250 cancel 30000
+fire the 30s of the first visit:
+start, burn: start 30000 start 1000 cancel 30000 cancel 1000
+fire the 30s before burn:
+enter, start, stopFsm: start 30000 start 1000 cancel 30000 cancel 1000
+enter, start, fire 30s: start 30000 start 1000 cancel 1000 ding
+`
+	if string(out) != want {
+		t.Errorf("the program printed\n%s\nwant\n%s", out, want)
+	}
+}
+
+// A delay becomes a std::chrono duration, in seconds when it is whole ones. A
+// named delay is read from the actions. A timer on a region that holds states
+// starts with its orthogonal state. What has to be rounded, is not a delay, or clashes with a
+// guard is said.
+func TestSMLDelays(t *testing.T) {
+	sm := &model.StateMachine{
+		Name: "d", Initial: "a",
+		States: []*model.State{
+			{Name: "a", Kind: model.Normal},
+			{Name: "p", Kind: model.Parallel},
+			{Name: "r1", Parent: "p", Kind: model.Normal, Initial: "b"},
+			{Name: "b", Parent: "r1", Kind: model.Normal},
+			{Name: "r2", Parent: "p", Kind: model.Normal},
+		},
+		Transitions: []*model.Transition{
+			{Source: "a", Targets: []string{"p"}, After: "1.5s"},
+			{Source: "a", Targets: []string{"p"}, After: "2.0s"},
+			{Source: "a", Targets: []string{"p"}, After: "250ms"},
+			{Source: "a", Targets: []string{"p"}, After: "1.2345s"},
+			{Source: "a", Targets: []string{"p"}, After: "x + 1"},
+			{Source: "a", Targets: []string{"p"}, After: "ok", Cond: "ok"},
+			{Source: "r1", Targets: []string{"a"}, After: "3s"},
+		},
+	}
+	if err := sm.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	files, warnings := smlFiles(t, sm)
+	wantWarnings := []string{
+		`transition a -> p: the delay 1.2345s is rounded down to whole milliseconds`,
+		`transition a -> p: the delay "x + 1" is neither a duration nor a name; no timer is written for it`,
+		`transition r1 -> a: Boost.SML has no transitions from inside a composite state; written as a transition of "p"`,
+		`delay "ok": its method ok clashes with a guard or action of that name; the files do not compile`,
+	}
+	if !reflect.DeepEqual([]string(warnings), wantWarnings) {
+		t.Errorf("warnings =\n%s\nwant\n%s", strings.Join(warnings, "\n"), strings.Join(wantWarnings, "\n"))
+	}
+	content := map[string]string{}
+	for _, f := range files {
+		content[f.Name] = f.Content
+	}
+	for name, wants := range map[string][]string{
+		"DFsmActions.h": {"\n    virtual std::chrono::milliseconds ok() const = 0;\n"},
+		"DFsm.cpp": {
+			"t.start(::timers::a_after_1_5s, std::chrono::milliseconds{1500}); }",
+			"t.start(::timers::a_after_2_0s, std::chrono::seconds{2}); }",
+			"t.start(::timers::a_after_250ms, std::chrono::milliseconds{250}); }",
+			"t.start(::timers::a_after_1_2345s, std::chrono::milliseconds{1234}); }",
+			"[](::timers& t, const DFsmActions& actions) { t.start(::timers::a_after_ok, actions.ok()); }",
+			"\n            sml::state<p> + sml::on_entry<sml::_> / [](::timers& t) { t.start(::timers::r1_after_3s, std::chrono::seconds{3}); },\n",
+		},
+	} {
+		for _, want := range wants {
+			if !strings.Contains(content[name], want) {
+				t.Errorf("%s lacks %q:\n%s", name, want, content[name])
+			}
+		}
+	}
+	if strings.Contains(content["DFsm.cpp"], "x + 1") && strings.Contains(content["DFsm.cpp"], "t.start(::timers::a_after_x") {
+		t.Errorf("a delay that is not one starts a timer:\n%s", content["DFsm.cpp"])
 	}
 }

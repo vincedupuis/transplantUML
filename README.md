@@ -48,7 +48,7 @@ symbol, and so on. Warnings go to stderr and never fail the conversion.
 | State invariant                        | `Invariant`                                           | `tpuml:invariant`                                       | `X : [ cond ]`                                      | comment                                   |
 | Variables                              | `Variables` on the machine / the state                | `<datamodel>`                                           | `legend` / `X : name = value`                       | comment; the actions hold them            |
 | Trigger, guard, effect                 | `Event`, `Cond`, `Actions`                            | `event`, `cond`, executable content                     | `A --> B : ev [ g ] / act`                          | event method, guard and action methods    |
-| Time trigger `after(5s)`               | `After`                                               | `<send delay(expr)>` in `<onentry>`, `<cancel>` on exit | `after(5s)`                                         | `sml::event<after_5s>` ⚠                  |
+| Time trigger `after(5s)`               | `After`                                               | `<send delay(expr)>` in `<onentry>`, `<cancel>` on exit | `after(5s)`                                         | a timer through `FsmTimers`               |
 | Completion transition                  | no `Event`, no `After`                                | eventless, or on `done.state` / `done.invoke`           | unlabelled arrow                                    | anonymous transition                      |
 | External / local / internal transition | `Kind`                                                | `type="internal"`; `tpuml:kind="local"` ⚠               | `X : ev / act` for internal; local drawn external ⚠ | no target for internal; local ⚠           |
 | Note                                   | `Note` on the machine, a state, a transition          | `<tpuml:note>`                                          | `note`, `note on link`                              | `//` comment                              |
@@ -129,7 +129,7 @@ tpuml: warning: state "work": SCXML has no deferred events; written as tpuml:def
 # SCXML -> PlantUML with the built-in template
 fsm -i example/coffee-machine.scxml -o coffee.puml
 
-# fsm -> C++ state machine on Boost.SML, four files in gen/
+# fsm -> C++ state machine on Boost.SML, five files in gen/
 fsm -i example/kiosk.fsm -t sml -o gen/
 
 # SCXML -> your own template
@@ -312,7 +312,7 @@ It draws everything in the coverage table above. Things to know:
 ### The built-in Boost.SML template
 
 `-t sml` writes a state machine in C++20 on [Boost.SML](https://github.com/boost-ext/sml) ([`assets/sml.gotmpl`](assets/sml.gotmpl)).
-It writes four files, into the folder `-o` names, each named after the machine:
+It writes four files named after the machine, and `FsmTimers.h`, into the folder `-o` names:
 
 ```bash
 fsm -i example/kiosk.fsm -t sml -o gen/
@@ -320,6 +320,8 @@ fsm -i example/kiosk.fsm -t sml -o gen/
 
 | File                | Holds                                                                        |
 |---------------------|------------------------------------------------------------------------------|
+| `FsmTimers.h`       | `class FsmTimers`, the interface that starts and cancels timers, the same    |
+|                     | for every machine                                                            |
 | `KioskFsmEvents.h`  | `class KioskFsmEvents`, the interface with one method per event              |
 | `KioskFsmActions.h` | `class KioskFsmActions`, the interface with the guards and actions to supply |
 | `KioskFsm.h`        | `class KioskFsm`, the state machine, which implements `KioskFsmEvents`       |
@@ -335,11 +337,13 @@ The application implements the actions and sends the events:
 class Kiosk : public KioskFsmActions {
     bool inStock() const override;                  // a guard returns bool and is const
     void addLine() override;                        // an action returns nothing
+    std::chrono::milliseconds authTimeout() const override;  // a named delay, after(authTimeout)
     // ...
 };
 
 Kiosk kiosk;
-KioskFsm fsm{kiosk};
+Timers timers;                                      // implements FsmTimers
+KioskFsm fsm{kiosk, timers};
 fsm.enterFsm();
 fsm.touch();
 ```
@@ -357,6 +361,32 @@ not compile.
 `onTerminated()` is called when it reaches a terminate state, at any depth, once the current event is done.
 `onExitP()` is called when it leaves by its exit point `p`.
 The machine stops before telling it.
+
+### Time triggers
+
+A machine with time triggers takes an `FsmTimers` in its constructor.
+`FsmTimers.h` is the same for every machine, so one implementation serves them all:
+
+```cpp
+class Timers : public FsmTimers {
+public:
+    Id startTimer(std::chrono::milliseconds delay, std::function<void()> fire) override;
+    void cancelTimer(Id id) override;
+};
+```
+
+- Each state has a timer per delay of its time triggers.
+  Entering the state starts it, after the state's entry behaviour.
+  Leaving the state cancels it, before the state's exit behaviour.
+- An orthogonal state starts and cancels the timers of its regions.
+- `fire` makes the machine process the timer's event, which only the timer can send.
+  Call it on the thread that sends the machine its events, and never from within `startTimer` or `cancelTimer`.
+- A timer that fires after its state was left, or after the machine was stopped or terminated, does nothing.
+  So cancelling a timer need not be exact.
+- `after(90s)` is written as `std::chrono::seconds{90}`, and `after(1.5s)` as `std::chrono::milliseconds{1500}`.
+  A delay finer than a millisecond is rounded down, with a warning.
+- A named delay, `after(authTimeout)`, is a method of the actions interface, read each time the timer starts.
+- Any other delay, such as SCXML's `delayexpr="t * 2"`, starts no timer, with a warning.
 
 ### Submachine states
 
@@ -424,8 +454,8 @@ Things to know:
   Inside a state, an effect on the initial transition goes through a transient state,
   `*"outer.initial"_s / greet = "inner"_s`.
 - Deferred events use SML's `defer_queue` policy.
-- A time trigger `after(90s)` becomes the event `after_90s`, which the application sends 90 seconds after entering
-  the state; it warns.
+- A time trigger `after(90s)` in the state `ordering` fires the event `internal::ordering_after_90s`, through a
+  timer (see [Time triggers](#time-triggers)).
 - A join ends each region that reaches it in `X`.
   Its outgoing transition becomes the orthogonal state's completion transition, taken once every region has ended.
 - Notes, stereotypes and invariants become `//` comments in `KioskFsm.cpp`, the machine's note goes on the class,

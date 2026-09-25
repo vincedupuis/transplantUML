@@ -3,6 +3,9 @@
 
 #include <boost/sml.hpp>
 #include <deque>
+#include <functional>
+#include <memory>
+#include <utility>
 
 namespace {
 
@@ -11,7 +14,6 @@ namespace sml = boost::sml;
 namespace event {
 struct touch {};
 struct abandon {};
-struct after_90s {};
 struct resume {};
 struct back {};
 struct add {};
@@ -20,7 +22,6 @@ struct checkout {};
 struct approved {};
 struct declined {};
 struct cancel {};
-struct after_authTimeout {};
 struct card {};
 struct ack {};
 }  // namespace event
@@ -30,7 +31,55 @@ namespace internal {
 struct stopped {};
 struct enter {};
 struct stop {};
+struct ordering_after_90s {};
+struct authorizing_after_authTimeout {};
 }  // namespace internal
+
+// The timers of the time triggers. A state starts its timers when it is entered
+// and cancels them when it is left. A timer that fires after that, or after the
+// machine was rebuilt, does nothing.
+struct timers {
+    enum id { ordering_after_90s, authorizing_after_authTimeout };
+
+    timers(FsmTimers& service, std::function<void(id)> fire) : service{service}, fire{std::move(fire)} {}
+    timers(const timers&) = delete;
+    timers& operator=(const timers&) = delete;
+    ~timers() {
+        for (auto& slot : slots) {
+            if (slot.running) {
+                service.cancelTimer(slot.handle);
+            }
+        }
+    }
+
+    void start(id timer, std::chrono::milliseconds delay) {
+        cancel(timer);
+        auto& slot = slots[timer];
+        slot.running = std::make_shared<bool>();
+        slot.handle = service.startTimer(delay, [this, timer, running = std::weak_ptr<bool>{slot.running}] {
+            if (!running.expired()) {
+                slots[timer].running.reset();
+                fire(timer);
+            }
+        });
+    }
+
+    void cancel(id timer) {
+        auto& slot = slots[timer];
+        if (slot.running) {
+            slot.running.reset();
+            service.cancelTimer(slot.handle);
+        }
+    }
+
+    FsmTimers& service;
+    std::function<void(id)> fire;
+    // running is set while the timer runs; its callback watches it.
+    struct {
+        FsmTimers::Id handle = 0;
+        std::shared_ptr<bool> running;
+    } slots[2];
+};
 
 // The composite state "paying".
 struct paying {
@@ -39,10 +88,12 @@ struct paying {
         const auto retries = [](const KioskFsmActions& actions) { return actions.retries(); };
         const auto warn = [](KioskFsmActions& actions) { actions.warn(); };
         return sml::make_transition_table(
+            *"authorizing"_s + sml::on_entry<sml::_> / [](::timers& t, const KioskFsmActions& actions) { t.start(::timers::authorizing_after_authTimeout, actions.authTimeout()); },
+            "authorizing"_s + sml::on_exit<sml::_> / [](::timers& t) { t.cancel(::timers::authorizing_after_authTimeout); },
             // do / spin
             // Until the bank answers.
-            *"authorizing"_s + sml::event<event::touch> / sml::defer,
-            "authorizing"_s + sml::event<event::after_authTimeout> [retries] / warn = "again"_s,
+            "authorizing"_s + sml::event<event::touch> / sml::defer,
+            "authorizing"_s + sml::event<::internal::authorizing_after_authTimeout> [retries] / warn = "again"_s,
             "again"_s + sml::event<event::card> = "authorizing"_s
         );
     }
@@ -93,11 +144,11 @@ struct machine {
             *sml::state<::internal::stopped> + sml::event<::internal::enter> / boot = "idle"_s,
             "idle"_s + sml::on_entry<sml::_> / dim,
             "idle"_s + sml::event<event::touch> / wake = sml::state<ordering>,
-            sml::state<ordering> + sml::on_entry<sml::_> / newBasket,
-            sml::state<ordering> + sml::on_exit<sml::_> / (clearBasket, unlock),
+            sml::state<ordering> + sml::on_entry<sml::_> / (newBasket, [](::timers& t) { t.start(::timers::ordering_after_90s, std::chrono::seconds{90}); }),
+            sml::state<ordering> + sml::on_exit<sml::_> / ([](::timers& t) { t.cancel(::timers::ordering_after_90s); }, clearBasket, unlock),
             sml::state<ordering> + sml::event<event::abandon> = "idle"_s,
             // Nobody touched the screen.
-            sml::state<ordering> + sml::event<event::after_90s> = "idle"_s,
+            sml::state<ordering> + sml::event<::internal::ordering_after_90s> = "idle"_s,
             sml::state<ordering> + sml::event<event::resume> = sml::state<ordering>,
             sml::state<ordering> + sml::event<event::back> = sml::state<ordering>,
             sml::state<ordering> + sml::event<event::approved> / receipt = "done"_s,
@@ -113,13 +164,17 @@ struct machine {
 }  // namespace
 
 struct KioskFsm::Machine {
-    explicit Machine(KioskFsmActions& actions) : sm{actions} {}
+    Machine(KioskFsm& fsm, KioskFsmActions& actions, FsmTimers& service)
+        : timers{service, [fsm = &fsm](::timers::id timer) { fsm->fireTimer(timer); }},
+          sm{actions, timers} {}
+    ::timers timers;
     sml::sm<machine, sml::defer_queue<std::deque>> sm;
 };
 
-KioskFsm::KioskFsm(KioskFsmActions& actions)
+KioskFsm::KioskFsm(KioskFsmActions& actions, FsmTimers& timers)
     : actions_{actions},
-      machine_{std::make_unique<Machine>(actions)} {}
+      timers_{timers},
+      machine_{std::make_unique<Machine>(*this, actions, timers)} {}
 
 KioskFsm::~KioskFsm() = default;
 
@@ -140,7 +195,7 @@ void KioskFsm::stopFsm() {
 
 void KioskFsm::terminateFsm() {
     machine_.reset();
-    machine_ = std::make_unique<Machine>(actions_);
+    machine_ = std::make_unique<Machine>(*this, actions_, timers_);
 }
 
 void KioskFsm::setListener(KioskFsmListener* listener) {
@@ -157,6 +212,19 @@ void KioskFsm::report() {
     }
 }
 
+void KioskFsm::fireTimer(int timer) {
+    switch (timer) {
+    case ::timers::ordering_after_90s:
+        machine_->sm.process_event(internal::ordering_after_90s{});
+        report();
+        break;
+    case ::timers::authorizing_after_authTimeout:
+        machine_->sm.process_event(internal::authorizing_after_authTimeout{});
+        report();
+        break;
+    }
+}
+
 void KioskFsm::touch() {
     machine_->sm.process_event(event::touch{});
     report();
@@ -164,11 +232,6 @@ void KioskFsm::touch() {
 
 void KioskFsm::abandon() {
     machine_->sm.process_event(event::abandon{});
-    report();
-}
-
-void KioskFsm::after_90s() {
-    machine_->sm.process_event(event::after_90s{});
     report();
 }
 
@@ -209,11 +272,6 @@ void KioskFsm::declined() {
 
 void KioskFsm::cancel() {
     machine_->sm.process_event(event::cancel{});
-    report();
-}
-
-void KioskFsm::after_authTimeout() {
-    machine_->sm.process_event(event::after_authTimeout{});
     report();
 }
 

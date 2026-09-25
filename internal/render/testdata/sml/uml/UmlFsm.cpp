@@ -5,6 +5,7 @@
 #include <boost/sml.hpp>
 #include <deque>
 #include <functional>
+#include <memory>
 #include <utility>
 
 namespace {
@@ -14,8 +15,6 @@ namespace sml = boost::sml;
 namespace event {
 struct pause {};
 struct resume {};
-struct after_5s {};
-struct after_retryDelay {};
 struct split {};
 struct abort {};
 struct enter {};
@@ -32,6 +31,8 @@ namespace internal {
 struct stopped {};
 struct enter {};
 struct stop {};
+struct work_after_5s {};
+struct work_after_retryDelay {};
 struct terminated {};
 struct sub_finished {};
 }  // namespace internal
@@ -40,6 +41,52 @@ struct sub_finished {};
 // runs: it ends once the current event is done.
 struct status {
     bool terminated = false;
+};
+
+// The timers of the time triggers. A state starts its timers when it is entered
+// and cancels them when it is left. A timer that fires after that, or after the
+// machine was rebuilt, does nothing.
+struct timers {
+    enum id { work_after_5s, work_after_retryDelay };
+
+    timers(FsmTimers& service, std::function<void(id)> fire) : service{service}, fire{std::move(fire)} {}
+    timers(const timers&) = delete;
+    timers& operator=(const timers&) = delete;
+    ~timers() {
+        for (auto& slot : slots) {
+            if (slot.running) {
+                service.cancelTimer(slot.handle);
+            }
+        }
+    }
+
+    void start(id timer, std::chrono::milliseconds delay) {
+        cancel(timer);
+        auto& slot = slots[timer];
+        slot.running = std::make_shared<bool>();
+        slot.handle = service.startTimer(delay, [this, timer, running = std::weak_ptr<bool>{slot.running}] {
+            if (!running.expired()) {
+                slots[timer].running.reset();
+                fire(timer);
+            }
+        });
+    }
+
+    void cancel(id timer) {
+        auto& slot = slots[timer];
+        if (slot.running) {
+            slot.running.reset();
+            service.cancelTimer(slot.handle);
+        }
+    }
+
+    FsmTimers& service;
+    std::function<void(id)> fire;
+    // running is set while the timer runs; its callback watches it.
+    struct {
+        FsmTimers::Id handle = 0;
+        std::shared_ptr<bool> running;
+    } slots[2];
 };
 
 // The machines the submachine states run, and the entry point each starts at next.
@@ -75,6 +122,7 @@ struct outer {
 struct machine {
     auto operator()() const {
         using namespace sml::literals;
+        using sml::operator!, sml::operator&&, sml::operator||, sml::operator,;
         return sml::make_transition_table(
             *sml::state<::internal::stopped> + sml::event<::internal::enter> = "check"_s,
             // "check"_s [retries > 3] = sml::X
@@ -87,15 +135,16 @@ struct machine {
             // Never negative.
             // variable: progress = 0
             // Starts the clock.
-            "work"_s + sml::on_entry<sml::_> / [] {},
+            "work"_s + sml::on_entry<sml::_> / ([](::timers& t) { t.start(::timers::work_after_5s, std::chrono::seconds{5}); }, [](::timers& t, const UmlFsmActions& actions) { t.start(::timers::work_after_retryDelay, actions.retryDelay()); }),
+            "work"_s + sml::on_exit<sml::_> / ([](::timers& t) { t.cancel(::timers::work_after_5s); }, [](::timers& t) { t.cancel(::timers::work_after_retryDelay); }),
             // do / invoke(job.py, http://example.com/worker)
             // Runs in a worker.
             // Kept until the job ends.
             "work"_s + sml::event<event::pause> / sml::defer,
             "work"_s + sml::event<event::resume> / sml::defer,
             // Timed out.
-            "work"_s + sml::event<event::after_5s> / [] {} = "check"_s,
-            "work"_s + sml::event<event::after_retryDelay> = "check"_s,
+            "work"_s + sml::event<::internal::work_after_5s> / [] {} = "check"_s,
+            "work"_s + sml::event<::internal::work_after_retryDelay> = "check"_s,
             "work"_s + sml::event<event::split> = sml::state<both>,
             "work"_s + sml::event<event::abort> = sml::state<::internal::terminated>,
             "work"_s + sml::event<event::enter> = sml::state<outer>,
@@ -136,10 +185,11 @@ struct UmlFsm::Machine {
         UmlFsm& fsm;
     };
 
-    Machine(UmlFsm& fsm, UmlFsmActions& actions, ChildFsm& sub)
+    Machine(UmlFsm& fsm, UmlFsmActions& actions, FsmTimers& service, ChildFsm& sub)
         : machines{.sub = sub},
           sub_listener{fsm},
-          sm{actions, machines, status} {
+          timers{service, [fsm = &fsm](::timers::id timer) { fsm->fireTimer(timer); }},
+          sm{actions, machines, status, timers} {
         sub.terminateFsm();
         sub.setListener(&sub_listener);
     }
@@ -171,15 +221,17 @@ struct UmlFsm::Machine {
     ::submachines machines;
     SubListener sub_listener;
     ::status status;
+    ::timers timers;
     sml::sm<machine, sml::defer_queue<std::deque>> sm;
     bool busy = false;
     std::deque<std::function<void()>> queue;
 };
 
-UmlFsm::UmlFsm(UmlFsmActions& actions, ChildFsm& sub)
+UmlFsm::UmlFsm(UmlFsmActions& actions, FsmTimers& timers, ChildFsm& sub)
     : actions_{actions},
+      timers_{timers},
       sub_{sub},
-      machine_{std::make_unique<Machine>(*this, actions, sub)} {}
+      machine_{std::make_unique<Machine>(*this, actions, timers, sub)} {}
 
 UmlFsm::~UmlFsm() = default;
 
@@ -201,7 +253,7 @@ void UmlFsm::stopFsm() {
 
 void UmlFsm::terminateFsm() {
     machine_.reset();
-    machine_ = std::make_unique<Machine>(*this, actions_, sub_);
+    machine_ = std::make_unique<Machine>(*this, actions_, timers_, sub_);
 }
 
 void UmlFsm::setListener(UmlFsmListener* listener) {
@@ -225,6 +277,21 @@ void UmlFsm::report() {
     }
 }
 
+void UmlFsm::fireTimer(int timer) {
+    switch (timer) {
+    case ::timers::work_after_5s:
+        if (machine_->process(internal::work_after_5s{})) {
+            report();
+        }
+        break;
+    case ::timers::work_after_retryDelay:
+        if (machine_->process(internal::work_after_retryDelay{})) {
+            report();
+        }
+        break;
+    }
+}
+
 void UmlFsm::pause() {
     if (machine_->process(event::pause{})) {
         report();
@@ -233,18 +300,6 @@ void UmlFsm::pause() {
 
 void UmlFsm::resume() {
     if (machine_->process(event::resume{})) {
-        report();
-    }
-}
-
-void UmlFsm::after_5s() {
-    if (machine_->process(event::after_5s{})) {
-        report();
-    }
-}
-
-void UmlFsm::after_retryDelay() {
-    if (machine_->process(event::after_retryDelay{})) {
         report();
     }
 }

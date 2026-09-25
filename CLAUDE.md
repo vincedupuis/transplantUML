@@ -9,7 +9,7 @@ format-neutral model (`internal/model`) of a UML state machine, which is then wr
 emitter (document formats: SCXML, JSON) or through a Go `text/template` (free-form text: PlantUML, code, docs).
 Template rendering is output-only. The bundled templates are embedded in the binary and `-t` takes their name when
 no file has it: `assets/puml.gotmpl` (`puml`, used when `-t` is omitted) produces PlantUML, `assets/sml.gotmpl`
-(`sml`) a C++20 state machine on Boost.SML as four files. A template that writes several files starts each with
+(`sml`) a C++20 state machine on Boost.SML as five files. A template that writes several files starts each with
 the `file` function; `render.Files` splits the output at those marks and `-o` then names a folder.
 
 The user keeps one source document and generates outputs from it; round-tripping is *not* a goal. The goal is to
@@ -156,6 +156,12 @@ warnings.
   `stopFsm` through the `submachines` struct SML injects, and a listener per submachine state turns what that machine
   reports into internal events, queued by `Machine::process` while an event is being processed.
   `TestSMLSubmachineRuns` links two machines and checks the order of their actions.
+  A time trigger has a timer per source state and delay (`timerList`; a compound region's timers belong to its
+  orthogonal state). The state's entry starts it and its exit cancels it through `FsmTimers.h`, one interface
+  written identically for every machine, which the user implements once. When it fires, the machine processes
+  `internal::<state>_after_<delay>`. The callback holds a `weak_ptr` to its slot in the `timers` dependency, so a
+  late fire, or one after the machine is rebuilt, does nothing. A named delay is a method of the actions
+  interface. `TestSMLTimersRun` checks the starts, cancels and stale fires.
 
 ## Conventions
 

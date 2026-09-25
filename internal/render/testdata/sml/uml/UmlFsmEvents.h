@@ -8,8 +8,6 @@ public:
 
     virtual void pause() = 0;
     virtual void resume() = 0;
-    virtual void after_5s() = 0;
-    virtual void after_retryDelay() = 0;
     virtual void split() = 0;
     virtual void abort() = 0;
     virtual void enter() = 0;
