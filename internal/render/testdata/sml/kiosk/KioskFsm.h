@@ -6,17 +6,36 @@
 
 #include <memory>
 
+// What the state machine "kiosk" tells when it ends, as a submachine does.
+class KioskFsmListener {
+public:
+    virtual ~KioskFsmListener() = default;
+
+    // It reached its final state.
+    virtual void onFinished() {}
+};
+
 // The state machine "kiosk".
 //
 // A self-service kiosk:
 // browse, pay, take the receipt.
 class KioskFsm : public KioskFsmEvents {
 public:
+    // Where enterFsm starts the machine: its initial state.
+    enum class Entry { initial };
+
     explicit KioskFsm(KioskFsmActions& actions);
     ~KioskFsm() override;
 
     KioskFsm(const KioskFsm&) = delete;
     KioskFsm& operator=(const KioskFsm&) = delete;
+
+    // Starts the machine, again if it runs, in its initial state.
+    void enterFsm(Entry entry = Entry::initial);
+    // Stops the machine: it ignores every event until entered again.
+    void stopFsm();
+    // Tells listener when the machine ends; nullptr tells no one.
+    void setListener(KioskFsmListener* listener);
 
     void touch() override;
     void abandon() override;
@@ -34,6 +53,10 @@ public:
     void ack() override;
 
 private:
+    void report();
+
     struct Machine;
+    KioskFsmActions& actions_;
+    KioskFsmListener* listener_ = nullptr;
     std::unique_ptr<Machine> machine_;
 };

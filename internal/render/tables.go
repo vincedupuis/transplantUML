@@ -100,26 +100,34 @@ func (x tables) outsideRegion(name string) string {
 }
 
 // Lift says where a transition is written. From and To are the states that
-// stand for its ends: the source, or the parallel state a join synchronises;
-// the first target, or the state a history, entry point or fork enters (a
-// join stays itself, as the end of its region). Source and Target are From
-// and To lifted out of the tables they are nested in, up to Table, the
-// innermost table holding both. Target and To are "" for a transition
+// stand for its ends: the source, the parallel state a join synchronises, or
+// the submachine state whose exit point it leaves; the first target, or the
+// state a history, entry point or fork enters (a join stays itself, as the end
+// of its region, and so does an exit point of the machine). Source and Target
+// are From and To lifted out of the tables they are nested in, up to Table,
+// the innermost table holding both. Target and To are "" for a transition
 // without targets.
 type Lift struct {
 	Table, Source, Target, From, To string
 }
 
 // Lift returns where the transition is written, or nil when it is not: a
-// transition leaving a history, entry or exit point or fork, or reaching an
-// exit point, an entry point with no parent, or a join with no owner.
+// transition leaving a history, a fork, an entry point of a state or an exit
+// point that is not a submachine state's, or reaching an exit point of a
+// state, an entry point of the machine, or a join with no owner.
 func (x tables) Lift(t *model.Transition) *Lift {
 	s := x.sm.State(t.Source)
 	from, to := t.Source, ""
-	skip := s.IsHistory() || s.Kind == model.EntryPoint || s.Kind == model.ExitPoint || s.Kind == model.Fork
-	if s.Kind == model.Join {
+	skip := s.IsHistory() || s.Kind == model.Fork
+	switch {
+	case s.Kind == model.Join:
 		from = x.JoinOwner(t.Source)
 		skip = from == ""
+	case s.Kind == model.EntryPoint:
+		skip = s.Parent != ""
+	case s.Kind == model.ExitPoint:
+		from = s.Parent
+		skip = !x.sm.IsReference(t.Source)
 	}
 	var toChain []link
 	if len(t.Targets) == 0 {
@@ -134,7 +142,7 @@ func (x tables) Lift(t *model.Transition) *Lift {
 			to = tg.Parent
 			skip = skip || to == ""
 		case tg.Kind == model.ExitPoint:
-			skip = true
+			skip = skip || tg.Parent != ""
 		case tg.Kind == model.Fork:
 			to = x.ForkTarget(tg.Name)
 		case tg.Kind == model.Join:

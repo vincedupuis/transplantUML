@@ -15,6 +15,8 @@ public:
     // Actions
     virtual void close() = 0;
     virtual void computeTotal() = 0;
+    virtual void loadBasket() = 0;
     virtual void openChat() = 0;
+    virtual void page() = 0;
     virtual void receipt() = 0;
 };

@@ -90,3 +90,52 @@ func TestTables(t *testing.T) {
 		}
 	}
 }
+
+// The machine's own points are written, as are the points a submachine state
+// references, which stand for that state; a state's own points are not.
+func TestLiftPoints(t *testing.T) {
+	sm := &model.StateMachine{
+		Initial: "a",
+		States: []*model.State{
+			{Name: "a", Kind: model.Normal},
+			{Name: "in", Kind: model.EntryPoint},
+			{Name: "out", Kind: model.ExitPoint},
+			{Name: "sub", Kind: model.Normal, Submachine: "other"},
+			{Name: "urgent", Parent: "sub", Kind: model.EntryPoint},
+			{Name: "failed", Parent: "sub", Kind: model.ExitPoint},
+			{Name: "c", Kind: model.Normal, Initial: "c1"},
+			{Name: "c1", Parent: "c", Kind: model.Normal},
+			{Name: "cin", Parent: "c", Kind: model.EntryPoint},
+			{Name: "cout", Parent: "c", Kind: model.ExitPoint},
+		},
+		Transitions: []*model.Transition{
+			{Source: "in", Targets: []string{"a"}},
+			{Source: "a", Targets: []string{"out"}, Event: "leave"},
+			{Source: "a", Targets: []string{"urgent"}, Event: "help"},
+			{Source: "failed", Targets: []string{"a"}},
+			{Source: "a", Targets: []string{"in"}, Event: "again"},
+			{Source: "out", Targets: []string{"a"}},
+			{Source: "cin", Targets: []string{"c1"}},
+			{Source: "c1", Targets: []string{"cout"}, Event: "done"},
+		},
+	}
+	if err := sm.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	x := tables{sm}
+	want := []*Lift{
+		{Table: "", Source: "in", Target: "a", From: "in", To: "a"},
+		{Table: "", Source: "a", Target: "out", From: "a", To: "out"},
+		{Table: "", Source: "a", Target: "sub", From: "a", To: "sub"},
+		{Table: "", Source: "sub", Target: "a", From: "sub", To: "a"},
+		nil,
+		nil,
+		nil,
+		nil,
+	}
+	for i, tr := range sm.Transitions {
+		if got := x.Lift(tr); !reflect.DeepEqual(got, want[i]) {
+			t.Errorf("Lift(%s -> %v) = %+v, want %+v", tr.Source, tr.Targets, got, want[i])
+		}
+	}
+}

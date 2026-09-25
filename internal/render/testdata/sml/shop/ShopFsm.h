@@ -6,14 +6,38 @@
 
 #include <memory>
 
+class SupportFsm;
+
+// What the state machine "shop" tells when it ends, as a submachine does.
+class ShopFsmListener {
+public:
+    virtual ~ShopFsmListener() = default;
+
+    // It reached its final state.
+    virtual void onFinished() {}
+};
+
 // The state machine "shop".
 class ShopFsm : public ShopFsmEvents {
 public:
-    explicit ShopFsm(ShopFsmActions& actions);
+    // Where enterFsm starts the machine: its initial state or an entry point.
+    enum class Entry { initial, reorder };
+
+    // The machines the submachine states run, one each:
+    // helpdesk runs "support" in the state "helpdesk".
+    // aftersales runs "support" in the state "aftersales".
+    explicit ShopFsm(ShopFsmActions& actions, SupportFsm& helpdesk, SupportFsm& aftersales);
     ~ShopFsm() override;
 
     ShopFsm(const ShopFsm&) = delete;
     ShopFsm& operator=(const ShopFsm&) = delete;
+
+    // Starts the machine, again if it runs, in its initial state or at an entry point.
+    void enterFsm(Entry entry = Entry::initial);
+    // Stops the machine: it ignores every event until entered again.
+    void stopFsm();
+    // Tells listener when the machine ends; nullptr tells no one.
+    void setListener(ShopFsmListener* listener);
 
     void buy() override;
     void quickBuy() override;
@@ -33,6 +57,12 @@ public:
     void complain() override;
 
 private:
+    void report();
+
     struct Machine;
+    ShopFsmActions& actions_;
+    SupportFsm& helpdesk_;
+    SupportFsm& aftersales_;
+    ShopFsmListener* listener_ = nullptr;
     std::unique_ptr<Machine> machine_;
 };

@@ -25,6 +25,16 @@ func renderFile(t *testing.T, path string) string {
 // with tmpl.
 func renderWith(t *testing.T, path, tmpl string) (string, model.Warnings) {
 	t.Helper()
+	out, warnings, err := Render(parseFile(t, path), tmpl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out, warnings
+}
+
+// parseFile parses path with the parser its extension names.
+func parseFile(t *testing.T, path string) *model.StateMachine {
+	t.Helper()
 	src, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -37,11 +47,7 @@ func renderWith(t *testing.T, path, tmpl string) (string, model.Warnings) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, warnings, err := Render(sm, tmpl)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return out, warnings
+	return sm
 }
 
 // goldens maps every input document that has a checked-in PlantUML rendering

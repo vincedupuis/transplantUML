@@ -30,9 +30,9 @@ symbol, and so on. Warnings go to stderr and never fail the conversion.
 |----------------------------------------|-------------------------------------------------------|---------------------------------------------------------|-----------------------------------------------------|-------------------------------------------|
 | Simple, compound state                 | `normal`                                              | `<state>`                                               | `state X`, `state X { }`                            | `"X"_s`, a struct per compound state      |
 | Orthogonal state, regions              | `parallel`, children are the regions                  | `<parallel>`                                            | regions separated by `--`                           | one table, a `*` initial state per region |
-| Submachine state                       | `Submachine`                                          | `<invoke src>`                                          | `state "X: ref" as X`                               | simple state ⚠                            |
+| Submachine state                       | `Submachine`                                          | `<invoke src>`                                          | `state "X: ref" as X`                               | runs that machine's generated class       |
 | Initial                                | `Initial` on the machine / the state                  | `initial` attr, `<initial>`                             | `[*] -->`                                           | `*` on the initial state                  |
-| Effect of the initial transition       | `InitialActions` on the machine / the state           | `<initial><transition>` content (on a state only ⚠)     | `[*] --> X : / act`                                 | transient `"initial"_s` state             |
+| Effect of the initial transition       | `InitialActions` on the machine / the state           | `<initial><transition>` content (on a state only ⚠)     | `[*] --> X : / act`                                 | on `enterFsm`; transient in a state       |
 | Final                                  | `final`                                               | `<final>`                                               | `state X <<end>>`                                   | `sml::X`                                  |
 | Terminate                              | `terminate`                                           | `<final>` ⚠                                             | `state X <<end>>` ⚠                                 | `sml::X` ⚠                                |
 | Shallow / deep history                 | `history-shallow`, `history-deep`                     | `<history>`                                             | `<<history>>`, `<<history*>>`                       | `(sml::H)` on the initial state; deep ⚠   |
@@ -40,8 +40,8 @@ symbol, and so on. Warnings go to stderr and never fail the conversion.
 | Junction                               | `junction`                                            | transient state, `tpuml:kind="junction"`                | filled circle (`<<start>>`)                         | state with guarded anonymous transitions  |
 | Fork                                   | `fork`                                                | transient state with one multi-target transition        | `<<fork>>`                                          | enters the orthogonal state ⚠             |
 | Join                                   | `join`                                                | transient state, `tpuml:kind="join"` ⚠                  | `<<join>>`                                          | regions end in `X`, then a completion ⚠   |
-| Entry / exit point                     | `entry-point`, `exit-point`                           | transient state inside the compound, `tpuml:kind`       | `<<entryPoint>>`, `<<exitPoint>>`                   | left out ⚠                                |
-| Connection point reference             | entry / exit point whose parent is a submachine state | left out ⚠                                              | `<<entryPoint>>`, `<<exitPoint>>` on its border     | left out ⚠                                |
+| Entry / exit point                     | `entry-point`, `exit-point`                           | transient state inside the compound, `tpuml:kind`       | `<<entryPoint>>`, `<<exitPoint>>`                   | the machine's: `Entry`, listener; else ⚠  |
+| Connection point reference             | entry / exit point whose parent is a submachine state | left out ⚠                                              | `<<entryPoint>>`, `<<exitPoint>>` on its border     | that machine's `Entry` and listener       |
 | Entry / exit behaviour                 | `OnEntry`, `OnExit`                                   | `<onentry>`, `<onexit>`                                 | `X : entry / …`, `X : exit / …`                     | `+ sml::on_entry<sml::_> / …`             |
 | Do activity                            | `Do`                                                  | `<invoke>`                                              | `X : do / …`                                        | comment ⚠                                 |
 | Deferred events                        | `Defer`                                               | `tpuml:defer` ⚠                                         | `X : ev / defer`                                    | `/ sml::defer`, with `defer_queue`        |
@@ -323,6 +323,7 @@ fsm -i example/kiosk.fsm -t sml -o gen/
 | `KioskFsmEvents.h`  | `class KioskFsmEvents`, the interface with one method per event              |
 | `KioskFsmActions.h` | `class KioskFsmActions`, the interface with the guards and actions to supply |
 | `KioskFsm.h`        | `class KioskFsm`, the state machine, which implements `KioskFsmEvents`       |
+|                     | and `class KioskFsmListener`, the interface it tells when it ends            |
 | `KioskFsm.cpp`      | its implementation, the only file that includes SML                          |
 
 [`internal/render/testdata/sml/kiosk`](internal/render/testdata/sml/kiosk) holds what it makes of `example/kiosk.fsm`.
@@ -339,10 +340,54 @@ class Kiosk : public KioskFsmActions {
 
 Kiosk kiosk;
 KioskFsm fsm{kiosk};
+fsm.enterFsm();
 fsm.touch();
 ```
 
-The machine starts in its initial state when it is built, so the actions on the way there run in the constructor.
+The machine waits, ignoring every event, until `enterFsm()` starts it in its initial state.
+`enterFsm(KioskFsm::Entry::p)` starts it at its entry point `p` instead.
+Either one starts the machine again from the beginning if it is already running.
+`stopFsm()` makes it wait again.
+These names keep them apart from the events' methods; an event named like one of them warns, since the files would
+not compile.
+
+`setListener` takes a `KioskFsmListener`, which the machine tells when it ends.
+`onFinished()` is called when it reaches its final state, or a terminate state.
+`onExitP()` is called when it leaves by its exit point `p`.
+The machine stops before telling it.
+
+### Submachine states
+
+A submachine state runs another machine, generated from its own document with `-t sml`.
+The machine is named after the submachine state's reference, without its extension: `payment.scxml` gives
+`PaymentFsm`.
+The constructor takes one instance of it per submachine state, and each state needs its own:
+
+```cpp
+Support support;                                    // implements SupportFsmActions
+Shop shop;                                          // implements ShopFsmActions
+SupportFsm helpdesk{support};
+SupportFsm aftersales{support};
+ShopFsm fsm{shop, helpdesk, aftersales};            // shop.fsm's helpdesk and aftersales
+fsm.enterFsm();
+
+fsm.help();            // enters helpdesk, which starts its SupportFsm
+helpdesk.human();      // the submachine's events go to its instance
+```
+
+- Entering the submachine state runs its entry behaviour, then starts the machine with `enterFsm`, at the entry point
+  the transition named, if any.
+- The machine's listener is the submachine state.
+  When the machine finishes, the submachine state takes its completion transition.
+  When it leaves by an exit point, the submachine state takes that point's transition.
+- Leaving the submachine state on an event of its own stops the machine with `stopFsm`, then runs the exit behaviour.
+  The machine's own exit behaviours do not run then.
+- The machine may finish while it is being entered.
+  The outer machine then queues what it reports and handles it once the current event is done.
+- `ShopFsm.h` only declares `class SupportFsm;`.
+  `ShopFsm.cpp` includes `SupportFsm.h`, so the build needs both machines' files.
+- `shop.fsm` is generated without reading `support.fsm`.
+  An entry or exit point that `support` does not declare shows up as a compile error.
 
 Things to know:
 
@@ -370,18 +415,20 @@ Things to know:
 - A choice or a junction is a state that anonymous transitions leave at once, tried in order, `else` last.
 - SML's history marks a region's initial state, `"browsing"_s(sml::H)`, so every entry into that region resumes it.
   A default transition that leads elsewhere, or that has an effect, is not written and warns.
-- An effect on the initial transition goes through a transient state, `*"initial"_s / boot = "idle"_s`.
+- The machine waits in `sml::state<internal::stopped>`, which `enterFsm` leaves with the effect of the initial
+  transition, `/ boot = "idle"_s`.
+  Inside a state, an effect on the initial transition goes through a transient state,
+  `*"outer.initial"_s / greet = "inner"_s`.
 - Deferred events use SML's `defer_queue` policy.
 - A time trigger `after(90s)` becomes the event `after_90s`, which the application sends 90 seconds after entering
   the state; it warns.
 - A join ends each region that reaches it in `X`.
   Its outgoing transition becomes the orthogonal state's completion transition, taken once every region has ended.
-- A submachine state is written as a simple state, with a warning: the other machine's tables are private to its
-  own `.cpp`.
 - Notes, stereotypes and invariants become `//` comments in `KioskFsm.cpp`, the machine's note goes on the class,
   and its variables are listed on the actions interface, whose implementation holds them.
   Do activities also become comments, with a warning.
-- Fork, entry and exit points, local transitions and terminate warn as the coverage table shows.
+- The machine's own entry points are the values of `Entry`, and its exit points are states that end it.
+  A state's entry and exit points, fork, local transitions and terminate warn as the coverage table shows.
 
 ## SCXML
 

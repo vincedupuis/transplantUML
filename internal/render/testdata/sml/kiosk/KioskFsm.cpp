@@ -25,6 +25,12 @@ struct card {};
 struct ack {};
 }  // namespace event
 
+// The events the machine sends itself, and the state it waits in until entered.
+namespace internal {
+struct stopped {};
+struct enter {};
+}  // namespace internal
+
 // The composite state "paying".
 struct paying {
     auto operator()() const {
@@ -83,7 +89,7 @@ struct machine {
         const auto receipt = [](KioskFsmActions& actions) { actions.receipt(); };
         const auto print = [](KioskFsmActions& actions) { actions.print(); };
         return sml::make_transition_table(
-            *"initial"_s / boot = "idle"_s,
+            *sml::state<::internal::stopped> + sml::event<::internal::enter> / boot = "idle"_s,
             "idle"_s + sml::on_entry<sml::_> / dim,
             "idle"_s + sml::event<event::touch> / wake = sml::state<ordering>,
             sml::state<ordering> + sml::on_entry<sml::_> / newBasket,
@@ -107,21 +113,107 @@ struct KioskFsm::Machine {
     sml::sm<machine, sml::defer_queue<std::deque>> sm;
 };
 
-KioskFsm::KioskFsm(KioskFsmActions& actions) : machine_{std::make_unique<Machine>(actions)} {}
+KioskFsm::KioskFsm(KioskFsmActions& actions)
+    : actions_{actions},
+      machine_{std::make_unique<Machine>(actions)} {}
 
 KioskFsm::~KioskFsm() = default;
 
-void KioskFsm::touch() { machine_->sm.process_event(event::touch{}); }
-void KioskFsm::abandon() { machine_->sm.process_event(event::abandon{}); }
-void KioskFsm::after_90s() { machine_->sm.process_event(event::after_90s{}); }
-void KioskFsm::resume() { machine_->sm.process_event(event::resume{}); }
-void KioskFsm::back() { machine_->sm.process_event(event::back{}); }
-void KioskFsm::add() { machine_->sm.process_event(event::add{}); }
-void KioskFsm::remove() { machine_->sm.process_event(event::remove{}); }
-void KioskFsm::checkout() { machine_->sm.process_event(event::checkout{}); }
-void KioskFsm::approved() { machine_->sm.process_event(event::approved{}); }
-void KioskFsm::declined() { machine_->sm.process_event(event::declined{}); }
-void KioskFsm::cancel() { machine_->sm.process_event(event::cancel{}); }
-void KioskFsm::after_authTimeout() { machine_->sm.process_event(event::after_authTimeout{}); }
-void KioskFsm::card() { machine_->sm.process_event(event::card{}); }
-void KioskFsm::ack() { machine_->sm.process_event(event::ack{}); }
+void KioskFsm::enterFsm(Entry entry) {
+    stopFsm();
+    switch (entry) {
+    case Entry::initial:
+        machine_->sm.process_event(internal::enter{});
+        report();
+        break;
+    }
+}
+
+void KioskFsm::stopFsm() {
+    machine_.reset();
+    machine_ = std::make_unique<Machine>(actions_);
+}
+
+void KioskFsm::setListener(KioskFsmListener* listener) {
+    listener_ = listener;
+}
+
+void KioskFsm::report() {
+    if (listener_ == nullptr) {
+        return;
+    }
+    if (machine_->sm.is(sml::X)) {
+        stopFsm();
+        listener_->onFinished();
+    }
+}
+
+void KioskFsm::touch() {
+    machine_->sm.process_event(event::touch{});
+    report();
+}
+
+void KioskFsm::abandon() {
+    machine_->sm.process_event(event::abandon{});
+    report();
+}
+
+void KioskFsm::after_90s() {
+    machine_->sm.process_event(event::after_90s{});
+    report();
+}
+
+void KioskFsm::resume() {
+    machine_->sm.process_event(event::resume{});
+    report();
+}
+
+void KioskFsm::back() {
+    machine_->sm.process_event(event::back{});
+    report();
+}
+
+void KioskFsm::add() {
+    machine_->sm.process_event(event::add{});
+    report();
+}
+
+void KioskFsm::remove() {
+    machine_->sm.process_event(event::remove{});
+    report();
+}
+
+void KioskFsm::checkout() {
+    machine_->sm.process_event(event::checkout{});
+    report();
+}
+
+void KioskFsm::approved() {
+    machine_->sm.process_event(event::approved{});
+    report();
+}
+
+void KioskFsm::declined() {
+    machine_->sm.process_event(event::declined{});
+    report();
+}
+
+void KioskFsm::cancel() {
+    machine_->sm.process_event(event::cancel{});
+    report();
+}
+
+void KioskFsm::after_authTimeout() {
+    machine_->sm.process_event(event::after_authTimeout{});
+    report();
+}
+
+void KioskFsm::card() {
+    machine_->sm.process_event(event::card{});
+    report();
+}
+
+void KioskFsm::ack() {
+    machine_->sm.process_event(event::ack{});
+    report();
+}

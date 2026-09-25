@@ -6,17 +6,40 @@
 
 #include <memory>
 
+class ChildFsm;
+
+// What the state machine "uml" tells when it ends, as a submachine does.
+class UmlFsmListener {
+public:
+    virtual ~UmlFsmListener() = default;
+
+    // It reached its final state.
+    virtual void onFinished() {}
+};
+
 // The state machine "uml".
 //
 // Every UML concept the model holds,
 // in one document.
 class UmlFsm : public UmlFsmEvents {
 public:
-    explicit UmlFsm(UmlFsmActions& actions);
+    // Where enterFsm starts the machine: its initial state.
+    enum class Entry { initial };
+
+    // The machines the submachine states run, one each:
+    // sub runs "child.scxml" in the state "sub".
+    explicit UmlFsm(UmlFsmActions& actions, ChildFsm& sub);
     ~UmlFsm() override;
 
     UmlFsm(const UmlFsm&) = delete;
     UmlFsm& operator=(const UmlFsm&) = delete;
+
+    // Starts the machine, again if it runs, in its initial state.
+    void enterFsm(Entry entry = Entry::initial);
+    // Stops the machine: it ignores every event until entered again.
+    void stopFsm();
+    // Tells listener when the machine ends; nullptr tells no one.
+    void setListener(UmlFsmListener* listener);
 
     void pause() override;
     void resume() override;
@@ -33,6 +56,11 @@ public:
     void note() override;
 
 private:
+    void report();
+
     struct Machine;
+    UmlFsmActions& actions_;
+    ChildFsm& sub_;
+    UmlFsmListener* listener_ = nullptr;
     std::unique_ptr<Machine> machine_;
 };
