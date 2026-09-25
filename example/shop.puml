@@ -3,11 +3,11 @@ title shop
 [*] --> browsing
 state reorder <<entryPoint>>
 state browsing
-state "support: support" as support {
+state "helpdesk: support" as helpdesk {
     state urgent <<entryPoint>>
     state escalated <<exitPoint>>
 }
-support : entry / openChat
+helpdesk : entry / openChat
 state "«secure»\ncheckout" as checkout <<secure>> {
     [*] --> address
     state express <<entryPoint>>
@@ -50,6 +50,7 @@ state shipping {
 }
 state merge <<join>>
 state done
+state "aftersales: support" as aftersales
 state refunded <<end>>
 note right of refunded : Money returned.
 state terminate <<end>>
@@ -59,9 +60,9 @@ reorder --> checkout: / loadBasket
 browsing --> checkout: buy
 browsing --> express: quickBuy
 browsing --> terminate: fraud
-browsing --> support: help
+browsing --> helpdesk: help
 browsing --> urgent: emergency
-support --> browsing
+helpdesk --> browsing
 escalated --> checkout: / page
 cancelled --> browsing
 paid --> split: / receipt
@@ -71,5 +72,7 @@ merge --> done: / close
 done --> checkout_H_deep: reopen
 done --> checkout_H: back
 done --> refunded: refund
+done --> aftersales: complain
 done --> final
+aftersales --> done
 @enduml

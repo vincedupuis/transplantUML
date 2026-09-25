@@ -1,0 +1,16 @@
+# The machine that shop.fsm runs in its submachine states helpdesk and
+# aftersales: an entry point that skips the bot, an exit point that leaves the
+# machine, and a final state that completes the submachine state.
+
+fsm support {
+  entry point urgent goto agent
+  exit point escalated
+  initial state bot {
+    on human goto agent
+    on solved goto final
+  }
+  state agent {
+    on solved goto final
+    on escalate goto escalated
+  }
+}

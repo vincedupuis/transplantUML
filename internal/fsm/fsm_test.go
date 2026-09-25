@@ -77,7 +77,6 @@ func TestGrammarRejects(t *testing.T) {
 		"fsm m { join j }",                   // and a goto
 		"fsm m { entry point e { goto e } }", // a point is one line too
 		"fsm m { entry point e [g] goto e }",
-		"fsm m { exit point e }",
 		"fsm m { point e goto e }",
 		"fsm m { state s { on e goto s.x } }", // after a dot comes H or H*
 		"fsm m { state s { on e goto .H } }",
@@ -128,6 +127,13 @@ func TestGrammarRejects(t *testing.T) {
 		"fsm m { submachine s { choice c goto s } }",                // and so are its pseudostates
 		"fsm m { submachine s { exit point e } }",                   // its exit point leaves by a goto
 		"fsm m { state s { entry point e } }",                       // only a submachine's entry point has none
+		"fsm m { state s { exit point e } }",                        // and the machine's exit point
+		"fsm m { entry point e }",                                   //
+		"fsm m { submachine s : {} }",                               // the colon names a machine
+		"fsm m { submachine : t {} }",                               // after the state's name
+		"fsm m { submachine s : t : u {} }",                         // one machine
+		"fsm m { state s : t {} }",                                  // on a submachine state only
+		"fsm m { submachine s <<a>> : t {} }",                       // before the stereotype
 		"fsm m { submachine state s {} }",                           // submachine replaces state
 		"fsm m { submachine s }",                                    // and keeps its braces
 		"fsm m { parallel state p { submachine s {} } }",            // a parallel state holds regions only

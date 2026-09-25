@@ -4,7 +4,7 @@ grammar fsm;
 fsm
     :   Note? FSM Identifier
         '{'
-            (start | state | parallel | submachine | final | terminate | choice | junction | fork | join | point | event)*
+            (start | state | parallel | submachine | final | terminate | choice | junction | fork | join | point | outlet | event)*
         '}' EOF
     ;
 
@@ -23,7 +23,7 @@ parallel
     ;
 
 submachine
-    :   Note? INITIAL? SUBMACHINE Identifier stereotype?
+    :   Note? INITIAL? SUBMACHINE Identifier (':' Identifier)? stereotype?
         '{'
             (point | reference | event)*
         '}'
@@ -79,6 +79,10 @@ point
 
 reference
     :   Note? ENTRY POINT Identifier stereotype?
+    ;
+
+outlet
+    :   Note? EXIT POINT Identifier stereotype?
     ;
 
 history

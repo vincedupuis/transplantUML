@@ -1,0 +1,14 @@
+@startuml
+title support
+[*] --> bot
+state urgent <<entryPoint>>
+state escalated <<exitPoint>>
+state bot
+state agent
+state final <<end>>
+urgent --> agent
+bot --> agent: human
+bot --> final: solved
+agent --> final: solved
+agent --> escalated: escalate
+@enduml

@@ -262,7 +262,8 @@ func TestBuildStateKinds(t *testing.T) {
 		{"route", "checkout", model.Choice},
 		{"paid", "checkout", model.Junction},
 		{"split", "", model.Fork},
-		{"support", "", model.Normal}, // a submachine state
+		{"helpdesk", "", model.Normal}, // a submachine state
+		{"aftersales", "", model.Normal},
 		{"shipping", "", model.Parallel},
 		{"warehouse", "shipping", model.Normal}, // a region
 		{"packing", "warehouse", model.Normal},
@@ -284,9 +285,12 @@ func TestBuildStateKinds(t *testing.T) {
 	if got := sm.State("checkout").Stereotype; got != "secure" {
 		t.Errorf("checkout stereotype = %q, want secure", got)
 	}
-	// A submachine state is named after the machine it refers to.
-	if s := sm.State("support"); s.Submachine != "support" || !slices.Equal(s.OnEntry, []string{"openChat"}) {
-		t.Errorf("support: submachine %q entry %v, want support/[openChat]", s.Submachine, s.OnEntry)
+	// Two submachine states name the machine they refer to after a colon.
+	if s := sm.State("helpdesk"); s.Submachine != "support" || !slices.Equal(s.OnEntry, []string{"openChat"}) {
+		t.Errorf("helpdesk: submachine %q entry %v, want support/[openChat]", s.Submachine, s.OnEntry)
+	}
+	if got := sm.State("aftersales").Submachine; got != "support" {
+		t.Errorf("aftersales submachine = %q, want support", got)
 	}
 	// Every region is entered, so the parallel state starts in none of them;
 	// each region starts in its own initial child.
@@ -309,8 +313,8 @@ func TestBuildStateKinds(t *testing.T) {
 		{"paid", "", "split", []string{"receipt"}},
 		{"split", "", "packing", nil}, // one transition per fork line
 		{"split", "", "invoicing", []string{"notify"}},
-		{"support", "", "browsing", nil}, // leaves when the submachine completes
-		{"packed", "", "merge", nil},     // a completion transition
+		{"helpdesk", "", "browsing", nil}, // leaves when the submachine completes
+		{"packed", "", "merge", nil},      // a completion transition
 		{"sent", "paidInFull", "merge", nil},
 		{"merge", "", "done", []string{"close"}},
 	} {
@@ -628,6 +632,23 @@ func TestBuildSubmachinePoints(t *testing.T) {
 	want := []string{"a -> urgent []", "solved -> a [thank]", "failed -> s.final []"}
 	if !slices.Equal(got, want) {
 		t.Errorf("transitions = %q, want %q", got, want)
+	}
+}
+
+// A machine declares its own exit point without a goto, since the point leaves
+// the machine; its states reach it like any state.
+func TestBuildMachineExitPoint(t *testing.T) {
+	sm := build(t, `fsm m {
+		| Handed to a human. |
+		exit point escalated <<page>>
+		initial state a { on e goto escalated }
+	}`)
+	s := sm.State("escalated")
+	if s == nil || s.Kind != model.ExitPoint || s.Parent != "" || s.Note != "Handed to a human." || s.Stereotype != "page" {
+		t.Fatalf("escalated = %+v, want a noted exit point <<page>> of the machine", s)
+	}
+	if len(sm.Transitions) != 1 || sm.Transitions[0].Source != "a" {
+		t.Errorf("transitions = %+v, want only a -> escalated", sm.Transitions)
 	}
 }
 

@@ -59,6 +59,10 @@ func (v *BasefsmVisitor) VisitReference(ctx *ReferenceContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasefsmVisitor) VisitOutlet(ctx *OutletContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasefsmVisitor) VisitHistory(ctx *HistoryContext) interface{} {
 	return v.VisitChildren(ctx)
 }

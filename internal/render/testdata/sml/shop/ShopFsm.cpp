@@ -23,6 +23,7 @@ struct sent {};
 struct reopen {};
 struct back {};
 struct refund {};
+struct complain {};
 }  // namespace event
 
 // The composite state "review".
@@ -81,10 +82,10 @@ struct machine {
             *"browsing"_s + sml::event<event::buy> = sml::state<checkout>,
             "browsing"_s + sml::event<event::quickBuy> = sml::state<checkout>,
             "browsing"_s + sml::event<event::fraud> = sml::X,
-            "browsing"_s + sml::event<event::help> = "support"_s,
-            "browsing"_s + sml::event<event::emergency> = "support"_s,
-            "support"_s + sml::on_entry<sml::_> / openChat,
-            "support"_s = "browsing"_s,
+            "browsing"_s + sml::event<event::help> = "helpdesk"_s,
+            "browsing"_s + sml::event<event::emergency> = "helpdesk"_s,
+            "helpdesk"_s + sml::on_entry<sml::_> / openChat,
+            "helpdesk"_s = "browsing"_s,
             // checkout:
             // «secure»
             sml::state<checkout> / receipt = sml::state<shipping>,
@@ -92,7 +93,9 @@ struct machine {
             "done"_s + sml::event<event::reopen> = sml::state<checkout>,
             "done"_s + sml::event<event::back> = sml::state<checkout>,
             "done"_s + sml::event<event::refund> = sml::X,
-            "done"_s = sml::X
+            "done"_s + sml::event<event::complain> = "aftersales"_s,
+            "done"_s = sml::X,
+            "aftersales"_s = "done"_s
             // refunded:
             // Money returned.
             // terminate:
@@ -127,3 +130,4 @@ void ShopFsm::sent() { machine_->sm.process_event(event::sent{}); }
 void ShopFsm::reopen() { machine_->sm.process_event(event::reopen{}); }
 void ShopFsm::back() { machine_->sm.process_event(event::back{}); }
 void ShopFsm::refund() { machine_->sm.process_event(event::refund{}); }
+void ShopFsm::complain() { machine_->sm.process_event(event::complain{}); }

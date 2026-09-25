@@ -21,4 +21,5 @@ public:
     virtual void reopen() = 0;
     virtual void back() = 0;
     virtual void refund() = 0;
+    virtual void complain() = 0;
 };

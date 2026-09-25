@@ -116,7 +116,7 @@ parallel state shipping {
 
 ```
 [<note>]
-[initial] submachine <name> [<stereotype>] {
+[initial] submachine <name> [: <name>] [<stereotype>] {
     <point> | <reference> | <clause> ...
 }
 
@@ -124,15 +124,21 @@ parallel state shipping {
 ```
 
 ```
-submachine support {
+submachine helpdesk : support {
   entry / openChat
   entry point urgent
   exit point escalated / page goto checkout
   goto browsing
 }
+
+submachine support {
+  goto browsing
+}
 ```
 
-The name is the name of the machine it refers to.
+The first name is the state's, the second the machine it refers to.
+Without `: <name>`, the state is named after the machine.
+The body describes only this use of the machine, never the machine itself.
 An `entry point` without a `goto` is a connection point reference.
 
 ### Final and terminate
@@ -223,14 +229,19 @@ join merge / close goto done
 ```
 [<note>]
 entry point | exit point <name> [<stereotype>] [<actions>] <goto>
+
+[<note>]
+exit point <name> [<stereotype>]
 ```
 
 ```
 entry point reorder / loadBasket goto checkout
 exit point cancelled goto browsing
+exit point escalated
 ```
 
 A point can be declared on the machine, on a state, or on a parallel state.
+An exit point of the machine has no `goto`, since it leaves the machine.
 
 ## Clauses
 

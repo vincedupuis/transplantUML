@@ -30,6 +30,7 @@ public:
     void reopen() override;
     void back() override;
     void refund() override;
+    void complain() override;
 
 private:
     struct Machine;

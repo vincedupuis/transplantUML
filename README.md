@@ -161,6 +161,7 @@ it next to it (`<name>.puml`, kept up to date by the tests):
 | [`thermostat.json`](example/thermostat.json)             | the same concepts written directly in the model's JSON shape                                                          |
 | [`kiosk.fsm`](example/kiosk.fsm)                         | the `fsm` language: nesting, behaviours, deferred events, invariants, guards, time triggers, transition kinds, notes  |
 | [`shop.fsm`](example/shop.fsm)                           | the `fsm` language's state kinds (parallel, submachine, all pseudostates, history, named finals) and stereotypes      |
+| [`support.fsm`](example/support.fsm)                     | the machine `shop.fsm` runs in its submachine states: an entry point, an exit point of the machine, a final state     |
 
 Run any of them with `fsm -i example/<name>` and compare with the `.puml` beside it; add `-F scxml` or `-F json`
 to see the other formats.
@@ -583,7 +584,7 @@ fork split {                          # enters several regions at once
 join merge / close goto done          # waits for every region, then leaves
 entry point express / useSavedCard goto paying
 exit point cancelled goto browsing
-submachine support {                  # runs the machine called support
+submachine helpdesk : support {       # runs the machine called support
   entry / openChat
   goto browsing                       # leaves when that machine completes
 }
@@ -598,19 +599,23 @@ an exit point are a single line. Entry and exit points go in a state, a parallel
 entry point leads into its state past the initial child, an exit point out of it. Every pseudostate may be declared
 wherever a state may, except that a region holds no points.
 
-A submachine state is named after the machine it refers to, which is another `fsm` document.
-The name becomes both the state's name and its `Submachine` reference.
+A submachine state refers to another machine, which is another `fsm` document.
+It is written `submachine helpdesk : support`, UML's `state : machine`.
+The first name becomes the state's name and the second its `Submachine` reference.
+Without `: support`, the state is named after the machine.
+Each submachine state runs its own instance, so a document can use one machine several times under different names.
 Its states come from that machine, so its body holds only behaviours, deferred events, transitions and points.
+The body describes this use of the machine: what belongs to every use goes in the machine's own document.
 It may be marked `initial` and goes wherever a state may.
-Since state names are one namespace, a document can use each submachine once.
 
 A point in a submachine body is UML's connection point reference.
 It stands for the entry or exit point of the same name in the machine the submachine refers to.
 An entry point there has no `goto`, since its path continues inside that machine; other states reach it by name.
 An exit point there has its `goto` as usual, taken when that machine leaves through its point.
+The machine itself declares its exit point without a `goto`, since that point leaves the machine.
 
 ```
-submachine support {
+submachine helpdesk : support {
   entry point urgent                  # goto urgent enters support there
   exit point escalated / page goto checkout
   goto browsing                       # support reached its final state

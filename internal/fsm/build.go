@@ -105,7 +105,7 @@ func (b *builder) declare(scope *node, ctx antlr.ParserRuleContext) {
 		case *parser.ParallelContext:
 			name, kind, mark = c.Identifier(), model.Parallel, c.INITIAL()
 		case *parser.SubmachineContext:
-			name, kind, mark = c.Identifier(), model.Normal, c.INITIAL()
+			name, kind, mark = c.Identifier(0), model.Normal, c.INITIAL()
 		case *parser.RegionContext:
 			name, kind = c.Identifier(), model.Normal
 		case *parser.ChoiceContext:
@@ -123,6 +123,8 @@ func (b *builder) declare(scope *node, ctx antlr.ParserRuleContext) {
 			}
 		case *parser.ReferenceContext:
 			name, kind = c.Identifier(), model.EntryPoint
+		case *parser.OutletContext:
+			name, kind = c.Identifier(), model.ExitPoint
 		case *parser.FinalContext:
 			name, kind = c.Identifier(), model.Final
 		case *parser.TerminateContext:
@@ -147,9 +149,13 @@ func (b *builder) declare(scope *node, ctx antlr.ParserRuleContext) {
 		if n == nil {
 			continue
 		}
-		// The state is named after the machine it refers to.
-		if _, ok := child.(*parser.SubmachineContext); ok {
+		// The state names the machine it refers to after a colon, or is
+		// named after it.
+		if c, ok := child.(*parser.SubmachineContext); ok {
 			n.state.Submachine = n.state.Name
+			if machine := c.Identifier(1); machine != nil {
+				n.state.Submachine = machine.GetText()
+			}
 		}
 		n.state.Note = note(leading(n.ctx))
 		// Every declaration may carry a stereotype after its name.
