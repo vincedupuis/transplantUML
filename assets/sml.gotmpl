@@ -23,8 +23,10 @@ actions.addLine(). Simple states and pseudostates are string-literal states
 ("idle"_s), final states SML's X.
 
 The machine waits in internal::stopped until enterFsm sends it
-internal::enter, or the event of one of its entry points, and enterFsm and
-stopFsm start again from a new SML machine. Their names keep them apart from
+internal::enter, or the event of one of its entry points. stopFsm sends
+internal::stop, which every state of the machine's table answers by going
+back to internal::stopped, so the active states' exit behaviours run; then
+it starts again from a new SML machine, as enterFsm does first. Their names keep them apart from
 the events' methods. It ends in X or in one of its exit points, which report
 tells the listener. A submachine state runs another generated machine, which
 the constructor takes: its behaviours enter and stop that machine, and a
@@ -74,7 +76,7 @@ the lambdas the tables declared, but first in the output.
 {{- range $exits -}}
 {{- if regexMatch (printf "(?m)^[ \t]*[^/ \t].*= %s,?$" (regexQuoteMeta (include "str" .))) $body }}{{ $ends = append $ends (list (include "str" .) (print "onExit" (include "pascal" .))) }}{{ end -}}
 {{- end -}}
-{{- $internal := list "stopped" "enter" -}}
+{{- $internal := list "stopped" "enter" "stop" -}}
 {{- range $entries }}{{ $internal = append $internal (print "enter_" (include "entryId" .)) }}{{ end -}}
 {{- range regexFindAll "::internal::[A-Za-z0-9_]+" $code -1 }}{{ $internal = append $internal (trimPrefix "::internal::" .) }}{{ end -}}
 {{- $internal = uniq $internal -}}
@@ -360,6 +362,7 @@ void {{ $fsm }}::enterFsm(Entry entry) {
 }
 
 void {{ $fsm }}::stopFsm() {
+    machine_->sm.process_event(internal::stop{});
     machine_.reset();
     machine_ = std::make_unique<Machine>({{ if $subs }}*this, {{ end }}actions_{{ range $subs }}, {{ include "sid" .Name }}_{{ end }});
 }
@@ -495,6 +498,14 @@ return sml::make_transition_table(
 {{- range States -}}
 {{- if and (not (IsRegion .Name)) (eq (TableOf .Name) $table) -}}
 {{- $out = append $out (include "memberItems" (dict "state" . "initials" $initials)) -}}
+{{- end -}}
+{{- end -}}
+{{- if eq $table "" -}}
+{{- /* stopFsm leaves whatever state the machine is in, running its exit behaviours */ -}}
+{{- range Children "" -}}
+{{- if or .IsNormal .IsParallel -}}
+{{- $out = append $out (printf "\n%s + sml::event<::internal::stop> = sml::state<::internal::stopped>" (include "ref" .Name)) -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 {{- join "⟪row⟫" $out -}}

@@ -17,6 +17,7 @@ struct escalate {};
 namespace internal {
 struct stopped {};
 struct enter {};
+struct stop {};
 struct enter_urgent {};
 }  // namespace internal
 
@@ -29,7 +30,9 @@ struct machine {
             "bot"_s + sml::event<event::human> = "agent"_s,
             "bot"_s + sml::event<event::solved> = sml::X,
             "agent"_s + sml::event<event::solved> = sml::X,
-            "agent"_s + sml::event<event::escalate> = "escalated"_s
+            "agent"_s + sml::event<event::escalate> = "escalated"_s,
+            "bot"_s + sml::event<::internal::stop> = sml::state<::internal::stopped>,
+            "agent"_s + sml::event<::internal::stop> = sml::state<::internal::stopped>
         );
     }
 };
@@ -62,6 +65,7 @@ void SupportFsm::enterFsm(Entry entry) {
 }
 
 void SupportFsm::stopFsm() {
+    machine_->sm.process_event(internal::stop{});
     machine_.reset();
     machine_ = std::make_unique<Machine>(actions_);
 }

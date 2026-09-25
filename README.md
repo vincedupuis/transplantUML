@@ -347,7 +347,7 @@ fsm.touch();
 The machine waits, ignoring every event, until `enterFsm()` starts it in its initial state.
 `enterFsm(KioskFsm::Entry::p)` starts it at its entry point `p` instead.
 Either one starts the machine again from the beginning if it is already running.
-`stopFsm()` makes it wait again.
+`stopFsm()` leaves the current state, running the exit behaviours of the active states, and makes it wait again.
 These names keep them apart from the events' methods; an event named like one of them warns, since the files would
 not compile.
 
@@ -380,8 +380,8 @@ helpdesk.human();      // the submachine's events go to its instance
 - The machine's listener is the submachine state.
   When the machine finishes, the submachine state takes its completion transition.
   When it leaves by an exit point, the submachine state takes that point's transition.
-- Leaving the submachine state on an event of its own stops the machine with `stopFsm`, then runs the exit behaviour.
-  The machine's own exit behaviours do not run then.
+- Leaving the submachine state on an event of its own stops the machine with `stopFsm`, which runs the exit
+  behaviours of its active states, then runs the submachine state's exit behaviour.
 - The machine may finish while it is being entered.
   The outer machine then queues what it reports and handles it once the current event is done.
 - `ShopFsm.h` only declares `class SupportFsm;`.

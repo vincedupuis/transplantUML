@@ -218,7 +218,8 @@ func TestSMLNames(t *testing.T) {
 			"\n            \"pick\"_s [event] = sml::state<::checkout>,\n",
 			"\n            \"pick\"_s = \"say \\\"hi\\\"\"_s,\n",
 			"\n            \"say \\\"hi\\\"\"_s + sml::event<::event::checkout> / checkout = sml::state<::checkout>,\n",
-			"\n            sml::state<::checkout> + sml::event<::event::go> [blocked] = sml::state<machine_state>\n",
+			"\n            sml::state<::checkout> + sml::event<::event::go> [blocked] = sml::state<machine_state>,\n",
+			"\n            sml::state<::checkout> + sml::event<::internal::stop> = sml::state<::internal::stopped>,\n",
 			"\n        const auto blocked = [](MyShopFsmActions& actions) { return actions.blocked(); };\n",
 			"\nvoid MyShopFsm::checkout() { machine_->sm.process_event(event::checkout{}); }\n",
 		},
@@ -464,7 +465,8 @@ const agent = `fsm agent {
 
 // A submachine state runs a machine of its own, generated from another
 // document: this links desk and agent and runs them, checking the actions
-// they take in turn.
+// they take in turn. Leaving the submachine state early, or stopping desk,
+// runs the exit behaviour of agent's active state first.
 func TestSMLSubmachineRuns(t *testing.T) {
 	cxx, include := smlToolchain(t)
 	var files []File
@@ -517,6 +519,14 @@ int main() {
   step("ask, quit");
   help.human();
   step("human");
+  fsm.hurry();
+  fsm.quit();
+  step("hurry, quit");
+  fsm.hurry();
+  fsm.stopFsm();
+  step("hurry, stopFsm");
+  help.solved();
+  step("solved");
 }
 `
 	dir := t.TempDir()
@@ -540,6 +550,9 @@ solved: release close
 rush: open close
 ask, quit: open greet close
 human:
+hurry, quit: open assign release close
+hurry, stopFsm: open assign release close
+solved:
 `
 	if string(out) != want {
 		t.Errorf("the program printed\n%s\nwant\n%s", out, want)

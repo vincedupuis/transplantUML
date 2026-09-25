@@ -31,6 +31,7 @@ struct note {};
 namespace internal {
 struct stopped {};
 struct enter {};
+struct stop {};
 struct sub_finished {};
 }  // namespace internal
 
@@ -98,7 +99,11 @@ struct machine {
             "sub"_s + sml::event<::internal::sub_finished> = sml::X,
             // Says goodbye.
             sml::state<outer> + sml::on_exit<sml::_> / [] {},
-            sml::state<outer> = sml::X
+            sml::state<outer> = sml::X,
+            "work"_s + sml::event<::internal::stop> = sml::state<::internal::stopped>,
+            sml::state<both> + sml::event<::internal::stop> = sml::state<::internal::stopped>,
+            "sub"_s + sml::event<::internal::stop> = sml::state<::internal::stopped>,
+            sml::state<outer> + sml::event<::internal::stop> = sml::state<::internal::stopped>
         );
     }
 };
@@ -175,6 +180,7 @@ void UmlFsm::enterFsm(Entry entry) {
 }
 
 void UmlFsm::stopFsm() {
+    machine_->sm.process_event(internal::stop{});
     machine_.reset();
     machine_ = std::make_unique<Machine>(*this, actions_, sub_);
 }

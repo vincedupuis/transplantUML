@@ -146,8 +146,9 @@ warnings.
   orthogonal state completes when every region has. `TestSMLCompiles` compiles every golden input with a stub
   implementation of the actions and a stand-in for each machine a submachine state runs.
   Every machine waits in `internal::stopped` until `enterFsm(Entry)` (the initial state or one of its entry points)
-  and ends in `X` or one of its exit points, which `report` tells the `<Name>FsmListener`; `enterFsm` and `stopFsm`
-  rebuild the SML machine, and their names keep them apart from event methods. A submachine state runs the other
+  and ends in `X` or one of its exit points, which `report` tells the `<Name>FsmListener`; `stopFsm` sends `internal::stop`, which every state of the
+  machine's table answers by going back to `stopped` (SML exits active inner states and regions first), then
+  rebuilds the SML machine, and the names `enterFsm`/`stopFsm` keep them apart from event methods. A submachine state runs the other
   generated machine, which the constructor takes by reference: its entry and exit behaviours call `enterFsm` and
   `stopFsm` through the `submachines` struct SML injects, and a listener per submachine state turns what that machine
   reports into internal events, queued by `Machine::process` while an event is being processed.

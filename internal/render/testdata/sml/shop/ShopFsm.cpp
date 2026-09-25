@@ -34,6 +34,7 @@ struct complain {};
 namespace internal {
 struct stopped {};
 struct enter {};
+struct stop {};
 struct enter_reorder {};
 struct helpdesk_finished {};
 struct helpdesk_exit_escalated {};
@@ -126,11 +127,17 @@ struct machine {
             "done"_s = sml::X,
             "aftersales"_s + sml::on_entry<sml::_> / [](::submachines& s) { s.aftersales.enterFsm(std::exchange(s.aftersales_entry, SupportFsm::Entry::initial)); },
             "aftersales"_s + sml::on_exit<sml::_> / [](::submachines& s) { s.aftersales.stopFsm(); },
-            "aftersales"_s + sml::event<::internal::aftersales_finished> = "done"_s
+            "aftersales"_s + sml::event<::internal::aftersales_finished> = "done"_s,
             // refunded:
             // Money returned.
             // terminate:
             // Fraud closes the shop.
+            "browsing"_s + sml::event<::internal::stop> = sml::state<::internal::stopped>,
+            "helpdesk"_s + sml::event<::internal::stop> = sml::state<::internal::stopped>,
+            sml::state<checkout> + sml::event<::internal::stop> = sml::state<::internal::stopped>,
+            sml::state<shipping> + sml::event<::internal::stop> = sml::state<::internal::stopped>,
+            "done"_s + sml::event<::internal::stop> = sml::state<::internal::stopped>,
+            "aftersales"_s + sml::event<::internal::stop> = sml::state<::internal::stopped>
         );
     }
 };
@@ -234,6 +241,7 @@ void ShopFsm::enterFsm(Entry entry) {
 }
 
 void ShopFsm::stopFsm() {
+    machine_->sm.process_event(internal::stop{});
     machine_.reset();
     machine_ = std::make_unique<Machine>(*this, actions_, helpdesk_, aftersales_);
 }

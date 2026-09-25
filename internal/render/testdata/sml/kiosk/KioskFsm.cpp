@@ -29,6 +29,7 @@ struct ack {};
 namespace internal {
 struct stopped {};
 struct enter {};
+struct stop {};
 }  // namespace internal
 
 // The composite state "paying".
@@ -101,7 +102,10 @@ struct machine {
             sml::state<ordering> + sml::event<event::back> = sml::state<ordering>,
             sml::state<ordering> + sml::event<event::approved> / receipt = "done"_s,
             "done"_s + sml::on_entry<sml::_> / print,
-            "done"_s + sml::event<event::ack> = sml::X
+            "done"_s + sml::event<event::ack> = sml::X,
+            "idle"_s + sml::event<::internal::stop> = sml::state<::internal::stopped>,
+            sml::state<ordering> + sml::event<::internal::stop> = sml::state<::internal::stopped>,
+            "done"_s + sml::event<::internal::stop> = sml::state<::internal::stopped>
         );
     }
 };
@@ -130,6 +134,7 @@ void KioskFsm::enterFsm(Entry entry) {
 }
 
 void KioskFsm::stopFsm() {
+    machine_->sm.process_event(internal::stop{});
     machine_.reset();
     machine_ = std::make_unique<Machine>(actions_);
 }
