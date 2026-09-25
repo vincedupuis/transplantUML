@@ -125,6 +125,31 @@ func TestBuiltinTemplates(t *testing.T) {
 	}
 }
 
+// A template that calls file writes several files, into the folder -o names.
+func TestSeveralFiles(t *testing.T) {
+	dir := t.TempDir()
+	tmpl := filepath.Join(dir, "t.tmpl")
+	os.WriteFile(tmpl, []byte(`{{ file "a.txt" }}{{ .Initial }}{{ file "b.txt" }}{{ len .States }}`), 0o644)
+
+	if _, _, err := runCLI(t, "-i", example, "-t", tmpl); err == nil || !strings.Contains(err.Error(), "name a folder for them with -o") {
+		t.Errorf("without -o: %v", err)
+	}
+	out := filepath.Join(dir, "gen")
+	_, stderr, err := runCLI(t, "-i", example, "-t", tmpl, "-o", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]string{"a.txt": "idle", "b.txt": "6"} {
+		data, err := os.ReadFile(filepath.Join(out, name))
+		if err != nil || string(data) != want {
+			t.Errorf("%s = %q, %v; want %q", name, data, err, want)
+		}
+		if !strings.Contains(stderr, "output written to "+filepath.Join(out, name)+"\n") {
+			t.Errorf("stderr does not name %s:\n%s", name, stderr)
+		}
+	}
+}
+
 func TestNoArgsPrintsUsage(t *testing.T) {
 	out, _, err := runCLI(t)
 	if err != nil {

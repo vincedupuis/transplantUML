@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -68,7 +69,7 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 	f.StringVarP(&opts.inputFormat, "input-format", "f", "", "input format, one of: "+strings.Join(format.ParserNames(), ", ")+" (default: from the input file extension)")
 	f.StringVarP(&opts.tmplFile, "template", "t", "", "Go template file to render the model with, or the name of a built-in one: "+strings.Join(assets.TemplateNames(), ", ")+" (default: puml)")
 	f.StringVarP(&opts.outputFormat, "output-format", "F", "", "emit a built-in output format instead of a template, one of: "+strings.Join(format.EmitterNames(), ", "))
-	f.StringVarP(&opts.output, "output", "o", "", "output file (default: stdout)")
+	f.StringVarP(&opts.output, "output", "o", "", "output file, or the folder for a template that writes several files (default: stdout)")
 
 	cmd.MarkFlagRequired("input")
 	cmd.MarkFlagsMutuallyExclusive("template", "output-format")
@@ -118,7 +119,15 @@ func convert(opts options, stdout, stderr io.Writer) error {
 		if err != nil {
 			return err
 		}
-		out, warnings = []byte(text), w
+		report(stderr, w)
+		files, err := render.Files(text)
+		if err != nil {
+			return err
+		}
+		if files != nil {
+			return writeFiles(opts.output, files, stderr)
+		}
+		out, warnings = []byte(text), nil
 	}
 	report(stderr, warnings)
 
@@ -130,6 +139,24 @@ func convert(opts options, stdout, stderr io.Writer) error {
 		return fmt.Errorf("writing output: %w", err)
 	}
 	fmt.Fprintln(stderr, "output written to", opts.output)
+	return nil
+}
+
+// writeFiles writes the files a template produced into dir, creating it.
+func writeFiles(dir string, files []render.File, stderr io.Writer) error {
+	if dir == "" {
+		return fmt.Errorf("the template writes %d files; name a folder for them with -o", len(files))
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("writing output: %w", err)
+	}
+	for _, f := range files {
+		path := filepath.Join(dir, f.Name)
+		if err := os.WriteFile(path, []byte(f.Content), 0o644); err != nil {
+			return fmt.Errorf("writing output: %w", err)
+		}
+		fmt.Fprintln(stderr, "output written to", path)
+	}
 	return nil
 }
 

@@ -219,3 +219,35 @@ func TestErrors(t *testing.T) {
 		t.Errorf("exec error: %v", err)
 	}
 }
+
+// file marks where each of several output files starts.
+func TestFiles(t *testing.T) {
+	out, _, err := Render(&model.StateMachine{}, "\n{{ file \"a.h\" }}\nA\n{{ file \"b.cpp\" }}\nB\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, err := Files(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []File{{"a.h", "A\n"}, {"b.cpp", "B\n"}}; !reflect.DeepEqual(files, want) {
+		t.Errorf("files = %q, want %q", files, want)
+	}
+	if files, err := Files("plain"); files != nil || err != nil {
+		t.Errorf("a template without file = %q, %v", files, err)
+	}
+	for tmpl, want := range map[string]string{
+		`x{{ file "a" }}`:              "text before its first file",
+		`{{ file "a" }}{{ file "a" }}`: `the file "a" twice`,
+		`{{ file "../a" }}`:            "has no folder",
+		`{{ file "" }}`:                "has no folder",
+	} {
+		out, _, err := Render(&model.StateMachine{}, tmpl)
+		if err == nil {
+			_, err = Files(out)
+		}
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: want error containing %q, got %v", tmpl, want, err)
+		}
+	}
+}

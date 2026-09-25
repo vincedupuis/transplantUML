@@ -105,7 +105,7 @@ fsm -i input [-f format] [-t template | -F format] [-o output]
 | `-f`, `--input-format`  | Input format: `scxml`, `json`, `fsm`. Default: inferred from the extension (`.scxml`/`.xml`, `.json`, `.fsm`). |
 | `-t`, `--template`      | Go template file to render with, or a built-in one: `puml` (the default). A file wins.                |
 | `-F`, `--output-format` | Write a document format instead of running a template: `scxml`, `json`. Mutually exclusive with `-t`. |
-| `-o`, `--output`        | Output file. Default: stdout.                                                                         |
+| `-o`, `--output`        | Output file, or the folder for a template that writes several files. Default: stdout.                 |
 | `-h`, `--help`          | Show usage.                                                                                           |
 
 Each flag has a long form; `-F`/`--output-format` is distinct from `-f`/`--input-format` (flags are case-sensitive).
@@ -252,8 +252,13 @@ Templates use Go's [`text/template`](https://pkg.go.dev/text/template) syntax. A
 | `surround p s q`             | `p + s + q`, or `""` if `s` is empty                                     |
 | `joinNonEmpty sep s...`      | joins the strings, skipping empty ones                                   |
 | `warn format args...`        | records a warning for the user (printf-style) and returns `""`           |
+| `file name`                  | starts a file: the output up to the next `file` goes into `name`         |
 
 Call `warn` wherever the template leaves something out, so the user learns what the output does not show.
+
+A template that writes several files calls `file` before each one.
+`-o` then names the folder they go in, which is created if needed.
+Only white space may come before the first `file`, a name takes no folder, and no name may be used twice.
 
 [`assets/puml.gotmpl`](assets/puml.gotmpl) is the reference template: it shows how to recurse through compound states,
 draw parallel regions, and render pseudo-states.

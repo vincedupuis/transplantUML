@@ -8,7 +8,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 format-neutral model (`internal/model`) of a UML state machine, which is then written back out either by a built-in
 emitter (document formats: SCXML, JSON) or through a Go `text/template` (free-form text: PlantUML, code, docs).
 Template rendering is output-only. The bundled templates are embedded in the binary and `-t` takes their name when
-no file has it: `assets/puml.gotmpl` (`puml`, used when `-t` is omitted) produces PlantUML.
+no file has it: `assets/puml.gotmpl` (`puml`, used when `-t` is omitted) produces PlantUML. A template that writes
+several files starts each with the `file` function; `render.Files` splits the output at those marks and `-o` then
+names a folder.
 
 The user keeps one source document and generates outputs from it; round-tripping is *not* a goal. The goal is to
 cover as much of UML as possible on the input side and, on the output side, to write what the format can express
@@ -105,7 +107,7 @@ warnings.
 - **`internal/jsonsm`** — the model's own JSON shape (struct tags in `model`). Parser uses
   `DisallowUnknownFields`; round-trip equality with the SCXML parser is tested.
 - **`internal/render`** — registers sprig plus project helpers (`include`, `prefix`, `surround`, `joinNonEmpty`,
-  `warn`) and the model accessors as template functions. `warn` records a warning and returns `""`; `Render`
+  `warn`, `file`) and the model accessors as template functions. `warn` records a warning and returns `""`; `Render`
   returns the collected warnings. `joinNonEmpty` exists because sprig's `join` has the signature `join sep list`;
   don't shadow sprig names.
 - **`assets/puml.gotmpl`** — every emitted line starts with `\n` so nested blocks compose via
