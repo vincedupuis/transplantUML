@@ -101,17 +101,17 @@ func (b *builder) declare(scope *node, ctx antlr.ParserRuleContext) {
 			starts = append(starts, c) // its goto may name a child declared further down
 			continue
 		case *parser.StateContext:
-			name, kind, mark = c.Identifier(), model.Normal, c.Initial()
+			name, kind, mark = c.Identifier(), model.Normal, c.INITIAL()
 		case *parser.ParallelContext:
-			name, kind, mark = c.Identifier(), model.Parallel, c.Initial()
+			name, kind, mark = c.Identifier(), model.Parallel, c.INITIAL()
 		case *parser.SubmachineContext:
-			name, kind, mark = c.Identifier(), model.Normal, c.Initial()
+			name, kind, mark = c.Identifier(), model.Normal, c.INITIAL()
 		case *parser.RegionContext:
 			name, kind = c.Identifier(), model.Normal
 		case *parser.ChoiceContext:
-			name, kind, mark = c.Identifier(), model.Choice, c.Initial()
+			name, kind, mark = c.Identifier(), model.Choice, c.INITIAL()
 		case *parser.JunctionContext:
-			name, kind, mark = c.Identifier(), model.Junction, c.Initial()
+			name, kind, mark = c.Identifier(), model.Junction, c.INITIAL()
 		case *parser.ForkContext:
 			name, kind = c.Identifier(), model.Fork
 		case *parser.JoinContext:
@@ -173,7 +173,7 @@ func (b *builder) declare(scope *node, ctx antlr.ParserRuleContext) {
 	}
 	for _, c := range starts {
 		if initial != nil {
-			b.failf(c.Initial().GetSymbol(), "%s already starts in %q", describe(scope), initial.GetText())
+			b.failf(c.INITIAL().GetSymbol(), "%s already starts in %q", describe(scope), initial.GetText())
 			continue
 		}
 		b.start(scope, c)
@@ -316,7 +316,7 @@ func (b *builder) walk(scope *node) {
 func (b *builder) event(n *node, ec parser.IEventContext) {
 	about := note(ec.Note())
 	// The model holds one condition per state, so a second would be lost.
-	if inv := ec.Invariant(); inv != nil {
+	if inv := ec.INVARIANT(); inv != nil {
 		if n.state.Invariant != "" {
 			b.failf(inv.GetSymbol(), "state %q already has the invariant [%s], join the conditions with and", n.state.Name, n.state.Invariant)
 			return
@@ -331,7 +331,7 @@ func (b *builder) event(n *node, ec parser.IEventContext) {
 		// UML gives a state one entry, one exit and one do behaviour, which
 		// the clauses build up together, so their notes add up too.
 		switch {
-		case ec.Defer() != nil:
+		case ec.DEFER() != nil:
 			n.state.Defer = append(n.state.Defer, name.GetText())
 			if about != "" {
 				if n.state.DeferNotes == nil {
@@ -435,11 +435,11 @@ func (b *builder) transition(n *node, ac parser.IActionsContext, gt parser.IGoto
 // transition only into its own source, which it then never leaves.
 func (b *builder) destination(n *node, g parser.IGotoContext) (string, model.TransitionKind, bool) {
 	target, ok := b.target(n, g)
-	if !ok || g.Local() == nil {
+	if !ok || g.LOCAL() == nil {
 		return target, "", ok
 	}
 	if !slices.Contains(b.sm.Ancestors(target), n.state.Name) {
-		b.failf(g.Local().GetSymbol(), "a local transition stays inside %q, but %q is not inside it", n.state.Name, target)
+		b.failf(g.LOCAL().GetSymbol(), "a local transition stays inside %q, but %q is not inside it", n.state.Name, target)
 		return "", "", false
 	}
 	return target, model.Local, true

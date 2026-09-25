@@ -2,50 +2,50 @@
 grammar fsm;
 
 fsm
-    :   Note? 'fsm' Identifier
+    :   Note? FSM Identifier
         '{'
             (start | state | parallel | submachine | final | terminate | choice | junction | fork | join | point | event)*
         '}' EOF
     ;
 
 state
-    :   Note? Initial? 'state' Identifier stereotype?
+    :   Note? INITIAL? STATE Identifier stereotype?
         '{'
             (start | state | parallel | submachine | final | terminate | choice | junction | fork | join | point | history | event)*
         '}'
     ;
 
 parallel
-    :   Note? Initial? 'parallel' 'state' Identifier stereotype?
+    :   Note? INITIAL? PARALLEL STATE Identifier stereotype?
         '{'
             (region | point | event)*
         '}'
     ;
 
 submachine
-    :   Note? Initial? 'submachine' Identifier stereotype?
+    :   Note? INITIAL? SUBMACHINE Identifier stereotype?
         '{'
             (point | reference | event)*
         '}'
     ;
 
 final
-    :   Note? 'final' 'state' Identifier? stereotype?
+    :   Note? FINAL STATE Identifier? stereotype?
     ;
 
 terminate
-    :   Note? 'terminate' 'state' Identifier? stereotype?
+    :   Note? TERMINATE STATE Identifier? stereotype?
     ;
 
 region
-    :   Note? 'region' Identifier stereotype?
+    :   Note? REGION Identifier stereotype?
         '{'
             (start | state | parallel | submachine | final | terminate | choice | junction | fork | join | history)*
         '}'
     ;
 
 choice
-    :   Note? Initial? 'choice' Identifier stereotype?
+    :   Note? INITIAL? CHOICE Identifier stereotype?
         (   '{'
                 branch*
             '}'
@@ -54,7 +54,7 @@ choice
     ;
 
 junction
-    :   Note? Initial? 'junction' Identifier stereotype?
+    :   Note? INITIAL? JUNCTION Identifier stereotype?
         (   '{'
                 branch*
             '}'
@@ -63,30 +63,30 @@ junction
     ;
 
 fork
-    :   Note? 'fork' Identifier stereotype?
+    :   Note? FORK Identifier stereotype?
         '{'
             (Note? actions? goto)*
         '}'
     ;
 
 join
-    :   Note? 'join' Identifier stereotype? actions? goto
+    :   Note? JOIN Identifier stereotype? actions? goto
     ;
 
 point
-    :   Note? kind=('entry' | 'exit') 'point' Identifier stereotype? actions? goto
+    :   Note? kind=(ENTRY | EXIT) POINT Identifier stereotype? actions? goto
     ;
 
 reference
-    :   Note? 'entry' 'point' Identifier stereotype?
+    :   Note? ENTRY POINT Identifier stereotype?
     ;
 
 history
-    :   Note? kind=('H' | 'H*') stereotype? (actions? goto)?
+    :   Note? kind=(H | H_DEEP) stereotype? (actions? goto)?
     ;
 
 start
-    :   Initial actions? 'goto' Identifier
+    :   INITIAL actions? GOTO Identifier
     ;
 
 stereotype
@@ -94,14 +94,14 @@ stereotype
     ;
 
 branch
-    :   Note? ('[' 'else' ']' | guard)? actions? goto
+    :   Note? ('[' ELSE ']' | guard)? actions? goto
     ;
 
 event
     :   Note?
-        (   name=('entry' | 'exit' | 'do') actions
-        |   'on' name=Identifier '/' Defer
-        |   Invariant guard
+        (   name=(ENTRY | EXIT | DO) actions
+        |   ON name=Identifier '/' DEFER
+        |   INVARIANT guard
         |   trigger guard? actions goto?
         |   trigger guard? goto
         |   guard? actions? goto
@@ -109,8 +109,8 @@ event
     ;
 
 trigger
-    :   'on' name=Identifier
-    |   'after' '(' delay=(Duration | Identifier) ')'
+    :   ON name=Identifier
+    |   AFTER '(' delay=(Duration | Identifier) ')'
     ;
 
 actions
@@ -130,15 +130,15 @@ expression
     ;
 
 or_expression
-    :   and_expression ('or' and_expression)*
+    :   and_expression (OR and_expression)*
     ;
 
 and_expression
-    :   not_expression ('and' not_expression)*
+    :   not_expression (AND not_expression)*
     ;
 
 not_expression
-    :   'not'? single_expression
+    :   NOT? single_expression
     ;
 
 single_expression
@@ -147,15 +147,39 @@ single_expression
     ;
 
 goto
-    :   'goto' ('final' | 'terminate')
-    |   'goto' Local? Identifier
-    |   'goto' Local? (Identifier '.')? ('H' | 'H*')
+    :   GOTO (FINAL | TERMINATE)
+    |   GOTO LOCAL? Identifier
+    |   GOTO LOCAL? (Identifier '.')? (H | H_DEEP)
     ;
 
-Initial: 'initial';
-Invariant: 'invariant';
-Defer: 'defer';
-Local: 'local';
+FSM: 'fsm';
+STATE: 'state';
+PARALLEL: 'parallel';
+SUBMACHINE: 'submachine';
+REGION: 'region';
+FINAL: 'final';
+TERMINATE: 'terminate';
+CHOICE: 'choice';
+JUNCTION: 'junction';
+FORK: 'fork';
+JOIN: 'join';
+ENTRY: 'entry';
+EXIT: 'exit';
+POINT: 'point';
+DO: 'do';
+ON: 'on';
+AFTER: 'after';
+ELSE: 'else';
+GOTO: 'goto';
+LOCAL: 'local';
+INITIAL: 'initial';
+DEFER: 'defer';
+INVARIANT: 'invariant';
+AND: 'and';
+OR: 'or';
+NOT: 'not';
+H: 'H';
+H_DEEP: 'H*';
 Duration: [0-9]+ ('.' [0-9]+)? ('ms' | 's');
 Identifier: [a-zA-Z_] [a-zA-Z0-9_]*;
 Note: '|' ( '\\' . | ~[|\\] )* '|';

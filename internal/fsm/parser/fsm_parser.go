@@ -32,18 +32,19 @@ var FsmParserStaticData struct {
 func fsmParserInit() {
 	staticData := &FsmParserStaticData
 	staticData.LiteralNames = []string{
-		"", "'fsm'", "'{'", "'}'", "'state'", "'parallel'", "'submachine'",
-		"'final'", "'terminate'", "'region'", "'choice'", "'junction'", "'fork'",
-		"'join'", "'entry'", "'exit'", "'point'", "'H'", "'H*'", "'goto'", "'<<'",
-		"'>>'", "'['", "'else'", "']'", "'do'", "'on'", "'/'", "'after'", "'('",
-		"')'", "','", "'or'", "'and'", "'not'", "'.'", "'initial'", "'invariant'",
-		"'defer'", "'local'",
+		"", "'{'", "'}'", "'<<'", "'>>'", "'['", "']'", "'/'", "'('", "')'",
+		"','", "'.'", "'fsm'", "'state'", "'parallel'", "'submachine'", "'region'",
+		"'final'", "'terminate'", "'choice'", "'junction'", "'fork'", "'join'",
+		"'entry'", "'exit'", "'point'", "'do'", "'on'", "'after'", "'else'",
+		"'goto'", "'local'", "'initial'", "'defer'", "'invariant'", "'and'",
+		"'or'", "'not'", "'H'", "'H*'",
 	}
 	staticData.SymbolicNames = []string{
-		"", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
-		"", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
-		"", "", "Initial", "Invariant", "Defer", "Local", "Duration", "Identifier",
-		"Note", "Comment", "Blank",
+		"", "", "", "", "", "", "", "", "", "", "", "", "FSM", "STATE", "PARALLEL",
+		"SUBMACHINE", "REGION", "FINAL", "TERMINATE", "CHOICE", "JUNCTION",
+		"FORK", "JOIN", "ENTRY", "EXIT", "POINT", "DO", "ON", "AFTER", "ELSE",
+		"GOTO", "LOCAL", "INITIAL", "DEFER", "INVARIANT", "AND", "OR", "NOT",
+		"H", "H_DEEP", "Duration", "Identifier", "Note", "Comment", "Blank",
 	}
 	staticData.RuleNames = []string{
 		"fsm", "state", "parallel", "submachine", "final", "terminate", "region",
@@ -102,8 +103,8 @@ func fsmParserInit() {
 		27, 441, 8, 27, 1, 27, 1, 27, 1, 27, 3, 27, 446, 8, 27, 1, 27, 1, 27, 3,
 		27, 450, 8, 27, 1, 27, 3, 27, 453, 8, 27, 1, 27, 0, 0, 28, 0, 2, 4, 6,
 		8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42,
-		44, 46, 48, 50, 52, 54, 0, 5, 1, 0, 14, 15, 1, 0, 17, 18, 2, 0, 14, 15,
-		25, 25, 1, 0, 40, 41, 1, 0, 7, 8, 540, 0, 57, 1, 0, 0, 0, 2, 83, 1, 0,
+		44, 46, 48, 50, 52, 54, 0, 5, 1, 0, 23, 24, 1, 0, 38, 39, 2, 0, 23, 24,
+		26, 26, 1, 0, 40, 41, 1, 0, 17, 18, 540, 0, 57, 1, 0, 0, 0, 2, 83, 1, 0,
 		0, 0, 4, 115, 1, 0, 0, 0, 6, 138, 1, 0, 0, 0, 8, 160, 1, 0, 0, 0, 10, 171,
 		1, 0, 0, 0, 12, 182, 1, 0, 0, 0, 14, 209, 1, 0, 0, 0, 16, 231, 1, 0, 0,
 		0, 18, 253, 1, 0, 0, 0, 20, 276, 1, 0, 0, 0, 22, 289, 1, 0, 0, 0, 24, 303,
@@ -112,8 +113,8 @@ func fsmParserInit() {
 		1, 0, 0, 0, 40, 394, 1, 0, 0, 0, 42, 402, 1, 0, 0, 0, 44, 406, 1, 0, 0,
 		0, 46, 408, 1, 0, 0, 0, 48, 416, 1, 0, 0, 0, 50, 425, 1, 0, 0, 0, 52, 434,
 		1, 0, 0, 0, 54, 452, 1, 0, 0, 0, 56, 58, 5, 42, 0, 0, 57, 56, 1, 0, 0,
-		0, 57, 58, 1, 0, 0, 0, 58, 59, 1, 0, 0, 0, 59, 60, 5, 1, 0, 0, 60, 61,
-		5, 41, 0, 0, 61, 76, 5, 2, 0, 0, 62, 75, 3, 28, 14, 0, 63, 75, 3, 2, 1,
+		0, 57, 58, 1, 0, 0, 0, 58, 59, 1, 0, 0, 0, 59, 60, 5, 12, 0, 0, 60, 61,
+		5, 41, 0, 0, 61, 76, 5, 1, 0, 0, 62, 75, 3, 28, 14, 0, 63, 75, 3, 2, 1,
 		0, 64, 75, 3, 4, 2, 0, 65, 75, 3, 6, 3, 0, 66, 75, 3, 8, 4, 0, 67, 75,
 		3, 10, 5, 0, 68, 75, 3, 14, 7, 0, 69, 75, 3, 16, 8, 0, 70, 75, 3, 18, 9,
 		0, 71, 75, 3, 20, 10, 0, 72, 75, 3, 22, 11, 0, 73, 75, 3, 34, 17, 0, 74,
@@ -121,12 +122,12 @@ func fsmParserInit() {
 		0, 74, 66, 1, 0, 0, 0, 74, 67, 1, 0, 0, 0, 74, 68, 1, 0, 0, 0, 74, 69,
 		1, 0, 0, 0, 74, 70, 1, 0, 0, 0, 74, 71, 1, 0, 0, 0, 74, 72, 1, 0, 0, 0,
 		74, 73, 1, 0, 0, 0, 75, 78, 1, 0, 0, 0, 76, 74, 1, 0, 0, 0, 76, 77, 1,
-		0, 0, 0, 77, 79, 1, 0, 0, 0, 78, 76, 1, 0, 0, 0, 79, 80, 5, 3, 0, 0, 80,
+		0, 0, 0, 77, 79, 1, 0, 0, 0, 78, 76, 1, 0, 0, 0, 79, 80, 5, 2, 0, 0, 80,
 		81, 5, 0, 0, 1, 81, 1, 1, 0, 0, 0, 82, 84, 5, 42, 0, 0, 83, 82, 1, 0, 0,
-		0, 83, 84, 1, 0, 0, 0, 84, 86, 1, 0, 0, 0, 85, 87, 5, 36, 0, 0, 86, 85,
-		1, 0, 0, 0, 86, 87, 1, 0, 0, 0, 87, 88, 1, 0, 0, 0, 88, 89, 5, 4, 0, 0,
+		0, 83, 84, 1, 0, 0, 0, 84, 86, 1, 0, 0, 0, 85, 87, 5, 32, 0, 0, 86, 85,
+		1, 0, 0, 0, 86, 87, 1, 0, 0, 0, 87, 88, 1, 0, 0, 0, 88, 89, 5, 13, 0, 0,
 		89, 91, 5, 41, 0, 0, 90, 92, 3, 30, 15, 0, 91, 90, 1, 0, 0, 0, 91, 92,
-		1, 0, 0, 0, 92, 93, 1, 0, 0, 0, 93, 109, 5, 2, 0, 0, 94, 108, 3, 28, 14,
+		1, 0, 0, 0, 92, 93, 1, 0, 0, 0, 93, 109, 5, 1, 0, 0, 94, 108, 3, 28, 14,
 		0, 95, 108, 3, 2, 1, 0, 96, 108, 3, 4, 2, 0, 97, 108, 3, 6, 3, 0, 98, 108,
 		3, 8, 4, 0, 99, 108, 3, 10, 5, 0, 100, 108, 3, 14, 7, 0, 101, 108, 3, 16,
 		8, 0, 102, 108, 3, 18, 9, 0, 103, 108, 3, 20, 10, 0, 104, 108, 3, 22, 11,
@@ -136,37 +137,37 @@ func fsmParserInit() {
 		0, 0, 107, 102, 1, 0, 0, 0, 107, 103, 1, 0, 0, 0, 107, 104, 1, 0, 0, 0,
 		107, 105, 1, 0, 0, 0, 107, 106, 1, 0, 0, 0, 108, 111, 1, 0, 0, 0, 109,
 		107, 1, 0, 0, 0, 109, 110, 1, 0, 0, 0, 110, 112, 1, 0, 0, 0, 111, 109,
-		1, 0, 0, 0, 112, 113, 5, 3, 0, 0, 113, 3, 1, 0, 0, 0, 114, 116, 5, 42,
+		1, 0, 0, 0, 112, 113, 5, 2, 0, 0, 113, 3, 1, 0, 0, 0, 114, 116, 5, 42,
 		0, 0, 115, 114, 1, 0, 0, 0, 115, 116, 1, 0, 0, 0, 116, 118, 1, 0, 0, 0,
-		117, 119, 5, 36, 0, 0, 118, 117, 1, 0, 0, 0, 118, 119, 1, 0, 0, 0, 119,
-		120, 1, 0, 0, 0, 120, 121, 5, 5, 0, 0, 121, 122, 5, 4, 0, 0, 122, 124,
+		117, 119, 5, 32, 0, 0, 118, 117, 1, 0, 0, 0, 118, 119, 1, 0, 0, 0, 119,
+		120, 1, 0, 0, 0, 120, 121, 5, 14, 0, 0, 121, 122, 5, 13, 0, 0, 122, 124,
 		5, 41, 0, 0, 123, 125, 3, 30, 15, 0, 124, 123, 1, 0, 0, 0, 124, 125, 1,
-		0, 0, 0, 125, 126, 1, 0, 0, 0, 126, 132, 5, 2, 0, 0, 127, 131, 3, 12, 6,
+		0, 0, 0, 125, 126, 1, 0, 0, 0, 126, 132, 5, 1, 0, 0, 127, 131, 3, 12, 6,
 		0, 128, 131, 3, 22, 11, 0, 129, 131, 3, 34, 17, 0, 130, 127, 1, 0, 0, 0,
 		130, 128, 1, 0, 0, 0, 130, 129, 1, 0, 0, 0, 131, 134, 1, 0, 0, 0, 132,
 		130, 1, 0, 0, 0, 132, 133, 1, 0, 0, 0, 133, 135, 1, 0, 0, 0, 134, 132,
-		1, 0, 0, 0, 135, 136, 5, 3, 0, 0, 136, 5, 1, 0, 0, 0, 137, 139, 5, 42,
+		1, 0, 0, 0, 135, 136, 5, 2, 0, 0, 136, 5, 1, 0, 0, 0, 137, 139, 5, 42,
 		0, 0, 138, 137, 1, 0, 0, 0, 138, 139, 1, 0, 0, 0, 139, 141, 1, 0, 0, 0,
-		140, 142, 5, 36, 0, 0, 141, 140, 1, 0, 0, 0, 141, 142, 1, 0, 0, 0, 142,
-		143, 1, 0, 0, 0, 143, 144, 5, 6, 0, 0, 144, 146, 5, 41, 0, 0, 145, 147,
+		140, 142, 5, 32, 0, 0, 141, 140, 1, 0, 0, 0, 141, 142, 1, 0, 0, 0, 142,
+		143, 1, 0, 0, 0, 143, 144, 5, 15, 0, 0, 144, 146, 5, 41, 0, 0, 145, 147,
 		3, 30, 15, 0, 146, 145, 1, 0, 0, 0, 146, 147, 1, 0, 0, 0, 147, 148, 1,
-		0, 0, 0, 148, 154, 5, 2, 0, 0, 149, 153, 3, 22, 11, 0, 150, 153, 3, 24,
+		0, 0, 0, 148, 154, 5, 1, 0, 0, 149, 153, 3, 22, 11, 0, 150, 153, 3, 24,
 		12, 0, 151, 153, 3, 34, 17, 0, 152, 149, 1, 0, 0, 0, 152, 150, 1, 0, 0,
 		0, 152, 151, 1, 0, 0, 0, 153, 156, 1, 0, 0, 0, 154, 152, 1, 0, 0, 0, 154,
 		155, 1, 0, 0, 0, 155, 157, 1, 0, 0, 0, 156, 154, 1, 0, 0, 0, 157, 158,
-		5, 3, 0, 0, 158, 7, 1, 0, 0, 0, 159, 161, 5, 42, 0, 0, 160, 159, 1, 0,
-		0, 0, 160, 161, 1, 0, 0, 0, 161, 162, 1, 0, 0, 0, 162, 163, 5, 7, 0, 0,
-		163, 165, 5, 4, 0, 0, 164, 166, 5, 41, 0, 0, 165, 164, 1, 0, 0, 0, 165,
+		5, 2, 0, 0, 158, 7, 1, 0, 0, 0, 159, 161, 5, 42, 0, 0, 160, 159, 1, 0,
+		0, 0, 160, 161, 1, 0, 0, 0, 161, 162, 1, 0, 0, 0, 162, 163, 5, 17, 0, 0,
+		163, 165, 5, 13, 0, 0, 164, 166, 5, 41, 0, 0, 165, 164, 1, 0, 0, 0, 165,
 		166, 1, 0, 0, 0, 166, 168, 1, 0, 0, 0, 167, 169, 3, 30, 15, 0, 168, 167,
 		1, 0, 0, 0, 168, 169, 1, 0, 0, 0, 169, 9, 1, 0, 0, 0, 170, 172, 5, 42,
 		0, 0, 171, 170, 1, 0, 0, 0, 171, 172, 1, 0, 0, 0, 172, 173, 1, 0, 0, 0,
-		173, 174, 5, 8, 0, 0, 174, 176, 5, 4, 0, 0, 175, 177, 5, 41, 0, 0, 176,
+		173, 174, 5, 18, 0, 0, 174, 176, 5, 13, 0, 0, 175, 177, 5, 41, 0, 0, 176,
 		175, 1, 0, 0, 0, 176, 177, 1, 0, 0, 0, 177, 179, 1, 0, 0, 0, 178, 180,
 		3, 30, 15, 0, 179, 178, 1, 0, 0, 0, 179, 180, 1, 0, 0, 0, 180, 11, 1, 0,
 		0, 0, 181, 183, 5, 42, 0, 0, 182, 181, 1, 0, 0, 0, 182, 183, 1, 0, 0, 0,
-		183, 184, 1, 0, 0, 0, 184, 185, 5, 9, 0, 0, 185, 187, 5, 41, 0, 0, 186,
+		183, 184, 1, 0, 0, 0, 184, 185, 5, 16, 0, 0, 185, 187, 5, 41, 0, 0, 186,
 		188, 3, 30, 15, 0, 187, 186, 1, 0, 0, 0, 187, 188, 1, 0, 0, 0, 188, 189,
-		1, 0, 0, 0, 189, 203, 5, 2, 0, 0, 190, 202, 3, 28, 14, 0, 191, 202, 3,
+		1, 0, 0, 0, 189, 203, 5, 1, 0, 0, 190, 202, 3, 28, 14, 0, 191, 202, 3,
 		2, 1, 0, 192, 202, 3, 4, 2, 0, 193, 202, 3, 6, 3, 0, 194, 202, 3, 8, 4,
 		0, 195, 202, 3, 10, 5, 0, 196, 202, 3, 14, 7, 0, 197, 202, 3, 16, 8, 0,
 		198, 202, 3, 18, 9, 0, 199, 202, 3, 20, 10, 0, 200, 202, 3, 26, 13, 0,
@@ -175,64 +176,64 @@ func fsmParserInit() {
 		1, 0, 0, 0, 201, 197, 1, 0, 0, 0, 201, 198, 1, 0, 0, 0, 201, 199, 1, 0,
 		0, 0, 201, 200, 1, 0, 0, 0, 202, 205, 1, 0, 0, 0, 203, 201, 1, 0, 0, 0,
 		203, 204, 1, 0, 0, 0, 204, 206, 1, 0, 0, 0, 205, 203, 1, 0, 0, 0, 206,
-		207, 5, 3, 0, 0, 207, 13, 1, 0, 0, 0, 208, 210, 5, 42, 0, 0, 209, 208,
-		1, 0, 0, 0, 209, 210, 1, 0, 0, 0, 210, 212, 1, 0, 0, 0, 211, 213, 5, 36,
+		207, 5, 2, 0, 0, 207, 13, 1, 0, 0, 0, 208, 210, 5, 42, 0, 0, 209, 208,
+		1, 0, 0, 0, 209, 210, 1, 0, 0, 0, 210, 212, 1, 0, 0, 0, 211, 213, 5, 32,
 		0, 0, 212, 211, 1, 0, 0, 0, 212, 213, 1, 0, 0, 0, 213, 214, 1, 0, 0, 0,
-		214, 215, 5, 10, 0, 0, 215, 217, 5, 41, 0, 0, 216, 218, 3, 30, 15, 0, 217,
+		214, 215, 5, 19, 0, 0, 215, 217, 5, 41, 0, 0, 216, 218, 3, 30, 15, 0, 217,
 		216, 1, 0, 0, 0, 217, 218, 1, 0, 0, 0, 218, 228, 1, 0, 0, 0, 219, 223,
-		5, 2, 0, 0, 220, 222, 3, 32, 16, 0, 221, 220, 1, 0, 0, 0, 222, 225, 1,
+		5, 1, 0, 0, 220, 222, 3, 32, 16, 0, 221, 220, 1, 0, 0, 0, 222, 225, 1,
 		0, 0, 0, 223, 221, 1, 0, 0, 0, 223, 224, 1, 0, 0, 0, 224, 226, 1, 0, 0,
-		0, 225, 223, 1, 0, 0, 0, 226, 229, 5, 3, 0, 0, 227, 229, 3, 32, 16, 0,
+		0, 225, 223, 1, 0, 0, 0, 226, 229, 5, 2, 0, 0, 227, 229, 3, 32, 16, 0,
 		228, 219, 1, 0, 0, 0, 228, 227, 1, 0, 0, 0, 229, 15, 1, 0, 0, 0, 230, 232,
 		5, 42, 0, 0, 231, 230, 1, 0, 0, 0, 231, 232, 1, 0, 0, 0, 232, 234, 1, 0,
-		0, 0, 233, 235, 5, 36, 0, 0, 234, 233, 1, 0, 0, 0, 234, 235, 1, 0, 0, 0,
-		235, 236, 1, 0, 0, 0, 236, 237, 5, 11, 0, 0, 237, 239, 5, 41, 0, 0, 238,
+		0, 0, 233, 235, 5, 32, 0, 0, 234, 233, 1, 0, 0, 0, 234, 235, 1, 0, 0, 0,
+		235, 236, 1, 0, 0, 0, 236, 237, 5, 20, 0, 0, 237, 239, 5, 41, 0, 0, 238,
 		240, 3, 30, 15, 0, 239, 238, 1, 0, 0, 0, 239, 240, 1, 0, 0, 0, 240, 250,
-		1, 0, 0, 0, 241, 245, 5, 2, 0, 0, 242, 244, 3, 32, 16, 0, 243, 242, 1,
+		1, 0, 0, 0, 241, 245, 5, 1, 0, 0, 242, 244, 3, 32, 16, 0, 243, 242, 1,
 		0, 0, 0, 244, 247, 1, 0, 0, 0, 245, 243, 1, 0, 0, 0, 245, 246, 1, 0, 0,
-		0, 246, 248, 1, 0, 0, 0, 247, 245, 1, 0, 0, 0, 248, 251, 5, 3, 0, 0, 249,
+		0, 246, 248, 1, 0, 0, 0, 247, 245, 1, 0, 0, 0, 248, 251, 5, 2, 0, 0, 249,
 		251, 3, 32, 16, 0, 250, 241, 1, 0, 0, 0, 250, 249, 1, 0, 0, 0, 251, 17,
 		1, 0, 0, 0, 252, 254, 5, 42, 0, 0, 253, 252, 1, 0, 0, 0, 253, 254, 1, 0,
-		0, 0, 254, 255, 1, 0, 0, 0, 255, 256, 5, 12, 0, 0, 256, 258, 5, 41, 0,
+		0, 0, 254, 255, 1, 0, 0, 0, 255, 256, 5, 21, 0, 0, 256, 258, 5, 41, 0,
 		0, 257, 259, 3, 30, 15, 0, 258, 257, 1, 0, 0, 0, 258, 259, 1, 0, 0, 0,
-		259, 260, 1, 0, 0, 0, 260, 270, 5, 2, 0, 0, 261, 263, 5, 42, 0, 0, 262,
+		259, 260, 1, 0, 0, 0, 260, 270, 5, 1, 0, 0, 261, 263, 5, 42, 0, 0, 262,
 		261, 1, 0, 0, 0, 262, 263, 1, 0, 0, 0, 263, 265, 1, 0, 0, 0, 264, 266,
 		3, 38, 19, 0, 265, 264, 1, 0, 0, 0, 265, 266, 1, 0, 0, 0, 266, 267, 1,
 		0, 0, 0, 267, 269, 3, 54, 27, 0, 268, 262, 1, 0, 0, 0, 269, 272, 1, 0,
 		0, 0, 270, 268, 1, 0, 0, 0, 270, 271, 1, 0, 0, 0, 271, 273, 1, 0, 0, 0,
-		272, 270, 1, 0, 0, 0, 273, 274, 5, 3, 0, 0, 274, 19, 1, 0, 0, 0, 275, 277,
+		272, 270, 1, 0, 0, 0, 273, 274, 5, 2, 0, 0, 274, 19, 1, 0, 0, 0, 275, 277,
 		5, 42, 0, 0, 276, 275, 1, 0, 0, 0, 276, 277, 1, 0, 0, 0, 277, 278, 1, 0,
-		0, 0, 278, 279, 5, 13, 0, 0, 279, 281, 5, 41, 0, 0, 280, 282, 3, 30, 15,
+		0, 0, 278, 279, 5, 22, 0, 0, 279, 281, 5, 41, 0, 0, 280, 282, 3, 30, 15,
 		0, 281, 280, 1, 0, 0, 0, 281, 282, 1, 0, 0, 0, 282, 284, 1, 0, 0, 0, 283,
 		285, 3, 38, 19, 0, 284, 283, 1, 0, 0, 0, 284, 285, 1, 0, 0, 0, 285, 286,
 		1, 0, 0, 0, 286, 287, 3, 54, 27, 0, 287, 21, 1, 0, 0, 0, 288, 290, 5, 42,
 		0, 0, 289, 288, 1, 0, 0, 0, 289, 290, 1, 0, 0, 0, 290, 291, 1, 0, 0, 0,
-		291, 292, 7, 0, 0, 0, 292, 293, 5, 16, 0, 0, 293, 295, 5, 41, 0, 0, 294,
+		291, 292, 7, 0, 0, 0, 292, 293, 5, 25, 0, 0, 293, 295, 5, 41, 0, 0, 294,
 		296, 3, 30, 15, 0, 295, 294, 1, 0, 0, 0, 295, 296, 1, 0, 0, 0, 296, 298,
 		1, 0, 0, 0, 297, 299, 3, 38, 19, 0, 298, 297, 1, 0, 0, 0, 298, 299, 1,
 		0, 0, 0, 299, 300, 1, 0, 0, 0, 300, 301, 3, 54, 27, 0, 301, 23, 1, 0, 0,
 		0, 302, 304, 5, 42, 0, 0, 303, 302, 1, 0, 0, 0, 303, 304, 1, 0, 0, 0, 304,
-		305, 1, 0, 0, 0, 305, 306, 5, 14, 0, 0, 306, 307, 5, 16, 0, 0, 307, 309,
+		305, 1, 0, 0, 0, 305, 306, 5, 23, 0, 0, 306, 307, 5, 25, 0, 0, 307, 309,
 		5, 41, 0, 0, 308, 310, 3, 30, 15, 0, 309, 308, 1, 0, 0, 0, 309, 310, 1,
 		0, 0, 0, 310, 25, 1, 0, 0, 0, 311, 313, 5, 42, 0, 0, 312, 311, 1, 0, 0,
 		0, 312, 313, 1, 0, 0, 0, 313, 314, 1, 0, 0, 0, 314, 316, 7, 1, 0, 0, 315,
 		317, 3, 30, 15, 0, 316, 315, 1, 0, 0, 0, 316, 317, 1, 0, 0, 0, 317, 322,
 		1, 0, 0, 0, 318, 320, 3, 38, 19, 0, 319, 318, 1, 0, 0, 0, 319, 320, 1,
 		0, 0, 0, 320, 321, 1, 0, 0, 0, 321, 323, 3, 54, 27, 0, 322, 319, 1, 0,
-		0, 0, 322, 323, 1, 0, 0, 0, 323, 27, 1, 0, 0, 0, 324, 326, 5, 36, 0, 0,
+		0, 0, 322, 323, 1, 0, 0, 0, 323, 27, 1, 0, 0, 0, 324, 326, 5, 32, 0, 0,
 		325, 327, 3, 38, 19, 0, 326, 325, 1, 0, 0, 0, 326, 327, 1, 0, 0, 0, 327,
-		328, 1, 0, 0, 0, 328, 329, 5, 19, 0, 0, 329, 330, 5, 41, 0, 0, 330, 29,
-		1, 0, 0, 0, 331, 332, 5, 20, 0, 0, 332, 333, 5, 41, 0, 0, 333, 334, 5,
-		21, 0, 0, 334, 31, 1, 0, 0, 0, 335, 337, 5, 42, 0, 0, 336, 335, 1, 0, 0,
-		0, 336, 337, 1, 0, 0, 0, 337, 342, 1, 0, 0, 0, 338, 339, 5, 22, 0, 0, 339,
-		340, 5, 23, 0, 0, 340, 343, 5, 24, 0, 0, 341, 343, 3, 42, 21, 0, 342, 338,
+		328, 1, 0, 0, 0, 328, 329, 5, 30, 0, 0, 329, 330, 5, 41, 0, 0, 330, 29,
+		1, 0, 0, 0, 331, 332, 5, 3, 0, 0, 332, 333, 5, 41, 0, 0, 333, 334, 5, 4,
+		0, 0, 334, 31, 1, 0, 0, 0, 335, 337, 5, 42, 0, 0, 336, 335, 1, 0, 0, 0,
+		336, 337, 1, 0, 0, 0, 337, 342, 1, 0, 0, 0, 338, 339, 5, 5, 0, 0, 339,
+		340, 5, 29, 0, 0, 340, 343, 5, 6, 0, 0, 341, 343, 3, 42, 21, 0, 342, 338,
 		1, 0, 0, 0, 342, 341, 1, 0, 0, 0, 342, 343, 1, 0, 0, 0, 343, 345, 1, 0,
 		0, 0, 344, 346, 3, 38, 19, 0, 345, 344, 1, 0, 0, 0, 345, 346, 1, 0, 0,
 		0, 346, 347, 1, 0, 0, 0, 347, 348, 3, 54, 27, 0, 348, 33, 1, 0, 0, 0, 349,
 		351, 5, 42, 0, 0, 350, 349, 1, 0, 0, 0, 350, 351, 1, 0, 0, 0, 351, 381,
 		1, 0, 0, 0, 352, 353, 7, 2, 0, 0, 353, 382, 3, 38, 19, 0, 354, 355, 5,
-		26, 0, 0, 355, 356, 5, 41, 0, 0, 356, 357, 5, 27, 0, 0, 357, 382, 5, 38,
-		0, 0, 358, 359, 5, 37, 0, 0, 359, 382, 3, 42, 21, 0, 360, 362, 3, 36, 18,
+		27, 0, 0, 355, 356, 5, 41, 0, 0, 356, 357, 5, 7, 0, 0, 357, 382, 5, 33,
+		0, 0, 358, 359, 5, 34, 0, 0, 359, 382, 3, 42, 21, 0, 360, 362, 3, 36, 18,
 		0, 361, 363, 3, 42, 21, 0, 362, 361, 1, 0, 0, 0, 362, 363, 1, 0, 0, 0,
 		363, 364, 1, 0, 0, 0, 364, 366, 3, 38, 19, 0, 365, 367, 3, 54, 27, 0, 366,
 		365, 1, 0, 0, 0, 366, 367, 1, 0, 0, 0, 367, 382, 1, 0, 0, 0, 368, 370,
@@ -243,37 +244,37 @@ func fsmParserInit() {
 		378, 379, 1, 0, 0, 0, 379, 380, 1, 0, 0, 0, 380, 382, 3, 54, 27, 0, 381,
 		352, 1, 0, 0, 0, 381, 354, 1, 0, 0, 0, 381, 358, 1, 0, 0, 0, 381, 360,
 		1, 0, 0, 0, 381, 368, 1, 0, 0, 0, 381, 375, 1, 0, 0, 0, 382, 35, 1, 0,
-		0, 0, 383, 384, 5, 26, 0, 0, 384, 390, 5, 41, 0, 0, 385, 386, 5, 28, 0,
-		0, 386, 387, 5, 29, 0, 0, 387, 388, 7, 3, 0, 0, 388, 390, 5, 30, 0, 0,
-		389, 383, 1, 0, 0, 0, 389, 385, 1, 0, 0, 0, 390, 37, 1, 0, 0, 0, 391, 392,
-		5, 27, 0, 0, 392, 393, 3, 40, 20, 0, 393, 39, 1, 0, 0, 0, 394, 399, 5,
-		41, 0, 0, 395, 396, 5, 31, 0, 0, 396, 398, 5, 41, 0, 0, 397, 395, 1, 0,
-		0, 0, 398, 401, 1, 0, 0, 0, 399, 397, 1, 0, 0, 0, 399, 400, 1, 0, 0, 0,
-		400, 41, 1, 0, 0, 0, 401, 399, 1, 0, 0, 0, 402, 403, 5, 22, 0, 0, 403,
-		404, 3, 44, 22, 0, 404, 405, 5, 24, 0, 0, 405, 43, 1, 0, 0, 0, 406, 407,
-		3, 46, 23, 0, 407, 45, 1, 0, 0, 0, 408, 413, 3, 48, 24, 0, 409, 410, 5,
-		32, 0, 0, 410, 412, 3, 48, 24, 0, 411, 409, 1, 0, 0, 0, 412, 415, 1, 0,
-		0, 0, 413, 411, 1, 0, 0, 0, 413, 414, 1, 0, 0, 0, 414, 47, 1, 0, 0, 0,
-		415, 413, 1, 0, 0, 0, 416, 421, 3, 50, 25, 0, 417, 418, 5, 33, 0, 0, 418,
-		420, 3, 50, 25, 0, 419, 417, 1, 0, 0, 0, 420, 423, 1, 0, 0, 0, 421, 419,
-		1, 0, 0, 0, 421, 422, 1, 0, 0, 0, 422, 49, 1, 0, 0, 0, 423, 421, 1, 0,
-		0, 0, 424, 426, 5, 34, 0, 0, 425, 424, 1, 0, 0, 0, 425, 426, 1, 0, 0, 0,
-		426, 427, 1, 0, 0, 0, 427, 428, 3, 52, 26, 0, 428, 51, 1, 0, 0, 0, 429,
-		435, 5, 41, 0, 0, 430, 431, 5, 29, 0, 0, 431, 432, 3, 44, 22, 0, 432, 433,
-		5, 30, 0, 0, 433, 435, 1, 0, 0, 0, 434, 429, 1, 0, 0, 0, 434, 430, 1, 0,
-		0, 0, 435, 53, 1, 0, 0, 0, 436, 437, 5, 19, 0, 0, 437, 453, 7, 4, 0, 0,
-		438, 440, 5, 19, 0, 0, 439, 441, 5, 39, 0, 0, 440, 439, 1, 0, 0, 0, 440,
-		441, 1, 0, 0, 0, 441, 442, 1, 0, 0, 0, 442, 453, 5, 41, 0, 0, 443, 445,
-		5, 19, 0, 0, 444, 446, 5, 39, 0, 0, 445, 444, 1, 0, 0, 0, 445, 446, 1,
-		0, 0, 0, 446, 449, 1, 0, 0, 0, 447, 448, 5, 41, 0, 0, 448, 450, 5, 35,
-		0, 0, 449, 447, 1, 0, 0, 0, 449, 450, 1, 0, 0, 0, 450, 451, 1, 0, 0, 0,
-		451, 453, 7, 1, 0, 0, 452, 436, 1, 0, 0, 0, 452, 438, 1, 0, 0, 0, 452,
-		443, 1, 0, 0, 0, 453, 55, 1, 0, 0, 0, 76, 57, 74, 76, 83, 86, 91, 107,
-		109, 115, 118, 124, 130, 132, 138, 141, 146, 152, 154, 160, 165, 168, 171,
-		176, 179, 182, 187, 201, 203, 209, 212, 217, 223, 228, 231, 234, 239, 245,
-		250, 253, 258, 262, 265, 270, 276, 281, 284, 289, 295, 298, 303, 309, 312,
-		316, 319, 322, 326, 336, 342, 345, 350, 362, 366, 370, 375, 378, 381, 389,
-		399, 413, 421, 425, 434, 440, 445, 449, 452,
+		0, 0, 383, 384, 5, 27, 0, 0, 384, 390, 5, 41, 0, 0, 385, 386, 5, 28, 0,
+		0, 386, 387, 5, 8, 0, 0, 387, 388, 7, 3, 0, 0, 388, 390, 5, 9, 0, 0, 389,
+		383, 1, 0, 0, 0, 389, 385, 1, 0, 0, 0, 390, 37, 1, 0, 0, 0, 391, 392, 5,
+		7, 0, 0, 392, 393, 3, 40, 20, 0, 393, 39, 1, 0, 0, 0, 394, 399, 5, 41,
+		0, 0, 395, 396, 5, 10, 0, 0, 396, 398, 5, 41, 0, 0, 397, 395, 1, 0, 0,
+		0, 398, 401, 1, 0, 0, 0, 399, 397, 1, 0, 0, 0, 399, 400, 1, 0, 0, 0, 400,
+		41, 1, 0, 0, 0, 401, 399, 1, 0, 0, 0, 402, 403, 5, 5, 0, 0, 403, 404, 3,
+		44, 22, 0, 404, 405, 5, 6, 0, 0, 405, 43, 1, 0, 0, 0, 406, 407, 3, 46,
+		23, 0, 407, 45, 1, 0, 0, 0, 408, 413, 3, 48, 24, 0, 409, 410, 5, 36, 0,
+		0, 410, 412, 3, 48, 24, 0, 411, 409, 1, 0, 0, 0, 412, 415, 1, 0, 0, 0,
+		413, 411, 1, 0, 0, 0, 413, 414, 1, 0, 0, 0, 414, 47, 1, 0, 0, 0, 415, 413,
+		1, 0, 0, 0, 416, 421, 3, 50, 25, 0, 417, 418, 5, 35, 0, 0, 418, 420, 3,
+		50, 25, 0, 419, 417, 1, 0, 0, 0, 420, 423, 1, 0, 0, 0, 421, 419, 1, 0,
+		0, 0, 421, 422, 1, 0, 0, 0, 422, 49, 1, 0, 0, 0, 423, 421, 1, 0, 0, 0,
+		424, 426, 5, 37, 0, 0, 425, 424, 1, 0, 0, 0, 425, 426, 1, 0, 0, 0, 426,
+		427, 1, 0, 0, 0, 427, 428, 3, 52, 26, 0, 428, 51, 1, 0, 0, 0, 429, 435,
+		5, 41, 0, 0, 430, 431, 5, 8, 0, 0, 431, 432, 3, 44, 22, 0, 432, 433, 5,
+		9, 0, 0, 433, 435, 1, 0, 0, 0, 434, 429, 1, 0, 0, 0, 434, 430, 1, 0, 0,
+		0, 435, 53, 1, 0, 0, 0, 436, 437, 5, 30, 0, 0, 437, 453, 7, 4, 0, 0, 438,
+		440, 5, 30, 0, 0, 439, 441, 5, 31, 0, 0, 440, 439, 1, 0, 0, 0, 440, 441,
+		1, 0, 0, 0, 441, 442, 1, 0, 0, 0, 442, 453, 5, 41, 0, 0, 443, 445, 5, 30,
+		0, 0, 444, 446, 5, 31, 0, 0, 445, 444, 1, 0, 0, 0, 445, 446, 1, 0, 0, 0,
+		446, 449, 1, 0, 0, 0, 447, 448, 5, 41, 0, 0, 448, 450, 5, 11, 0, 0, 449,
+		447, 1, 0, 0, 0, 449, 450, 1, 0, 0, 0, 450, 451, 1, 0, 0, 0, 451, 453,
+		7, 1, 0, 0, 452, 436, 1, 0, 0, 0, 452, 438, 1, 0, 0, 0, 452, 443, 1, 0,
+		0, 0, 453, 55, 1, 0, 0, 0, 76, 57, 74, 76, 83, 86, 91, 107, 109, 115, 118,
+		124, 130, 132, 138, 141, 146, 152, 154, 160, 165, 168, 171, 176, 179, 182,
+		187, 201, 203, 209, 212, 217, 223, 228, 231, 234, 239, 245, 250, 253, 258,
+		262, 265, 270, 276, 281, 284, 289, 295, 298, 303, 309, 312, 316, 319, 322,
+		326, 336, 342, 345, 350, 362, 366, 370, 375, 378, 381, 389, 399, 413, 421,
+		425, 434, 440, 445, 449, 452,
 	}
 	deserializer := antlr.NewATNDeserializer(nil)
 	staticData.atn = deserializer.Deserialize(staticData.serializedATN)
@@ -323,34 +324,34 @@ const (
 	fsmParserT__8       = 9
 	fsmParserT__9       = 10
 	fsmParserT__10      = 11
-	fsmParserT__11      = 12
-	fsmParserT__12      = 13
-	fsmParserT__13      = 14
-	fsmParserT__14      = 15
-	fsmParserT__15      = 16
-	fsmParserT__16      = 17
-	fsmParserT__17      = 18
-	fsmParserT__18      = 19
-	fsmParserT__19      = 20
-	fsmParserT__20      = 21
-	fsmParserT__21      = 22
-	fsmParserT__22      = 23
-	fsmParserT__23      = 24
-	fsmParserT__24      = 25
-	fsmParserT__25      = 26
-	fsmParserT__26      = 27
-	fsmParserT__27      = 28
-	fsmParserT__28      = 29
-	fsmParserT__29      = 30
-	fsmParserT__30      = 31
-	fsmParserT__31      = 32
-	fsmParserT__32      = 33
-	fsmParserT__33      = 34
-	fsmParserT__34      = 35
-	fsmParserInitial    = 36
-	fsmParserInvariant  = 37
-	fsmParserDefer      = 38
-	fsmParserLocal      = 39
+	fsmParserFSM        = 12
+	fsmParserSTATE      = 13
+	fsmParserPARALLEL   = 14
+	fsmParserSUBMACHINE = 15
+	fsmParserREGION     = 16
+	fsmParserFINAL      = 17
+	fsmParserTERMINATE  = 18
+	fsmParserCHOICE     = 19
+	fsmParserJUNCTION   = 20
+	fsmParserFORK       = 21
+	fsmParserJOIN       = 22
+	fsmParserENTRY      = 23
+	fsmParserEXIT       = 24
+	fsmParserPOINT      = 25
+	fsmParserDO         = 26
+	fsmParserON         = 27
+	fsmParserAFTER      = 28
+	fsmParserELSE       = 29
+	fsmParserGOTO       = 30
+	fsmParserLOCAL      = 31
+	fsmParserINITIAL    = 32
+	fsmParserDEFER      = 33
+	fsmParserINVARIANT  = 34
+	fsmParserAND        = 35
+	fsmParserOR         = 36
+	fsmParserNOT        = 37
+	fsmParserH          = 38
+	fsmParserH_DEEP     = 39
 	fsmParserDuration   = 40
 	fsmParserIdentifier = 41
 	fsmParserNote       = 42
@@ -398,6 +399,7 @@ type IFsmContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
+	FSM() antlr.TerminalNode
 	Identifier() antlr.TerminalNode
 	EOF() antlr.TerminalNode
 	Note() antlr.TerminalNode
@@ -461,6 +463,10 @@ func NewFsmContext(parser antlr.Parser, parent antlr.ParserRuleContext, invoking
 }
 
 func (s *FsmContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *FsmContext) FSM() antlr.TerminalNode {
+	return s.GetToken(fsmParserFSM, 0)
+}
 
 func (s *FsmContext) Identifier() antlr.TerminalNode {
 	return s.GetToken(fsmParserIdentifier, 0)
@@ -1010,7 +1016,7 @@ func (p *fsmParser) Fsm() (localctx IFsmContext) {
 	}
 	{
 		p.SetState(59)
-		p.Match(fsmParserT__0)
+		p.Match(fsmParserFSM)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -1026,7 +1032,7 @@ func (p *fsmParser) Fsm() (localctx IFsmContext) {
 	}
 	{
 		p.SetState(61)
-		p.Match(fsmParserT__1)
+		p.Match(fsmParserT__0)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -1039,7 +1045,7 @@ func (p *fsmParser) Fsm() (localctx IFsmContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4604713041392) != 0 {
+	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4421098332320) != 0 {
 		p.SetState(74)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
@@ -1132,7 +1138,7 @@ func (p *fsmParser) Fsm() (localctx IFsmContext) {
 	}
 	{
 		p.SetState(79)
-		p.Match(fsmParserT__2)
+		p.Match(fsmParserT__1)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -1168,9 +1174,10 @@ type IStateContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
+	STATE() antlr.TerminalNode
 	Identifier() antlr.TerminalNode
 	Note() antlr.TerminalNode
-	Initial() antlr.TerminalNode
+	INITIAL() antlr.TerminalNode
 	Stereotype() IStereotypeContext
 	AllStart_() []IStartContext
 	Start_(i int) IStartContext
@@ -1235,6 +1242,10 @@ func NewStateContext(parser antlr.Parser, parent antlr.ParserRuleContext, invoki
 
 func (s *StateContext) GetParser() antlr.Parser { return s.parser }
 
+func (s *StateContext) STATE() antlr.TerminalNode {
+	return s.GetToken(fsmParserSTATE, 0)
+}
+
 func (s *StateContext) Identifier() antlr.TerminalNode {
 	return s.GetToken(fsmParserIdentifier, 0)
 }
@@ -1243,8 +1254,8 @@ func (s *StateContext) Note() antlr.TerminalNode {
 	return s.GetToken(fsmParserNote, 0)
 }
 
-func (s *StateContext) Initial() antlr.TerminalNode {
-	return s.GetToken(fsmParserInitial, 0)
+func (s *StateContext) INITIAL() antlr.TerminalNode {
+	return s.GetToken(fsmParserINITIAL, 0)
 }
 
 func (s *StateContext) Stereotype() IStereotypeContext {
@@ -1845,10 +1856,10 @@ func (p *fsmParser) State() (localctx IStateContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserInitial {
+	if _la == fsmParserINITIAL {
 		{
 			p.SetState(85)
-			p.Match(fsmParserInitial)
+			p.Match(fsmParserINITIAL)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -1858,7 +1869,7 @@ func (p *fsmParser) State() (localctx IStateContext) {
 	}
 	{
 		p.SetState(88)
-		p.Match(fsmParserT__3)
+		p.Match(fsmParserSTATE)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -1879,7 +1890,7 @@ func (p *fsmParser) State() (localctx IStateContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserT__19 {
+	if _la == fsmParserT__2 {
 		{
 			p.SetState(90)
 			p.Stereotype()
@@ -1888,7 +1899,7 @@ func (p *fsmParser) State() (localctx IStateContext) {
 	}
 	{
 		p.SetState(93)
-		p.Match(fsmParserT__1)
+		p.Match(fsmParserT__0)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -1901,7 +1912,7 @@ func (p *fsmParser) State() (localctx IStateContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4604713434608) != 0 {
+	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&5245732053152) != 0 {
 		p.SetState(107)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
@@ -2000,7 +2011,7 @@ func (p *fsmParser) State() (localctx IStateContext) {
 	}
 	{
 		p.SetState(112)
-		p.Match(fsmParserT__2)
+		p.Match(fsmParserT__1)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -2028,9 +2039,11 @@ type IParallelContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
+	PARALLEL() antlr.TerminalNode
+	STATE() antlr.TerminalNode
 	Identifier() antlr.TerminalNode
 	Note() antlr.TerminalNode
-	Initial() antlr.TerminalNode
+	INITIAL() antlr.TerminalNode
 	Stereotype() IStereotypeContext
 	AllRegion() []IRegionContext
 	Region(i int) IRegionContext
@@ -2075,6 +2088,14 @@ func NewParallelContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 
 func (s *ParallelContext) GetParser() antlr.Parser { return s.parser }
 
+func (s *ParallelContext) PARALLEL() antlr.TerminalNode {
+	return s.GetToken(fsmParserPARALLEL, 0)
+}
+
+func (s *ParallelContext) STATE() antlr.TerminalNode {
+	return s.GetToken(fsmParserSTATE, 0)
+}
+
 func (s *ParallelContext) Identifier() antlr.TerminalNode {
 	return s.GetToken(fsmParserIdentifier, 0)
 }
@@ -2083,8 +2104,8 @@ func (s *ParallelContext) Note() antlr.TerminalNode {
 	return s.GetToken(fsmParserNote, 0)
 }
 
-func (s *ParallelContext) Initial() antlr.TerminalNode {
-	return s.GetToken(fsmParserInitial, 0)
+func (s *ParallelContext) INITIAL() antlr.TerminalNode {
+	return s.GetToken(fsmParserINITIAL, 0)
 }
 
 func (s *ParallelContext) Stereotype() IStereotypeContext {
@@ -2275,10 +2296,10 @@ func (p *fsmParser) Parallel() (localctx IParallelContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserInitial {
+	if _la == fsmParserINITIAL {
 		{
 			p.SetState(117)
-			p.Match(fsmParserInitial)
+			p.Match(fsmParserINITIAL)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2288,7 +2309,7 @@ func (p *fsmParser) Parallel() (localctx IParallelContext) {
 	}
 	{
 		p.SetState(120)
-		p.Match(fsmParserT__4)
+		p.Match(fsmParserPARALLEL)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -2296,7 +2317,7 @@ func (p *fsmParser) Parallel() (localctx IParallelContext) {
 	}
 	{
 		p.SetState(121)
-		p.Match(fsmParserT__3)
+		p.Match(fsmParserSTATE)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -2317,7 +2338,7 @@ func (p *fsmParser) Parallel() (localctx IParallelContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserT__19 {
+	if _la == fsmParserT__2 {
 		{
 			p.SetState(123)
 			p.Stereotype()
@@ -2326,7 +2347,7 @@ func (p *fsmParser) Parallel() (localctx IParallelContext) {
 	}
 	{
 		p.SetState(126)
-		p.Match(fsmParserT__1)
+		p.Match(fsmParserT__0)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -2339,7 +2360,7 @@ func (p *fsmParser) Parallel() (localctx IParallelContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4535993549312) != 0 {
+	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4416795115680) != 0 {
 		p.SetState(130)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
@@ -2378,7 +2399,7 @@ func (p *fsmParser) Parallel() (localctx IParallelContext) {
 	}
 	{
 		p.SetState(135)
-		p.Match(fsmParserT__2)
+		p.Match(fsmParserT__1)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -2406,9 +2427,10 @@ type ISubmachineContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
+	SUBMACHINE() antlr.TerminalNode
 	Identifier() antlr.TerminalNode
 	Note() antlr.TerminalNode
-	Initial() antlr.TerminalNode
+	INITIAL() antlr.TerminalNode
 	Stereotype() IStereotypeContext
 	AllPoint() []IPointContext
 	Point(i int) IPointContext
@@ -2453,6 +2475,10 @@ func NewSubmachineContext(parser antlr.Parser, parent antlr.ParserRuleContext, i
 
 func (s *SubmachineContext) GetParser() antlr.Parser { return s.parser }
 
+func (s *SubmachineContext) SUBMACHINE() antlr.TerminalNode {
+	return s.GetToken(fsmParserSUBMACHINE, 0)
+}
+
 func (s *SubmachineContext) Identifier() antlr.TerminalNode {
 	return s.GetToken(fsmParserIdentifier, 0)
 }
@@ -2461,8 +2487,8 @@ func (s *SubmachineContext) Note() antlr.TerminalNode {
 	return s.GetToken(fsmParserNote, 0)
 }
 
-func (s *SubmachineContext) Initial() antlr.TerminalNode {
-	return s.GetToken(fsmParserInitial, 0)
+func (s *SubmachineContext) INITIAL() antlr.TerminalNode {
+	return s.GetToken(fsmParserINITIAL, 0)
 }
 
 func (s *SubmachineContext) Stereotype() IStereotypeContext {
@@ -2653,10 +2679,10 @@ func (p *fsmParser) Submachine() (localctx ISubmachineContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserInitial {
+	if _la == fsmParserINITIAL {
 		{
 			p.SetState(140)
-			p.Match(fsmParserInitial)
+			p.Match(fsmParserINITIAL)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -2666,7 +2692,7 @@ func (p *fsmParser) Submachine() (localctx ISubmachineContext) {
 	}
 	{
 		p.SetState(143)
-		p.Match(fsmParserT__5)
+		p.Match(fsmParserSUBMACHINE)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -2687,7 +2713,7 @@ func (p *fsmParser) Submachine() (localctx ISubmachineContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserT__19 {
+	if _la == fsmParserT__2 {
 		{
 			p.SetState(145)
 			p.Stereotype()
@@ -2696,7 +2722,7 @@ func (p *fsmParser) Submachine() (localctx ISubmachineContext) {
 	}
 	{
 		p.SetState(148)
-		p.Match(fsmParserT__1)
+		p.Match(fsmParserT__0)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -2709,7 +2735,7 @@ func (p *fsmParser) Submachine() (localctx ISubmachineContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4535993548800) != 0 {
+	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4416795050144) != 0 {
 		p.SetState(152)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
@@ -2748,7 +2774,7 @@ func (p *fsmParser) Submachine() (localctx ISubmachineContext) {
 	}
 	{
 		p.SetState(157)
-		p.Match(fsmParserT__2)
+		p.Match(fsmParserT__1)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -2776,6 +2802,8 @@ type IFinalContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
+	FINAL() antlr.TerminalNode
+	STATE() antlr.TerminalNode
 	Note() antlr.TerminalNode
 	Identifier() antlr.TerminalNode
 	Stereotype() IStereotypeContext
@@ -2815,6 +2843,14 @@ func NewFinalContext(parser antlr.Parser, parent antlr.ParserRuleContext, invoki
 }
 
 func (s *FinalContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *FinalContext) FINAL() antlr.TerminalNode {
+	return s.GetToken(fsmParserFINAL, 0)
+}
+
+func (s *FinalContext) STATE() antlr.TerminalNode {
+	return s.GetToken(fsmParserSTATE, 0)
+}
 
 func (s *FinalContext) Note() antlr.TerminalNode {
 	return s.GetToken(fsmParserNote, 0)
@@ -2884,7 +2920,7 @@ func (p *fsmParser) Final() (localctx IFinalContext) {
 	}
 	{
 		p.SetState(162)
-		p.Match(fsmParserT__6)
+		p.Match(fsmParserFINAL)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -2892,7 +2928,7 @@ func (p *fsmParser) Final() (localctx IFinalContext) {
 	}
 	{
 		p.SetState(163)
-		p.Match(fsmParserT__3)
+		p.Match(fsmParserSTATE)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -2923,7 +2959,7 @@ func (p *fsmParser) Final() (localctx IFinalContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserT__19 {
+	if _la == fsmParserT__2 {
 		{
 			p.SetState(167)
 			p.Stereotype()
@@ -2952,6 +2988,8 @@ type ITerminateContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
+	TERMINATE() antlr.TerminalNode
+	STATE() antlr.TerminalNode
 	Note() antlr.TerminalNode
 	Identifier() antlr.TerminalNode
 	Stereotype() IStereotypeContext
@@ -2991,6 +3029,14 @@ func NewTerminateContext(parser antlr.Parser, parent antlr.ParserRuleContext, in
 }
 
 func (s *TerminateContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *TerminateContext) TERMINATE() antlr.TerminalNode {
+	return s.GetToken(fsmParserTERMINATE, 0)
+}
+
+func (s *TerminateContext) STATE() antlr.TerminalNode {
+	return s.GetToken(fsmParserSTATE, 0)
+}
 
 func (s *TerminateContext) Note() antlr.TerminalNode {
 	return s.GetToken(fsmParserNote, 0)
@@ -3060,7 +3106,7 @@ func (p *fsmParser) Terminate() (localctx ITerminateContext) {
 	}
 	{
 		p.SetState(173)
-		p.Match(fsmParserT__7)
+		p.Match(fsmParserTERMINATE)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -3068,7 +3114,7 @@ func (p *fsmParser) Terminate() (localctx ITerminateContext) {
 	}
 	{
 		p.SetState(174)
-		p.Match(fsmParserT__3)
+		p.Match(fsmParserSTATE)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -3099,7 +3145,7 @@ func (p *fsmParser) Terminate() (localctx ITerminateContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserT__19 {
+	if _la == fsmParserT__2 {
 		{
 			p.SetState(178)
 			p.Stereotype()
@@ -3128,6 +3174,7 @@ type IRegionContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
+	REGION() antlr.TerminalNode
 	Identifier() antlr.TerminalNode
 	Note() antlr.TerminalNode
 	Stereotype() IStereotypeContext
@@ -3189,6 +3236,10 @@ func NewRegionContext(parser antlr.Parser, parent antlr.ParserRuleContext, invok
 }
 
 func (s *RegionContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *RegionContext) REGION() antlr.TerminalNode {
+	return s.GetToken(fsmParserREGION, 0)
+}
 
 func (s *RegionContext) Identifier() antlr.TerminalNode {
 	return s.GetToken(fsmParserIdentifier, 0)
@@ -3709,7 +3760,7 @@ func (p *fsmParser) Region() (localctx IRegionContext) {
 	}
 	{
 		p.SetState(184)
-		p.Match(fsmParserT__8)
+		p.Match(fsmParserREGION)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -3730,7 +3781,7 @@ func (p *fsmParser) Region() (localctx IRegionContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserT__19 {
+	if _la == fsmParserT__2 {
 		{
 			p.SetState(186)
 			p.Stereotype()
@@ -3739,7 +3790,7 @@ func (p *fsmParser) Region() (localctx IRegionContext) {
 	}
 	{
 		p.SetState(189)
-		p.Match(fsmParserT__1)
+		p.Match(fsmParserT__0)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -3752,7 +3803,7 @@ func (p *fsmParser) Region() (localctx IRegionContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4466766396912) != 0 {
+	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&5226983514112) != 0 {
 		p.SetState(201)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
@@ -3839,7 +3890,7 @@ func (p *fsmParser) Region() (localctx IRegionContext) {
 	}
 	{
 		p.SetState(206)
-		p.Match(fsmParserT__2)
+		p.Match(fsmParserT__1)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -3867,11 +3918,12 @@ type IChoiceContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
+	CHOICE() antlr.TerminalNode
 	Identifier() antlr.TerminalNode
 	AllBranch() []IBranchContext
 	Branch(i int) IBranchContext
 	Note() antlr.TerminalNode
-	Initial() antlr.TerminalNode
+	INITIAL() antlr.TerminalNode
 	Stereotype() IStereotypeContext
 
 	// IsChoiceContext differentiates from other interfaces.
@@ -3909,6 +3961,10 @@ func NewChoiceContext(parser antlr.Parser, parent antlr.ParserRuleContext, invok
 }
 
 func (s *ChoiceContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *ChoiceContext) CHOICE() antlr.TerminalNode {
+	return s.GetToken(fsmParserCHOICE, 0)
+}
 
 func (s *ChoiceContext) Identifier() antlr.TerminalNode {
 	return s.GetToken(fsmParserIdentifier, 0)
@@ -3959,8 +4015,8 @@ func (s *ChoiceContext) Note() antlr.TerminalNode {
 	return s.GetToken(fsmParserNote, 0)
 }
 
-func (s *ChoiceContext) Initial() antlr.TerminalNode {
-	return s.GetToken(fsmParserInitial, 0)
+func (s *ChoiceContext) INITIAL() antlr.TerminalNode {
+	return s.GetToken(fsmParserINITIAL, 0)
 }
 
 func (s *ChoiceContext) Stereotype() IStereotypeContext {
@@ -4028,10 +4084,10 @@ func (p *fsmParser) Choice() (localctx IChoiceContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserInitial {
+	if _la == fsmParserINITIAL {
 		{
 			p.SetState(211)
-			p.Match(fsmParserInitial)
+			p.Match(fsmParserINITIAL)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -4041,7 +4097,7 @@ func (p *fsmParser) Choice() (localctx IChoiceContext) {
 	}
 	{
 		p.SetState(214)
-		p.Match(fsmParserT__9)
+		p.Match(fsmParserCHOICE)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -4062,7 +4118,7 @@ func (p *fsmParser) Choice() (localctx IChoiceContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserT__19 {
+	if _la == fsmParserT__2 {
 		{
 			p.SetState(216)
 			p.Stereotype()
@@ -4076,10 +4132,10 @@ func (p *fsmParser) Choice() (localctx IChoiceContext) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case fsmParserT__1:
+	case fsmParserT__0:
 		{
 			p.SetState(219)
-			p.Match(fsmParserT__1)
+			p.Match(fsmParserT__0)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -4092,7 +4148,7 @@ func (p *fsmParser) Choice() (localctx IChoiceContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4398185447424) != 0 {
+		for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4399120253088) != 0 {
 			{
 				p.SetState(220)
 				p.Branch()
@@ -4107,14 +4163,14 @@ func (p *fsmParser) Choice() (localctx IChoiceContext) {
 		}
 		{
 			p.SetState(226)
-			p.Match(fsmParserT__2)
+			p.Match(fsmParserT__1)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
 
-	case fsmParserT__18, fsmParserT__21, fsmParserT__26, fsmParserNote:
+	case fsmParserT__4, fsmParserT__6, fsmParserGOTO, fsmParserNote:
 		{
 			p.SetState(227)
 			p.Branch()
@@ -4146,11 +4202,12 @@ type IJunctionContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
+	JUNCTION() antlr.TerminalNode
 	Identifier() antlr.TerminalNode
 	AllBranch() []IBranchContext
 	Branch(i int) IBranchContext
 	Note() antlr.TerminalNode
-	Initial() antlr.TerminalNode
+	INITIAL() antlr.TerminalNode
 	Stereotype() IStereotypeContext
 
 	// IsJunctionContext differentiates from other interfaces.
@@ -4188,6 +4245,10 @@ func NewJunctionContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 }
 
 func (s *JunctionContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *JunctionContext) JUNCTION() antlr.TerminalNode {
+	return s.GetToken(fsmParserJUNCTION, 0)
+}
 
 func (s *JunctionContext) Identifier() antlr.TerminalNode {
 	return s.GetToken(fsmParserIdentifier, 0)
@@ -4238,8 +4299,8 @@ func (s *JunctionContext) Note() antlr.TerminalNode {
 	return s.GetToken(fsmParserNote, 0)
 }
 
-func (s *JunctionContext) Initial() antlr.TerminalNode {
-	return s.GetToken(fsmParserInitial, 0)
+func (s *JunctionContext) INITIAL() antlr.TerminalNode {
+	return s.GetToken(fsmParserINITIAL, 0)
 }
 
 func (s *JunctionContext) Stereotype() IStereotypeContext {
@@ -4307,10 +4368,10 @@ func (p *fsmParser) Junction() (localctx IJunctionContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserInitial {
+	if _la == fsmParserINITIAL {
 		{
 			p.SetState(233)
-			p.Match(fsmParserInitial)
+			p.Match(fsmParserINITIAL)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -4320,7 +4381,7 @@ func (p *fsmParser) Junction() (localctx IJunctionContext) {
 	}
 	{
 		p.SetState(236)
-		p.Match(fsmParserT__10)
+		p.Match(fsmParserJUNCTION)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -4341,7 +4402,7 @@ func (p *fsmParser) Junction() (localctx IJunctionContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserT__19 {
+	if _la == fsmParserT__2 {
 		{
 			p.SetState(238)
 			p.Stereotype()
@@ -4355,10 +4416,10 @@ func (p *fsmParser) Junction() (localctx IJunctionContext) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case fsmParserT__1:
+	case fsmParserT__0:
 		{
 			p.SetState(241)
-			p.Match(fsmParserT__1)
+			p.Match(fsmParserT__0)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -4371,7 +4432,7 @@ func (p *fsmParser) Junction() (localctx IJunctionContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4398185447424) != 0 {
+		for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4399120253088) != 0 {
 			{
 				p.SetState(242)
 				p.Branch()
@@ -4386,14 +4447,14 @@ func (p *fsmParser) Junction() (localctx IJunctionContext) {
 		}
 		{
 			p.SetState(248)
-			p.Match(fsmParserT__2)
+			p.Match(fsmParserT__1)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
 			}
 		}
 
-	case fsmParserT__18, fsmParserT__21, fsmParserT__26, fsmParserNote:
+	case fsmParserT__4, fsmParserT__6, fsmParserGOTO, fsmParserNote:
 		{
 			p.SetState(249)
 			p.Branch()
@@ -4425,6 +4486,7 @@ type IForkContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
+	FORK() antlr.TerminalNode
 	Identifier() antlr.TerminalNode
 	AllNote() []antlr.TerminalNode
 	Note(i int) antlr.TerminalNode
@@ -4469,6 +4531,10 @@ func NewForkContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokin
 }
 
 func (s *ForkContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *ForkContext) FORK() antlr.TerminalNode {
+	return s.GetToken(fsmParserFORK, 0)
+}
 
 func (s *ForkContext) Identifier() antlr.TerminalNode {
 	return s.GetToken(fsmParserIdentifier, 0)
@@ -4624,7 +4690,7 @@ func (p *fsmParser) Fork() (localctx IForkContext) {
 	}
 	{
 		p.SetState(255)
-		p.Match(fsmParserT__11)
+		p.Match(fsmParserFORK)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -4645,7 +4711,7 @@ func (p *fsmParser) Fork() (localctx IForkContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserT__19 {
+	if _la == fsmParserT__2 {
 		{
 			p.SetState(257)
 			p.Stereotype()
@@ -4654,7 +4720,7 @@ func (p *fsmParser) Fork() (localctx IForkContext) {
 	}
 	{
 		p.SetState(260)
-		p.Match(fsmParserT__1)
+		p.Match(fsmParserT__0)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -4667,7 +4733,7 @@ func (p *fsmParser) Fork() (localctx IForkContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4398181253120) != 0 {
+	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4399120253056) != 0 {
 		p.SetState(262)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
@@ -4693,7 +4759,7 @@ func (p *fsmParser) Fork() (localctx IForkContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == fsmParserT__26 {
+		if _la == fsmParserT__6 {
 			{
 				p.SetState(264)
 				p.Actions()
@@ -4714,7 +4780,7 @@ func (p *fsmParser) Fork() (localctx IForkContext) {
 	}
 	{
 		p.SetState(273)
-		p.Match(fsmParserT__2)
+		p.Match(fsmParserT__1)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -4742,6 +4808,7 @@ type IJoinContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
+	JOIN() antlr.TerminalNode
 	Identifier() antlr.TerminalNode
 	Goto_() IGotoContext
 	Note() antlr.TerminalNode
@@ -4783,6 +4850,10 @@ func NewJoinContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokin
 }
 
 func (s *JoinContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *JoinContext) JOIN() antlr.TerminalNode {
+	return s.GetToken(fsmParserJOIN, 0)
+}
 
 func (s *JoinContext) Identifier() antlr.TerminalNode {
 	return s.GetToken(fsmParserIdentifier, 0)
@@ -4884,7 +4955,7 @@ func (p *fsmParser) Join() (localctx IJoinContext) {
 	}
 	{
 		p.SetState(278)
-		p.Match(fsmParserT__12)
+		p.Match(fsmParserJOIN)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -4905,7 +4976,7 @@ func (p *fsmParser) Join() (localctx IJoinContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserT__19 {
+	if _la == fsmParserT__2 {
 		{
 			p.SetState(280)
 			p.Stereotype()
@@ -4919,7 +4990,7 @@ func (p *fsmParser) Join() (localctx IJoinContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserT__26 {
+	if _la == fsmParserT__6 {
 		{
 			p.SetState(283)
 			p.Actions()
@@ -4958,8 +5029,11 @@ type IPointContext interface {
 	SetKind(antlr.Token)
 
 	// Getter signatures
+	POINT() antlr.TerminalNode
 	Identifier() antlr.TerminalNode
 	Goto_() IGotoContext
+	ENTRY() antlr.TerminalNode
+	EXIT() antlr.TerminalNode
 	Note() antlr.TerminalNode
 	Stereotype() IStereotypeContext
 	Actions() IActionsContext
@@ -5005,6 +5079,10 @@ func (s *PointContext) GetKind() antlr.Token { return s.kind }
 
 func (s *PointContext) SetKind(v antlr.Token) { s.kind = v }
 
+func (s *PointContext) POINT() antlr.TerminalNode {
+	return s.GetToken(fsmParserPOINT, 0)
+}
+
 func (s *PointContext) Identifier() antlr.TerminalNode {
 	return s.GetToken(fsmParserIdentifier, 0)
 }
@@ -5023,6 +5101,14 @@ func (s *PointContext) Goto_() IGotoContext {
 	}
 
 	return t.(IGotoContext)
+}
+
+func (s *PointContext) ENTRY() antlr.TerminalNode {
+	return s.GetToken(fsmParserENTRY, 0)
+}
+
+func (s *PointContext) EXIT() antlr.TerminalNode {
+	return s.GetToken(fsmParserEXIT, 0)
 }
 
 func (s *PointContext) Note() antlr.TerminalNode {
@@ -5112,7 +5198,7 @@ func (p *fsmParser) Point() (localctx IPointContext) {
 
 		_la = p.GetTokenStream().LA(1)
 
-		if !(_la == fsmParserT__13 || _la == fsmParserT__14) {
+		if !(_la == fsmParserENTRY || _la == fsmParserEXIT) {
 			var _ri = p.GetErrorHandler().RecoverInline(p)
 
 			localctx.(*PointContext).kind = _ri
@@ -5123,7 +5209,7 @@ func (p *fsmParser) Point() (localctx IPointContext) {
 	}
 	{
 		p.SetState(292)
-		p.Match(fsmParserT__15)
+		p.Match(fsmParserPOINT)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -5144,7 +5230,7 @@ func (p *fsmParser) Point() (localctx IPointContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserT__19 {
+	if _la == fsmParserT__2 {
 		{
 			p.SetState(294)
 			p.Stereotype()
@@ -5158,7 +5244,7 @@ func (p *fsmParser) Point() (localctx IPointContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserT__26 {
+	if _la == fsmParserT__6 {
 		{
 			p.SetState(297)
 			p.Actions()
@@ -5191,6 +5277,8 @@ type IReferenceContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
+	ENTRY() antlr.TerminalNode
+	POINT() antlr.TerminalNode
 	Identifier() antlr.TerminalNode
 	Note() antlr.TerminalNode
 	Stereotype() IStereotypeContext
@@ -5230,6 +5318,14 @@ func NewReferenceContext(parser antlr.Parser, parent antlr.ParserRuleContext, in
 }
 
 func (s *ReferenceContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *ReferenceContext) ENTRY() antlr.TerminalNode {
+	return s.GetToken(fsmParserENTRY, 0)
+}
+
+func (s *ReferenceContext) POINT() antlr.TerminalNode {
+	return s.GetToken(fsmParserPOINT, 0)
+}
 
 func (s *ReferenceContext) Identifier() antlr.TerminalNode {
 	return s.GetToken(fsmParserIdentifier, 0)
@@ -5299,7 +5395,7 @@ func (p *fsmParser) Reference() (localctx IReferenceContext) {
 	}
 	{
 		p.SetState(305)
-		p.Match(fsmParserT__13)
+		p.Match(fsmParserENTRY)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -5307,7 +5403,7 @@ func (p *fsmParser) Reference() (localctx IReferenceContext) {
 	}
 	{
 		p.SetState(306)
-		p.Match(fsmParserT__15)
+		p.Match(fsmParserPOINT)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -5328,7 +5424,7 @@ func (p *fsmParser) Reference() (localctx IReferenceContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserT__19 {
+	if _la == fsmParserT__2 {
 		{
 			p.SetState(308)
 			p.Stereotype()
@@ -5363,6 +5459,8 @@ type IHistoryContext interface {
 	SetKind(antlr.Token)
 
 	// Getter signatures
+	H() antlr.TerminalNode
+	H_DEEP() antlr.TerminalNode
 	Note() antlr.TerminalNode
 	Stereotype() IStereotypeContext
 	Goto_() IGotoContext
@@ -5408,6 +5506,14 @@ func (s *HistoryContext) GetParser() antlr.Parser { return s.parser }
 func (s *HistoryContext) GetKind() antlr.Token { return s.kind }
 
 func (s *HistoryContext) SetKind(v antlr.Token) { s.kind = v }
+
+func (s *HistoryContext) H() antlr.TerminalNode {
+	return s.GetToken(fsmParserH, 0)
+}
+
+func (s *HistoryContext) H_DEEP() antlr.TerminalNode {
+	return s.GetToken(fsmParserH_DEEP, 0)
+}
 
 func (s *HistoryContext) Note() antlr.TerminalNode {
 	return s.GetToken(fsmParserNote, 0)
@@ -5512,7 +5618,7 @@ func (p *fsmParser) History() (localctx IHistoryContext) {
 
 		_la = p.GetTokenStream().LA(1)
 
-		if !(_la == fsmParserT__16 || _la == fsmParserT__17) {
+		if !(_la == fsmParserH || _la == fsmParserH_DEEP) {
 			var _ri = p.GetErrorHandler().RecoverInline(p)
 
 			localctx.(*HistoryContext).kind = _ri
@@ -5528,7 +5634,7 @@ func (p *fsmParser) History() (localctx IHistoryContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserT__19 {
+	if _la == fsmParserT__2 {
 		{
 			p.SetState(315)
 			p.Stereotype()
@@ -5546,7 +5652,7 @@ func (p *fsmParser) History() (localctx IHistoryContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == fsmParserT__26 {
+		if _la == fsmParserT__6 {
 			{
 				p.SetState(318)
 				p.Actions()
@@ -5583,7 +5689,8 @@ type IStartContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
-	Initial() antlr.TerminalNode
+	INITIAL() antlr.TerminalNode
+	GOTO() antlr.TerminalNode
 	Identifier() antlr.TerminalNode
 	Actions() IActionsContext
 
@@ -5623,8 +5730,12 @@ func NewStartContext(parser antlr.Parser, parent antlr.ParserRuleContext, invoki
 
 func (s *StartContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *StartContext) Initial() antlr.TerminalNode {
-	return s.GetToken(fsmParserInitial, 0)
+func (s *StartContext) INITIAL() antlr.TerminalNode {
+	return s.GetToken(fsmParserINITIAL, 0)
+}
+
+func (s *StartContext) GOTO() antlr.TerminalNode {
+	return s.GetToken(fsmParserGOTO, 0)
 }
 
 func (s *StartContext) Identifier() antlr.TerminalNode {
@@ -5673,7 +5784,7 @@ func (p *fsmParser) Start_() (localctx IStartContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(324)
-		p.Match(fsmParserInitial)
+		p.Match(fsmParserINITIAL)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -5686,7 +5797,7 @@ func (p *fsmParser) Start_() (localctx IStartContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserT__26 {
+	if _la == fsmParserT__6 {
 		{
 			p.SetState(325)
 			p.Actions()
@@ -5695,7 +5806,7 @@ func (p *fsmParser) Start_() (localctx IStartContext) {
 	}
 	{
 		p.SetState(328)
-		p.Match(fsmParserT__18)
+		p.Match(fsmParserGOTO)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -5797,7 +5908,7 @@ func (p *fsmParser) Stereotype() (localctx IStereotypeContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(331)
-		p.Match(fsmParserT__19)
+		p.Match(fsmParserT__2)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -5813,7 +5924,7 @@ func (p *fsmParser) Stereotype() (localctx IStereotypeContext) {
 	}
 	{
 		p.SetState(333)
-		p.Match(fsmParserT__20)
+		p.Match(fsmParserT__3)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -5843,6 +5954,7 @@ type IBranchContext interface {
 	// Getter signatures
 	Goto_() IGotoContext
 	Note() antlr.TerminalNode
+	ELSE() antlr.TerminalNode
 	Guard() IGuardContext
 	Actions() IActionsContext
 
@@ -5900,6 +6012,10 @@ func (s *BranchContext) Goto_() IGotoContext {
 
 func (s *BranchContext) Note() antlr.TerminalNode {
 	return s.GetToken(fsmParserNote, 0)
+}
+
+func (s *BranchContext) ELSE() antlr.TerminalNode {
+	return s.GetToken(fsmParserELSE, 0)
 }
 
 func (s *BranchContext) Guard() IGuardContext {
@@ -5982,7 +6098,7 @@ func (p *fsmParser) Branch() (localctx IBranchContext) {
 	if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 57, p.GetParserRuleContext()) == 1 {
 		{
 			p.SetState(338)
-			p.Match(fsmParserT__21)
+			p.Match(fsmParserT__4)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -5990,7 +6106,7 @@ func (p *fsmParser) Branch() (localctx IBranchContext) {
 		}
 		{
 			p.SetState(339)
-			p.Match(fsmParserT__22)
+			p.Match(fsmParserELSE)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -5998,7 +6114,7 @@ func (p *fsmParser) Branch() (localctx IBranchContext) {
 		}
 		{
 			p.SetState(340)
-			p.Match(fsmParserT__23)
+			p.Match(fsmParserT__5)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -6023,7 +6139,7 @@ func (p *fsmParser) Branch() (localctx IBranchContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserT__26 {
+	if _la == fsmParserT__6 {
 		{
 			p.SetState(344)
 			p.Actions()
@@ -6063,13 +6179,17 @@ type IEventContext interface {
 
 	// Getter signatures
 	Actions() IActionsContext
-	Defer() antlr.TerminalNode
-	Invariant() antlr.TerminalNode
+	ON() antlr.TerminalNode
+	DEFER() antlr.TerminalNode
+	INVARIANT() antlr.TerminalNode
 	Guard() IGuardContext
 	Trigger() ITriggerContext
 	Goto_() IGotoContext
 	Note() antlr.TerminalNode
 	Identifier() antlr.TerminalNode
+	ENTRY() antlr.TerminalNode
+	EXIT() antlr.TerminalNode
+	DO() antlr.TerminalNode
 
 	// IsEventContext differentiates from other interfaces.
 	IsEventContext()
@@ -6128,12 +6248,16 @@ func (s *EventContext) Actions() IActionsContext {
 	return t.(IActionsContext)
 }
 
-func (s *EventContext) Defer() antlr.TerminalNode {
-	return s.GetToken(fsmParserDefer, 0)
+func (s *EventContext) ON() antlr.TerminalNode {
+	return s.GetToken(fsmParserON, 0)
 }
 
-func (s *EventContext) Invariant() antlr.TerminalNode {
-	return s.GetToken(fsmParserInvariant, 0)
+func (s *EventContext) DEFER() antlr.TerminalNode {
+	return s.GetToken(fsmParserDEFER, 0)
+}
+
+func (s *EventContext) INVARIANT() antlr.TerminalNode {
+	return s.GetToken(fsmParserINVARIANT, 0)
 }
 
 func (s *EventContext) Guard() IGuardContext {
@@ -6190,6 +6314,18 @@ func (s *EventContext) Note() antlr.TerminalNode {
 
 func (s *EventContext) Identifier() antlr.TerminalNode {
 	return s.GetToken(fsmParserIdentifier, 0)
+}
+
+func (s *EventContext) ENTRY() antlr.TerminalNode {
+	return s.GetToken(fsmParserENTRY, 0)
+}
+
+func (s *EventContext) EXIT() antlr.TerminalNode {
+	return s.GetToken(fsmParserEXIT, 0)
+}
+
+func (s *EventContext) DO() antlr.TerminalNode {
+	return s.GetToken(fsmParserDO, 0)
 }
 
 func (s *EventContext) GetRuleContext() antlr.RuleContext {
@@ -6251,7 +6387,7 @@ func (p *fsmParser) Event() (localctx IEventContext) {
 
 			_la = p.GetTokenStream().LA(1)
 
-			if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&33603584) != 0) {
+			if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&92274688) != 0) {
 				var _ri = p.GetErrorHandler().RecoverInline(p)
 
 				localctx.(*EventContext).name = _ri
@@ -6268,7 +6404,7 @@ func (p *fsmParser) Event() (localctx IEventContext) {
 	case 2:
 		{
 			p.SetState(354)
-			p.Match(fsmParserT__25)
+			p.Match(fsmParserON)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -6287,7 +6423,7 @@ func (p *fsmParser) Event() (localctx IEventContext) {
 		}
 		{
 			p.SetState(356)
-			p.Match(fsmParserT__26)
+			p.Match(fsmParserT__6)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -6295,7 +6431,7 @@ func (p *fsmParser) Event() (localctx IEventContext) {
 		}
 		{
 			p.SetState(357)
-			p.Match(fsmParserDefer)
+			p.Match(fsmParserDEFER)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -6305,7 +6441,7 @@ func (p *fsmParser) Event() (localctx IEventContext) {
 	case 3:
 		{
 			p.SetState(358)
-			p.Match(fsmParserInvariant)
+			p.Match(fsmParserINVARIANT)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -6328,7 +6464,7 @@ func (p *fsmParser) Event() (localctx IEventContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == fsmParserT__21 {
+		if _la == fsmParserT__4 {
 			{
 				p.SetState(361)
 				p.Guard()
@@ -6364,7 +6500,7 @@ func (p *fsmParser) Event() (localctx IEventContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == fsmParserT__21 {
+		if _la == fsmParserT__4 {
 			{
 				p.SetState(369)
 				p.Guard()
@@ -6384,7 +6520,7 @@ func (p *fsmParser) Event() (localctx IEventContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == fsmParserT__21 {
+		if _la == fsmParserT__4 {
 			{
 				p.SetState(374)
 				p.Guard()
@@ -6398,7 +6534,7 @@ func (p *fsmParser) Event() (localctx IEventContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == fsmParserT__26 {
+		if _la == fsmParserT__6 {
 			{
 				p.SetState(377)
 				p.Actions()
@@ -6447,7 +6583,9 @@ type ITriggerContext interface {
 	SetDelay(antlr.Token)
 
 	// Getter signatures
+	ON() antlr.TerminalNode
 	Identifier() antlr.TerminalNode
+	AFTER() antlr.TerminalNode
 	Duration() antlr.TerminalNode
 
 	// IsTriggerContext differentiates from other interfaces.
@@ -6496,8 +6634,16 @@ func (s *TriggerContext) SetName(v antlr.Token) { s.name = v }
 
 func (s *TriggerContext) SetDelay(v antlr.Token) { s.delay = v }
 
+func (s *TriggerContext) ON() antlr.TerminalNode {
+	return s.GetToken(fsmParserON, 0)
+}
+
 func (s *TriggerContext) Identifier() antlr.TerminalNode {
 	return s.GetToken(fsmParserIdentifier, 0)
+}
+
+func (s *TriggerContext) AFTER() antlr.TerminalNode {
+	return s.GetToken(fsmParserAFTER, 0)
 }
 
 func (s *TriggerContext) Duration() antlr.TerminalNode {
@@ -6534,11 +6680,11 @@ func (p *fsmParser) Trigger() (localctx ITriggerContext) {
 	}
 
 	switch p.GetTokenStream().LA(1) {
-	case fsmParserT__25:
+	case fsmParserON:
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(383)
-			p.Match(fsmParserT__25)
+			p.Match(fsmParserON)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -6556,11 +6702,11 @@ func (p *fsmParser) Trigger() (localctx ITriggerContext) {
 			}
 		}
 
-	case fsmParserT__27:
+	case fsmParserAFTER:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(385)
-			p.Match(fsmParserT__27)
+			p.Match(fsmParserAFTER)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -6568,7 +6714,7 @@ func (p *fsmParser) Trigger() (localctx ITriggerContext) {
 		}
 		{
 			p.SetState(386)
-			p.Match(fsmParserT__28)
+			p.Match(fsmParserT__7)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -6594,7 +6740,7 @@ func (p *fsmParser) Trigger() (localctx ITriggerContext) {
 		}
 		{
 			p.SetState(388)
-			p.Match(fsmParserT__29)
+			p.Match(fsmParserT__8)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -6705,7 +6851,7 @@ func (p *fsmParser) Actions() (localctx IActionsContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(391)
-		p.Match(fsmParserT__26)
+		p.Match(fsmParserT__6)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -6823,10 +6969,10 @@ func (p *fsmParser) Identifiers() (localctx IIdentifiersContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == fsmParserT__30 {
+	for _la == fsmParserT__9 {
 		{
 			p.SetState(395)
-			p.Match(fsmParserT__30)
+			p.Match(fsmParserT__9)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -6948,7 +7094,7 @@ func (p *fsmParser) Guard() (localctx IGuardContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(402)
-		p.Match(fsmParserT__21)
+		p.Match(fsmParserT__4)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -6960,7 +7106,7 @@ func (p *fsmParser) Guard() (localctx IGuardContext) {
 	}
 	{
 		p.SetState(404)
-		p.Match(fsmParserT__23)
+		p.Match(fsmParserT__5)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
@@ -7092,6 +7238,8 @@ type IOr_expressionContext interface {
 	// Getter signatures
 	AllAnd_expression() []IAnd_expressionContext
 	And_expression(i int) IAnd_expressionContext
+	AllOR() []antlr.TerminalNode
+	OR(i int) antlr.TerminalNode
 
 	// IsOr_expressionContext differentiates from other interfaces.
 	IsOr_expressionContext()
@@ -7170,6 +7318,14 @@ func (s *Or_expressionContext) And_expression(i int) IAnd_expressionContext {
 	return t.(IAnd_expressionContext)
 }
 
+func (s *Or_expressionContext) AllOR() []antlr.TerminalNode {
+	return s.GetTokens(fsmParserOR)
+}
+
+func (s *Or_expressionContext) OR(i int) antlr.TerminalNode {
+	return s.GetToken(fsmParserOR, i)
+}
+
 func (s *Or_expressionContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
@@ -7205,10 +7361,10 @@ func (p *fsmParser) Or_expression() (localctx IOr_expressionContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == fsmParserT__31 {
+	for _la == fsmParserOR {
 		{
 			p.SetState(409)
-			p.Match(fsmParserT__31)
+			p.Match(fsmParserOR)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -7250,6 +7406,8 @@ type IAnd_expressionContext interface {
 	// Getter signatures
 	AllNot_expression() []INot_expressionContext
 	Not_expression(i int) INot_expressionContext
+	AllAND() []antlr.TerminalNode
+	AND(i int) antlr.TerminalNode
 
 	// IsAnd_expressionContext differentiates from other interfaces.
 	IsAnd_expressionContext()
@@ -7328,6 +7486,14 @@ func (s *And_expressionContext) Not_expression(i int) INot_expressionContext {
 	return t.(INot_expressionContext)
 }
 
+func (s *And_expressionContext) AllAND() []antlr.TerminalNode {
+	return s.GetTokens(fsmParserAND)
+}
+
+func (s *And_expressionContext) AND(i int) antlr.TerminalNode {
+	return s.GetToken(fsmParserAND, i)
+}
+
 func (s *And_expressionContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
@@ -7363,10 +7529,10 @@ func (p *fsmParser) And_expression() (localctx IAnd_expressionContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == fsmParserT__32 {
+	for _la == fsmParserAND {
 		{
 			p.SetState(417)
-			p.Match(fsmParserT__32)
+			p.Match(fsmParserAND)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -7407,6 +7573,7 @@ type INot_expressionContext interface {
 
 	// Getter signatures
 	Single_expression() ISingle_expressionContext
+	NOT() antlr.TerminalNode
 
 	// IsNot_expressionContext differentiates from other interfaces.
 	IsNot_expressionContext()
@@ -7460,6 +7627,10 @@ func (s *Not_expressionContext) Single_expression() ISingle_expressionContext {
 	return t.(ISingle_expressionContext)
 }
 
+func (s *Not_expressionContext) NOT() antlr.TerminalNode {
+	return s.GetToken(fsmParserNOT, 0)
+}
+
 func (s *Not_expressionContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
@@ -7491,10 +7662,10 @@ func (p *fsmParser) Not_expression() (localctx INot_expressionContext) {
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == fsmParserT__33 {
+	if _la == fsmParserNOT {
 		{
 			p.SetState(424)
-			p.Match(fsmParserT__33)
+			p.Match(fsmParserNOT)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -7626,11 +7797,11 @@ func (p *fsmParser) Single_expression() (localctx ISingle_expressionContext) {
 			}
 		}
 
-	case fsmParserT__28:
+	case fsmParserT__7:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(430)
-			p.Match(fsmParserT__28)
+			p.Match(fsmParserT__7)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -7642,7 +7813,7 @@ func (p *fsmParser) Single_expression() (localctx ISingle_expressionContext) {
 		}
 		{
 			p.SetState(432)
-			p.Match(fsmParserT__29)
+			p.Match(fsmParserT__8)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -7675,8 +7846,13 @@ type IGotoContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
+	GOTO() antlr.TerminalNode
+	FINAL() antlr.TerminalNode
+	TERMINATE() antlr.TerminalNode
 	Identifier() antlr.TerminalNode
-	Local() antlr.TerminalNode
+	LOCAL() antlr.TerminalNode
+	H() antlr.TerminalNode
+	H_DEEP() antlr.TerminalNode
 
 	// IsGotoContext differentiates from other interfaces.
 	IsGotoContext()
@@ -7714,12 +7890,32 @@ func NewGotoContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokin
 
 func (s *GotoContext) GetParser() antlr.Parser { return s.parser }
 
+func (s *GotoContext) GOTO() antlr.TerminalNode {
+	return s.GetToken(fsmParserGOTO, 0)
+}
+
+func (s *GotoContext) FINAL() antlr.TerminalNode {
+	return s.GetToken(fsmParserFINAL, 0)
+}
+
+func (s *GotoContext) TERMINATE() antlr.TerminalNode {
+	return s.GetToken(fsmParserTERMINATE, 0)
+}
+
 func (s *GotoContext) Identifier() antlr.TerminalNode {
 	return s.GetToken(fsmParserIdentifier, 0)
 }
 
-func (s *GotoContext) Local() antlr.TerminalNode {
-	return s.GetToken(fsmParserLocal, 0)
+func (s *GotoContext) LOCAL() antlr.TerminalNode {
+	return s.GetToken(fsmParserLOCAL, 0)
+}
+
+func (s *GotoContext) H() antlr.TerminalNode {
+	return s.GetToken(fsmParserH, 0)
+}
+
+func (s *GotoContext) H_DEEP() antlr.TerminalNode {
+	return s.GetToken(fsmParserH_DEEP, 0)
 }
 
 func (s *GotoContext) GetRuleContext() antlr.RuleContext {
@@ -7756,7 +7952,7 @@ func (p *fsmParser) Goto_() (localctx IGotoContext) {
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(436)
-			p.Match(fsmParserT__18)
+			p.Match(fsmParserGOTO)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -7766,7 +7962,7 @@ func (p *fsmParser) Goto_() (localctx IGotoContext) {
 			p.SetState(437)
 			_la = p.GetTokenStream().LA(1)
 
-			if !(_la == fsmParserT__6 || _la == fsmParserT__7) {
+			if !(_la == fsmParserFINAL || _la == fsmParserTERMINATE) {
 				p.GetErrorHandler().RecoverInline(p)
 			} else {
 				p.GetErrorHandler().ReportMatch(p)
@@ -7778,7 +7974,7 @@ func (p *fsmParser) Goto_() (localctx IGotoContext) {
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(438)
-			p.Match(fsmParserT__18)
+			p.Match(fsmParserGOTO)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -7791,10 +7987,10 @@ func (p *fsmParser) Goto_() (localctx IGotoContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == fsmParserLocal {
+		if _la == fsmParserLOCAL {
 			{
 				p.SetState(439)
-				p.Match(fsmParserLocal)
+				p.Match(fsmParserLOCAL)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -7815,7 +8011,7 @@ func (p *fsmParser) Goto_() (localctx IGotoContext) {
 		p.EnterOuterAlt(localctx, 3)
 		{
 			p.SetState(443)
-			p.Match(fsmParserT__18)
+			p.Match(fsmParserGOTO)
 			if p.HasError() {
 				// Recognition error - abort rule
 				goto errorExit
@@ -7828,10 +8024,10 @@ func (p *fsmParser) Goto_() (localctx IGotoContext) {
 		}
 		_la = p.GetTokenStream().LA(1)
 
-		if _la == fsmParserLocal {
+		if _la == fsmParserLOCAL {
 			{
 				p.SetState(444)
-				p.Match(fsmParserLocal)
+				p.Match(fsmParserLOCAL)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -7857,7 +8053,7 @@ func (p *fsmParser) Goto_() (localctx IGotoContext) {
 			}
 			{
 				p.SetState(448)
-				p.Match(fsmParserT__34)
+				p.Match(fsmParserT__10)
 				if p.HasError() {
 					// Recognition error - abort rule
 					goto errorExit
@@ -7869,7 +8065,7 @@ func (p *fsmParser) Goto_() (localctx IGotoContext) {
 			p.SetState(451)
 			_la = p.GetTokenStream().LA(1)
 
-			if !(_la == fsmParserT__16 || _la == fsmParserT__17) {
+			if !(_la == fsmParserH || _la == fsmParserH_DEEP) {
 				p.GetErrorHandler().RecoverInline(p)
 			} else {
 				p.GetErrorHandler().ReportMatch(p)

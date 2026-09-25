@@ -244,17 +244,17 @@ func TestInitialState(t *testing.T) {
 		t.Fatalf("syntax errors: %v", err)
 	}
 	top := tree.AllState()
-	if top[0].Initial() == nil {
+	if top[0].INITIAL() == nil {
 		t.Error("a: not marked initial")
 	}
-	if top[1].Initial() != nil {
+	if top[1].INITIAL() != nil {
 		t.Error("d: marked initial")
 	}
 	inner := top[0].AllState()
-	if inner[0].Initial() == nil {
+	if inner[0].INITIAL() == nil {
 		t.Error("b: not marked initial")
 	}
-	if inner[1].Initial() != nil {
+	if inner[1].INITIAL() != nil {
 		t.Error("c: marked initial")
 	}
 }
