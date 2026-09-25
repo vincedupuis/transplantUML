@@ -136,8 +136,9 @@ warnings.
   action name becomes a lambda calling it on the actions interface, which SML injects. Everything from SML is
   qualified (`sml::event`, `sml::X`, …) with only `sml::literals` and the guard/action operators imported, because
   `using namespace sml` makes event names like `back` ambiguous. Each compound or orthogonal state is a struct
-  (`isStruct`), an orthogonal state's regions are flattened into its table (`tableOf`), and a transition is lifted by
-  `lift` into the innermost table holding both ends, warning when that moves an end. Rows are built with sentinels
+  (`HasTable`), an orthogonal state's regions are flattened into its table (`TableOf`), and a transition is lifted by
+  `Lift` into the innermost table holding both ends, warning when that moves an end. Those table functions live in
+  `internal/render/tables.go`; the template keeps the rendering and every `warn`. Rows are built with sentinels
   (`⟨g:…⟩`, `⟨a:…⟩`, `⟨e:…⟩`, `⟨s:…⟩`) so `body` can declare only the lambdas a table uses and fully qualify the
   event namespace or a struct a lambda would hide. The tables are rendered first and the interfaces derived from the
   lambdas they declare. Behaviour verified by compiling and running generated code against SML: guards on one source

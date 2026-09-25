@@ -17,6 +17,19 @@
 //	ScopeOf transition          -> string     (innermost state containing its source and targets)
 //	OutgoingTransitions source  -> []*Transition
 //	IncomingTransitions target  -> []*Transition
+//
+// and these, for templates that write transition tables (see tables.go):
+//
+//	IsRegion name               -> bool       (a composite child of a parallel state)
+//	HasTable name               -> bool       (a parallel or composite state that is not a region)
+//	TableOf name                -> string     (the table its rows go in, "" for the machine's)
+//	Initials table              -> []Initial  (the states it starts in, with the scope of each)
+//	ForkTarget fork             -> string     (the state its transitions enter together)
+//	JoinOwner join              -> string     (the parallel state its sources lie in, or "")
+//	Lift transition             -> *Lift      (where it is written, or nil when it is not)
+//
+// and the helpers:
+//
 //	include "name" data         -> string     (like template, but pipeable, e.g. | indent 4)
 //	prefix p s                  -> p+s, or "" when s is empty
 //	surround p s q              -> p+s+q, or "" when s is empty
@@ -45,6 +58,7 @@ func Render(sm *model.StateMachine, tmplSrc string) (string, model.Warnings, err
 	tmpl := template.New("fsm")
 	var warnings model.Warnings
 
+	tbl := tables{sm}
 	funcs := template.FuncMap{
 		"warn": func(format string, args ...any) string {
 			warnings.Addf(format, args...)
@@ -98,6 +112,13 @@ func Render(sm *model.StateMachine, tmplSrc string) (string, model.Warnings, err
 		"ScopeOf":             sm.ScopeOf,
 		"OutgoingTransitions": sm.OutgoingTransitions,
 		"IncomingTransitions": sm.IncomingTransitions,
+		"IsRegion":            tbl.IsRegion,
+		"HasTable":            tbl.HasTable,
+		"TableOf":             tbl.TableOf,
+		"Initials":            tbl.Initials,
+		"ForkTarget":          tbl.ForkTarget,
+		"JoinOwner":           tbl.JoinOwner,
+		"Lift":                tbl.Lift,
 	}
 	tmpl.Funcs(sprig.FuncMap()).Funcs(funcs)
 

@@ -178,12 +178,12 @@ void {{ $fsm }}::{{ . }}() { machine_->sm.process_event(event::{{ . }}{}); }
 {{- $actions := .actions -}}
 {{- range Children .scope -}}
 {{- template "structs" (dict "scope" .Name "actions" $actions) -}}
-{{- if include "isRegion" .Name -}}
+{{- if IsRegion .Name -}}
 {{- if or .OnEntry .OnExit .Do .Defer -}}
 {{- warn "region %q: Boost.SML regions are anonymous; its behaviours and deferred events are not written" .Name -}}
 {{- end -}}
 {{- end -}}
-{{- if include "isStruct" .Name }}
+{{- if HasTable .Name }}
 
 // The {{ if .IsParallel }}orthogonal{{ else }}composite{{ end }} state "{{ .Name }}".
 struct {{ include "sid" .Name }} {
@@ -243,10 +243,10 @@ return sml::make_transition_table(
 {{- define "tableItems" -}}{{- /* . = table name: its rows, each preceded by its comments, separated by ⟪row⟫ */ -}}
 {{- $table := . -}}
 {{- $out := list -}}
-{{- $initials := include "initials" $table | splitList "\n" -}}
+{{- $initials := Initials $table -}}
 {{- range $initials -}}
-{{- $scope := . | splitList "\t" | last -}}
-{{- $init := . | splitList "\t" | first -}}
+{{- $scope := .Scope -}}
+{{- $init := .State -}}
 {{- with InitialActionsOf $scope -}}
 {{- $from := include "str" (ternary "initial" (printf "%s.initial" $scope) (eq $scope "")) -}}
 {{- $mark := ternary (printf "%s(sml::H)" $from) (printf "*%s" $from) (not (not (HistoryOf $scope))) -}}
@@ -255,39 +255,20 @@ return sml::make_transition_table(
 {{- end -}}
 {{- end -}}
 {{- range States -}}
-{{- if and (not (include "isRegion" .Name)) (eq (include "tableOf" .Name) $table) -}}
+{{- if and (not (IsRegion .Name)) (eq (TableOf .Name) $table) -}}
 {{- $out = append $out (include "memberItems" (dict "state" . "initials" $initials)) -}}
 {{- end -}}
 {{- end -}}
 {{- join "⟪row⟫" $out -}}
 {{- end -}}
 
-{{- define "initials" -}}{{- /* . = table name: lines "initial state<TAB>scope it starts" */ -}}
-{{- $table := . -}}
-{{- $lines := list -}}
-{{- $s := State $table -}}
-{{- if and $s $s.IsParallel -}}
-{{- range $r := Children $table -}}
-{{- if include "isRegion" $r.Name -}}
-{{- with $r.Initial }}{{ $lines = append $lines (printf "%s\t%s" . $r.Name) }}{{ end -}}
-{{- else -}}
-{{- $lines = append $lines (printf "%s\t%s" $r.Name $table) -}}
-{{- end -}}
-{{- end -}}
-{{- else -}}
-{{- with InitialOf $table }}{{ $lines = append $lines (printf "%s\t%s" . $table) }}{{ end -}}
-{{- end -}}
-{{- join "\n" $lines -}}
-{{- end -}}
-
-{{- define "memberItems" -}}{{- /* . = dict "state" *State "initials" lines: the state's comments and rows in its table */ -}}
+{{- define "memberItems" -}}{{- /* . = dict "state" *State "initials" its table's Initials: the state's comments and rows in its table */ -}}
 {{- $s := .state -}}
 {{- $src := include "ref" $s.Name -}}
 {{- $first := $src -}}
 {{- range .initials -}}
-{{- $parts := splitList "\t" . -}}
-{{- if and (eq (first $parts) $s.Name) (not (InitialActionsOf (last $parts))) -}}
-{{- $first = ternary (printf "%s(sml::H)" $src) (printf "*%s" $src) (not (not (HistoryOf (last $parts)))) -}}
+{{- if and (eq .State $s.Name) (not (InitialActionsOf .Scope)) -}}
+{{- $first = ternary (printf "%s(sml::H)" $src) (printf "*%s" $src) (not (not (HistoryOf .Scope))) -}}
 {{- end -}}
 {{- end -}}
 {{- $items := list -}}
@@ -332,7 +313,6 @@ return sml::make_transition_table(
 {{- define "stateRows" -}}{{- /* . = *State: its behaviours and the transitions leaving it, sources written ⟨src⟩, separated by ⟪row⟫ */ -}}
 {{- $s := . -}}
 {{- $out := list -}}
-{{- $region := include "isRegion" $s.Name -}}
 {{- if and $s.IsPseudo (or $s.OnEntry $s.OnExit) -}}
 {{- warn "state %q: Boost.SML's final state X has no entry or exit behaviour; it is not written" $s.Name -}}
 {{- else -}}
@@ -351,24 +331,22 @@ return sml::make_transition_table(
 {{- /* transitions whose lifted source is this state, an else branch after its siblings */ -}}
 {{- $else := list -}}
 {{- range $t := Transitions -}}
-{{- $lift := include "lift" $t -}}
-{{- if $lift -}}
-{{- $parts := splitList "\t" $lift -}}
-{{- $src := index $parts 1 -}}
-{{- $effSrc := index $parts 3 -}}
+{{- with $lift := Lift $t -}}
+{{- $src := $lift.Source -}}
+{{- $effSrc := $lift.From -}}
 {{- $completion := not (or $t.Event $t.After) -}}
 {{- $row := "" -}}
 {{- if and (eq $src $s.Name) (ne $src $effSrc) $completion -}}
 {{- /* a completion transition from inside: the inside ends (X), which completes this state */ -}}
-{{- if eq (include "tableOf" $effSrc) $src -}}
-{{- $row = include "row" (dict "t" $t "parts" $parts "mode" "outer") -}}
+{{- if eq (TableOf $effSrc) $src -}}
+{{- $row = include "row" (dict "t" $t "lift" $lift "mode" "outer") -}}
 {{- else -}}
 {{- warn "transition %s -> %s: Boost.SML has no transitions from inside a composite state, and %q lies too deep inside %q to complete it; it is not written" $t.Source (join " " $t.Targets) $t.Source $src -}}
 {{- end -}}
 {{- else if eq $src $s.Name -}}
-{{- $row = include "row" (dict "t" $t "parts" $parts "mode" "") -}}
-{{- else if and (eq $effSrc $s.Name) $completion (eq (include "tableOf" $effSrc) $src) -}}
-{{- $row = include "row" (dict "t" $t "parts" $parts "mode" "inner") -}}
+{{- $row = include "row" (dict "t" $t "lift" $lift "mode" "") -}}
+{{- else if and (eq $effSrc $s.Name) $completion (eq (TableOf $effSrc) $src) -}}
+{{- $row = include "row" (dict "t" $t "lift" $lift "mode" "inner") -}}
 {{- end -}}
 {{- if not $row -}}
 {{- else if eq $t.Cond "else" }}{{ $else = append $else $row }}{{ else }}{{ $out = append $out $row }}{{ end -}}
@@ -386,9 +364,9 @@ return sml::make_transition_table(
 {{- else if eq .Kind "history-deep" -}}
 {{- warn "state %q: Boost.SML has only shallow history; written as a shallow one" .Name -}}
 {{- else if eq .Kind "fork" -}}
-{{- warn "state %q: Boost.SML has no fork; transitions to it enter %q, whose regions start in their initial states, and its own transitions are not written" .Name (include "forkTarget" .Name) -}}
+{{- warn "state %q: Boost.SML has no fork; transitions to it enter %q, whose regions start in their initial states, and its own transitions are not written" .Name (ForkTarget .Name) -}}
 {{- else if eq .Kind "join" -}}
-{{- with include "joinOwner" .Name -}}
+{{- with JoinOwner .Name -}}
 {{- warn "state %q: Boost.SML has no join; transitions to it end their region (X), and its outgoing transition is taken once every region of %q has ended" $s.Name . -}}
 {{- else -}}
 {{- warn "state %q: Boost.SML has no join, and its incoming transitions do not all come from one orthogonal state; the transitions to and from it are not written" $s.Name -}}
@@ -412,13 +390,13 @@ return sml::make_transition_table(
 {{- end -}}
 {{- end -}}
 
-{{- define "row" -}}{{- /* . = dict "t" *Transition "parts" its lift "mode" "", or "inner" and "outer" for the two rows of a completion transition from inside a composite state: the row, source written ⟨src⟩ */ -}}
+{{- define "row" -}}{{- /* . = dict "t" *Transition "lift" its Lift "mode" "", or "inner" and "outer" for the two rows of a completion transition from inside a composite state: the row, source written ⟨src⟩ */ -}}
 {{- $t := .t -}}
 {{- $mode := .mode -}}
-{{- $src := index .parts 1 -}}
-{{- $tgt := index .parts 2 -}}
-{{- $effSrc := index .parts 3 -}}
-{{- $effTgt := index .parts 4 -}}
+{{- $src := .lift.Source -}}
+{{- $tgt := .lift.Target -}}
+{{- $effSrc := .lift.From -}}
+{{- $effTgt := .lift.To -}}
 {{- $label := printf "transition %s -> %s" $t.Source (join " " $t.Targets) -}}
 {{- if ne $mode "inner" -}}
 {{- if gt (len $t.Targets) 1 -}}
@@ -488,103 +466,10 @@ return sml::make_transition_table(
 {{- end -}}
 {{- end -}}
 
-{{- define "lift" -}}{{- /* . = *Transition: "table<TAB>source<TAB>target<TAB>its source<TAB>its target" in the innermost table holding both ends, or "" when it is not written */ -}}
-{{- $t := . -}}
-{{- $s := State .Source -}}
-{{- $effSrc := .Source -}}
-{{- $skip := or $s.IsHistory (eq $s.Kind "entry-point" "exit-point" "fork") -}}
-{{- if eq $s.Kind "join" }}{{ $effSrc = include "joinOwner" .Source }}{{ $skip = not $effSrc }}{{ end -}}
-{{- $effTgt := "" -}}
-{{- $tChain := "" -}}
-{{- with .Targets -}}
-{{- $tg := State (first .) -}}
-{{- $effTgt = $tg.Name -}}
-{{- if $tg.IsHistory -}}{{- $effTgt = $tg.Parent -}}
-{{- else if eq $tg.Kind "entry-point" -}}{{- $effTgt = $tg.Parent -}}{{- $skip = or $skip (not $tg.Parent) -}}
-{{- else if eq $tg.Kind "exit-point" -}}{{- $skip = true -}}
-{{- else if eq $tg.Kind "fork" -}}{{- $effTgt = include "forkTarget" $tg.Name -}}
-{{- else if eq $tg.Kind "join" -}}
-{{- with include "joinOwner" $tg.Name -}}
-{{- $effTgt = "⟨X⟩" -}}{{- $tChain = printf "⟨X⟩\t%s\n%s" . (include "chain" .) -}}
-{{- else -}}{{- $skip = true -}}{{- end -}}
-{{- end -}}
-{{- if and (not $tChain) (not $skip) }}{{ $tChain = include "chain" $effTgt }}{{ end -}}
-{{- else -}}
-{{- $tChain = include "chain" $effSrc -}}
-{{- end -}}
-{{- if not $skip -}}
-{{- $found := "" -}}
-{{- range $sl := include "chain" $effSrc | splitList "\n" -}}
-{{- if not $found -}}
-{{- range $tl := splitList "\n" $tChain -}}
-{{- if and (not $found) (eq (last (splitList "\t" $sl)) (last (splitList "\t" $tl))) -}}
-{{- $found = printf "%s\t%s\t%s" (last (splitList "\t" $sl)) (first (splitList "\t" $sl)) (ternary (first (splitList "\t" $tl)) "" (not (not $t.Targets))) -}}
-{{- end -}}
-{{- end -}}
-{{- end -}}
-{{- end -}}
-{{- with $found }}{{ printf "%s\t%s\t%s" . $effSrc $effTgt }}{{ end -}}
-{{- end -}}
-{{- end -}}
-
-{{- define "chain" -}}{{- /* . = state name: lines "state<TAB>its table" for it and each ancestor that is a state of some table */ -}}
-{{- $lines := list -}}
-{{- range prepend (Ancestors .) . -}}
-{{- if not (include "isRegion" .) }}{{ $lines = append $lines (printf "%s\t%s" . (include "tableOf" .)) }}{{ end -}}
-{{- end -}}
-{{- join "\n" $lines -}}
-{{- end -}}
-
-{{- define "forkTarget" -}}{{- /* . = fork name: the state its transitions enter together */ -}}
-{{- $targets := list -}}
-{{- range OutgoingTransitions . }}{{ $targets = concat $targets .Targets }}{{ end -}}
-{{- $common := include "commonAncestor" $targets -}}
-{{- if include "isRegion" $common }}{{ $common = (State $common).Parent }}{{ end -}}
-{{- $common -}}
-{{- end -}}
-
-{{- define "joinOwner" -}}{{- /* . = join name: the orthogonal state its incoming transitions all come from, or "" */ -}}
-{{- $sources := list -}}
-{{- range IncomingTransitions . }}{{ $sources = append $sources .Source }}{{ end -}}
-{{- $p := include "commonAncestor" $sources -}}
-{{- if include "isRegion" $p }}{{ $p = (State $p).Parent }}{{ end -}}
-{{- with State $p }}{{ if .IsParallel }}{{ .Name }}{{ end }}{{ end -}}
-{{- end -}}
-
-{{- define "commonAncestor" -}}{{- /* . = list of state names: the innermost state containing them all, "" for none */ -}}
-{{- $names := . -}}
-{{- $found := "" -}}
-{{- if $names -}}
-{{- range $a := Ancestors (first $names) -}}
-{{- if not $found -}}
-{{- $all := true -}}
-{{- range rest $names }}{{ if not (has $a (Ancestors .)) }}{{ $all = false }}{{ end }}{{ end -}}
-{{- if $all }}{{ $found = $a }}{{ end -}}
-{{- end -}}
-{{- end -}}
-{{- end -}}
-{{- $found -}}
-{{- end -}}
-
-{{- define "tableOf" -}}{{- /* . = state name: the table its rows go in, "" for the machine's; a region's states go in the orthogonal state's */ -}}
+{{- define "ref" -}}{{- /* . = state name: the state as SML writes it, a join as the end of its region */ -}}
 {{- $s := State . -}}
-{{- if include "isRegion" $s.Parent }}{{ (State $s.Parent).Parent }}{{ else }}{{ $s.Parent }}{{ end -}}
-{{- end -}}
-
-{{- define "isRegion" -}}{{- /* . = state name: non-empty for a region with states of its own, which SML flattens into its orthogonal state */ -}}
-{{- $s := State . -}}
-{{- if and $s $s.IsNormal (not $s.Submachine) (Children .) $s.Parent (State $s.Parent).IsParallel }}region{{ end -}}
-{{- end -}}
-
-{{- define "isStruct" -}}{{- /* . = state name: non-empty when the state gets a struct of its own */ -}}
-{{- $s := State . -}}
-{{- if and (not (include "isRegion" .)) (not $s.Submachine) (or $s.IsParallel (and $s.IsNormal (Children .))) }}struct{{ end -}}
-{{- end -}}
-
-{{- define "ref" -}}{{- /* . = state name, "⟨X⟩" for a region's end: the state as SML writes it */ -}}
-{{- $s := State . -}}
-{{- if or (eq . "⟨X⟩") $s.IsFinal $s.IsTerminate }}sml::X
-{{- else if include "isStruct" . }}sml::state<⟨s:{{ include "sid" . }}⟩>
+{{- if or $s.IsFinal $s.IsTerminate (eq $s.Kind "join") }}sml::X
+{{- else if HasTable . }}sml::state<⟨s:{{ include "sid" . }}⟩>
 {{- else }}{{ include "str" . }}
 {{- end -}}
 {{- end -}}

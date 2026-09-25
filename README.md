@@ -256,6 +256,13 @@ Templates use Go's [`text/template`](https://pkg.go.dev/text/template) syntax. A
 | `ScopeOf transition`         | innermost state containing a transition's source and targets             |
 | `OutgoingTransitions source` | transitions leaving a state                                              |
 | `IncomingTransitions target` | transitions entering a state                                             |
+| `IsRegion name`              | whether the state is a composite child of a parallel state               |
+| `HasTable name`              | whether the state gets a transition table of its own                     |
+| `TableOf name`               | the table a state's rows go in (`""` = the machine's)                    |
+| `Initials table`             | the states a table starts in, each with its `.State` and `.Scope`        |
+| `ForkTarget fork`            | the state a fork's transitions enter together                            |
+| `JoinOwner join`             | the parallel state a join's sources lie in, or `""`                      |
+| `Lift transition`            | where a transition is written in the tables, or nil (see below)          |
 | `include "name" data`        | like `template`, but returns a string so it can be piped (`\| indent 4`) |
 | `prefix p s`                 | `p + s`, or `""` if `s` is empty                                         |
 | `surround p s q`             | `p + s + q`, or `""` if `s` is empty                                     |
@@ -264,6 +271,14 @@ Templates use Go's [`text/template`](https://pkg.go.dev/text/template) syntax. A
 | `file name`                  | starts a file: the output up to the next `file` goes into `name`         |
 
 Call `warn` wherever the template leaves something out, so the user learns what the output does not show.
+
+The table functions serve templates that write one transition table per composite state, as Boost.SML does.
+A parallel state's regions are flattened into its own table.
+`Lift` returns `.From` and `.To`, the states standing for the transition's ends.
+A history, an entry point or a fork stands for the state it enters, and a join's source for its parallel state.
+`.Source` and `.Target` are those states lifted out of the tables they are nested in, up to `.Table`, the innermost table holding both.
+`Lift` returns nil when the transition leaves a history, an entry point, an exit point or a fork.
+It also returns nil when the transition reaches an exit point, an entry point with no parent, or a join outside any parallel state.
 
 A template that writes several files calls `file` before each one.
 `-o` then names the folder they go in, which is created if needed.
