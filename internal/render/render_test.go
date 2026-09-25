@@ -14,8 +14,16 @@ import (
 )
 
 // renderFile parses path with the parser its extension names and renders it
-// with the built-in template.
+// with the built-in PlantUML template.
 func renderFile(t *testing.T, path string) string {
+	t.Helper()
+	out, _ := renderWith(t, path, assets.PlantUML)
+	return out
+}
+
+// renderWith parses path with the parser its extension names and renders it
+// with tmpl.
+func renderWith(t *testing.T, path, tmpl string) (string, model.Warnings) {
 	t.Helper()
 	src, err := os.ReadFile(path)
 	if err != nil {
@@ -29,11 +37,11 @@ func renderFile(t *testing.T, path string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, _, err := Render(sm, assets.PlantUML)
+	out, warnings, err := Render(sm, tmpl)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return out
+	return out, warnings
 }
 
 // goldens maps every input document that has a checked-in PlantUML rendering

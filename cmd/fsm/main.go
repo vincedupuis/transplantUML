@@ -51,8 +51,8 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 		Use:   "fsm -i input [-f format] [-t template | -F format] [-o output]",
 		Short: "Convert state machine documents",
 		Long: "fsm parses a state machine document into a format-neutral model and renders\n" +
-			"that model either through a Go template (PlantUML by default) or with a\n" +
-			"built-in emitter.",
+			"that model either through a Go template (PlantUML by default, or Boost.SML\n" +
+			"with -t sml) or with a built-in emitter.",
 		Args:                  cobra.NoArgs,
 		DisableFlagsInUseLine: true,
 		SilenceUsage:          true,

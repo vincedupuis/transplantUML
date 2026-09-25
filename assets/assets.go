@@ -12,10 +12,17 @@ import (
 //go:embed puml.gotmpl
 var PlantUML string
 
+// SML is the built-in template that renders the model as a C++ header for
+// Boost.SML (https://github.com/boost-ext/sml).
+//
+//go:embed sml.gotmpl
+var SML string
+
 // Templates maps the name -t accepts in place of a file to each built-in
 // template.
 var Templates = map[string]string{
 	"puml": PlantUML,
+	"sml":  SML,
 }
 
 // TemplateNames lists the built-in template names, sorted.

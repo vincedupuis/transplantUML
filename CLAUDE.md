@@ -8,9 +8,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 format-neutral model (`internal/model`) of a UML state machine, which is then written back out either by a built-in
 emitter (document formats: SCXML, JSON) or through a Go `text/template` (free-form text: PlantUML, code, docs).
 Template rendering is output-only. The bundled templates are embedded in the binary and `-t` takes their name when
-no file has it: `assets/puml.gotmpl` (`puml`, used when `-t` is omitted) produces PlantUML. A template that writes
-several files starts each with the `file` function; `render.Files` splits the output at those marks and `-o` then
-names a folder.
+no file has it: `assets/puml.gotmpl` (`puml`, used when `-t` is omitted) produces PlantUML, `assets/sml.gotmpl`
+(`sml`) a C++20 state machine on Boost.SML as four files. A template that writes several files starts each with
+the `file` function; `render.Files` splits the output at those marks and `-o` then names a folder.
 
 The user keeps one source document and generates outputs from it; round-tripping is *not* a goal. The goal is to
 cover as much of UML as possible on the input side and, on the output side, to write what the format can express
@@ -28,6 +28,7 @@ go test ./...
 go test ./internal/scxml -run TestEdgeCases          # one test
 go test ./internal/render -run TestPlantUMLGolden/edge
 make plantuml                       # download the PlantUML jar into bin/ so TestPlantUMLSyntax runs (make test picks it up)
+make sml                            # download the Boost.SML header into bin/ so TestSMLCompiles runs (needs a C++20 compiler)
 make generate                       # download the ANTLR jar into bin/ and regenerate internal/fsm/parser from fsm.g4
 
 # End-to-end
@@ -36,7 +37,9 @@ make generate                       # download the ANTLR jar into bin/ and regen
 ```
 
 Golden files for the PlantUML template live in `internal/render/testdata/*.puml`; regenerate one with
-`go run ./cmd/fsm -i <input> -o internal/render/testdata/<name>.puml` after checking the diff is intended.
+`go run ./cmd/fsm -i <input> -o internal/render/testdata/<name>.puml` after checking the diff is intended. Those for
+the SML template are folders, `internal/render/testdata/sml/<name>/` (listed in `smlGoldens`), regenerated with
+`-t sml -o internal/render/testdata/sml/<name>`.
 
 ## Architecture
 
@@ -125,10 +128,27 @@ warnings.
   any region but the first (`confined`), so those warn instead. Verified with the PlantUML jar: `-syntax` accepts
   unknown stereotypes and silently ignores unsupported constructs, so test new notations by rendering
   (`-tpng`, with `-Playout=smetana` if Graphviz is missing) and looking at the image.
+- **`assets/sml.gotmpl`** — Boost.SML, as `<Name>FsmEvents.h` (an interface, one pure virtual `void` method per
+  event), `<Name>FsmActions.h` (an interface, a `bool … const` per guard and a `void` per action, which the user
+  implements), `<Name>Fsm.h` (the state machine class, implementing the events interface, built from the actions,
+  its SML machine behind a `unique_ptr<Machine>`) and `<Name>Fsm.cpp`, the only file including SML. No namespace in
+  the public files; in the `.cpp` everything sits in an anonymous namespace, events in `namespace event`. A guard or
+  action name becomes a lambda calling it on the actions interface, which SML injects. Everything from SML is
+  qualified (`sml::event`, `sml::X`, …) with only `sml::literals` and the guard/action operators imported, because
+  `using namespace sml` makes event names like `back` ambiguous. Each compound or orthogonal state is a struct
+  (`isStruct`), an orthogonal state's regions are flattened into its table (`tableOf`), and a transition is lifted by
+  `lift` into the innermost table holding both ends, warning when that moves an end. Rows are built with sentinels
+  (`⟨g:…⟩`, `⟨a:…⟩`, `⟨e:…⟩`, `⟨s:…⟩`) so `body` can declare only the lambdas a table uses and fully qualify the
+  event namespace or a struct a lambda would hide. The tables are rendered first and the interfaces derived from the
+  lambdas they declare. Behaviour verified by compiling and running generated code against SML: guards on one source
+  are tried in table order, an anonymous transition leaving a composite state waits for it to reach `X`, and an
+  orthogonal state completes when every region has. `TestSMLCompiles` compiles every golden input with a stub
+  implementation of the actions.
 
 ## Conventions
 
 - README.md documents the model, template functions and CLI flags; update it when any of those change.
+- A concept added to `uml.scxml` also goes into `internal/render/testdata/sml/uml/` and `TestSMLWarnings`.
 - Test fixtures: `example/coffee-machine.scxml` (simple, flat), `internal/scxml/testdata/edge.scxml`
   (parallel, `<initial>` element, deep history, final, onentry, multi-target) and `internal/scxml/testdata/uml.scxml`
   (every UML concept: connectors, terminate, submachine, do, defer, invariant, variables, time trigger, local and
