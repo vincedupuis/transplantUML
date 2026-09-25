@@ -32,8 +32,15 @@ namespace internal {
 struct stopped {};
 struct enter {};
 struct stop {};
+struct terminated {};
 struct sub_finished {};
 }  // namespace internal
+
+// Whether the machine reached a terminate state, its own or one of a machine it
+// runs: it ends once the current event is done.
+struct status {
+    bool terminated = false;
+};
 
 // The machines the submachine states run, and the entry point each starts at next.
 struct submachines {
@@ -90,7 +97,7 @@ struct machine {
             "work"_s + sml::event<event::after_5s> / [] {} = "check"_s,
             "work"_s + sml::event<event::after_retryDelay> = "check"_s,
             "work"_s + sml::event<event::split> = sml::state<both>,
-            "work"_s + sml::event<event::abort> = sml::X,
+            "work"_s + sml::event<event::abort> = sml::state<::internal::terminated>,
             "work"_s + sml::event<event::enter> = sml::state<outer>,
             sml::state<both> = sml::X,
             "sub"_s + sml::on_entry<sml::_> / [](::submachines& s) { s.sub.enterFsm(std::exchange(s.sub_entry, ChildFsm::Entry::initial)); },
@@ -100,6 +107,7 @@ struct machine {
             // Says goodbye.
             sml::state<outer> + sml::on_exit<sml::_> / [] {},
             sml::state<outer> = sml::X,
+            sml::state<::internal::terminated> + sml::on_entry<sml::_> / [](::status& s) { s.terminated = true; },
             "work"_s + sml::event<::internal::stop> = sml::state<::internal::stopped>,
             sml::state<both> + sml::event<::internal::stop> = sml::state<::internal::stopped>,
             "sub"_s + sml::event<::internal::stop> = sml::state<::internal::stopped>,
@@ -114,6 +122,12 @@ struct UmlFsm::Machine {
     // Hands what the machine of "sub" reports to this one.
     struct SubListener : ChildFsmListener {
         explicit SubListener(UmlFsm& fsm) : fsm{fsm} {}
+        void onTerminated() override {
+            fsm.machine_->status.terminated = true;
+            if (!fsm.machine_->busy) {
+                fsm.report();
+            }
+        }
         void onFinished() override {
             if (fsm.machine_->process(internal::sub_finished{})) {
                 fsm.report();
@@ -125,8 +139,8 @@ struct UmlFsm::Machine {
     Machine(UmlFsm& fsm, UmlFsmActions& actions, ChildFsm& sub)
         : machines{.sub = sub},
           sub_listener{fsm},
-          sm{actions, machines} {
-        sub.stopFsm();
+          sm{actions, machines, status} {
+        sub.terminateFsm();
         sub.setListener(&sub_listener);
     }
 
@@ -145,7 +159,7 @@ struct UmlFsm::Machine {
         }
         busy = true;
         sm.process_event(event);
-        while (!queue.empty()) {
+        while (!queue.empty() && !status.terminated) {
             auto next = std::move(queue.front());
             queue.pop_front();
             next();
@@ -156,6 +170,7 @@ struct UmlFsm::Machine {
 
     ::submachines machines;
     SubListener sub_listener;
+    ::status status;
     sml::sm<machine, sml::defer_queue<std::deque>> sm;
     bool busy = false;
     std::deque<std::function<void()>> queue;
@@ -181,6 +196,10 @@ void UmlFsm::enterFsm(Entry entry) {
 
 void UmlFsm::stopFsm() {
     machine_->sm.process_event(internal::stop{});
+    terminateFsm();
+}
+
+void UmlFsm::terminateFsm() {
     machine_.reset();
     machine_ = std::make_unique<Machine>(*this, actions_, sub_);
 }
@@ -190,6 +209,13 @@ void UmlFsm::setListener(UmlFsmListener* listener) {
 }
 
 void UmlFsm::report() {
+    if (machine_->status.terminated) {
+        terminateFsm();
+        if (listener_ != nullptr) {
+            listener_->onTerminated();
+        }
+        return;
+    }
     if (listener_ == nullptr) {
         return;
     }

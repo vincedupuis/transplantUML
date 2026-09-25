@@ -13,6 +13,8 @@ public:
 
     // It reached its final state.
     virtual void onFinished() {}
+    // It reached a terminate state.
+    virtual void onTerminated() {}
     // It left by its exit point "escalated".
     virtual void onExitEscalated() {}
 };
@@ -31,8 +33,12 @@ public:
 
     // Starts the machine, again if it runs, in its initial state or at an entry point.
     void enterFsm(Entry entry = Entry::initial);
-    // Stops the machine: it ignores every event until entered again.
+    // Stops the machine: it leaves its states, running their exit behaviours, and
+    // ignores every event until entered again.
     void stopFsm();
+    // Ends the machine at once, as a terminate state does: no exit behaviour runs,
+    // and it ignores every event until entered again.
+    void terminateFsm();
     // Tells listener when the machine ends; nullptr tells no one.
     void setListener(SupportFsmListener* listener);
 

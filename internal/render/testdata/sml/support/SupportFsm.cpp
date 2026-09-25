@@ -66,6 +66,10 @@ void SupportFsm::enterFsm(Entry entry) {
 
 void SupportFsm::stopFsm() {
     machine_->sm.process_event(internal::stop{});
+    terminateFsm();
+}
+
+void SupportFsm::terminateFsm() {
     machine_.reset();
     machine_ = std::make_unique<Machine>(actions_);
 }

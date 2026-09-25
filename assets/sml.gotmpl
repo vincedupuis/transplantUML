@@ -26,7 +26,10 @@ The machine waits in internal::stopped until enterFsm sends it
 internal::enter, or the event of one of its entry points. stopFsm sends
 internal::stop, which every state of the machine's table answers by going
 back to internal::stopped, so the active states' exit behaviours run; then
-it starts again from a new SML machine, as enterFsm does first. Their names keep them apart from
+it starts again from a new SML machine, as enterFsm does first. A terminate
+state is internal::terminated, whose entry sets status.terminated; report
+then ends the machine without exit behaviours, by starting again from a new
+SML machine (terminateFsm), and tells the listener. Their names keep them apart from
 the events' methods. It ends in X or in one of its exit points, which report
 tells the listener. A submachine state runs another generated machine, which
 the constructor takes: its behaviours enter and stop that machine, and a
@@ -55,6 +58,9 @@ the lambdas the tables declared, but first in the output.
 {{- $listener := print $fsm "Listener" -}}
 {{- $defer := false -}}{{- range States }}{{ if .Defer }}{{ $defer = true }}{{ end }}{{ end -}}
 {{- $subs := list -}}{{- range States }}{{ if .Submachine }}{{ $subs = append $subs . }}{{ end }}{{ end -}}
+{{- $terminates := false -}}{{- range States }}{{ if .IsTerminate }}{{ $terminates = true }}{{ end }}{{ end -}}
+{{- /* whether the machine can be terminated: by a terminate state of its own, or by one of a machine it runs */ -}}
+{{- $halts := or $terminates (not (empty $subs)) -}}
 {{- $machines := list -}}{{- range $subs }}{{ $machines = append $machines (include "machineClass" .Submachine) }}{{ end -}}
 {{- $machines = uniq $machines | sortAlpha -}}
 {{- $entries := list -}}{{- $exits := list -}}
@@ -62,7 +68,7 @@ the lambdas the tables declared, but first in the output.
 {{- if eq .Kind "entry-point" }}{{ $entries = append $entries .Name }}{{ else if eq .Kind "exit-point" }}{{ $exits = append $exits .Name }}{{ end -}}
 {{- end -}}
 {{- range splitList "\n" (include "eventIds" .) -}}
-{{- if has . (list "enterFsm" "stopFsm") -}}
+{{- if has . (list "enterFsm" "stopFsm" "terminateFsm") -}}
 {{- warn "event %q: its method %s clashes with the one that starts or stops the machine; the files do not compile" . . -}}
 {{- end -}}
 {{- end -}}
@@ -80,10 +86,11 @@ the lambdas the tables declared, but first in the output.
 {{- range $entries }}{{ $internal = append $internal (print "enter_" (include "entryId" .)) }}{{ end -}}
 {{- range regexFindAll "::internal::[A-Za-z0-9_]+" $code -1 }}{{ $internal = append $internal (trimPrefix "::internal::" .) }}{{ end -}}
 {{- $internal = uniq $internal -}}
+{{- $reports := or $halts (not (empty $ends)) -}}
 {{- /* how the state machine processes an event, %s standing for it */ -}}
 {{- $process := "machine_->sm.process_event(%s);" -}}
 {{- if $subs }}{{ $process = "machine_->process(%s)" }}{{ end -}}
-{{- if and $subs $ends }}{{ $process = printf "if (%s) {\n        report();\n    }" $process }}{{ else if $subs }}{{ $process = print $process ";" }}{{ else if $ends }}{{ $process = print $process "\n    report();" }}{{ end -}}
+{{- if and $subs $reports }}{{ $process = printf "if (%s) {\n        report();\n    }" $process }}{{ else if $subs }}{{ $process = print $process ";" }}{{ else if $reports }}{{ $process = print $process "\n    report();" }}{{ end -}}
 {{- /* a name used as both a guard and an action, in any table, is one method that returns bool and is not const */ -}}
 {{- $calls := regexFindAll "const auto [A-Za-z0-9_]+ = \\[\\]\\((const )?[A-Za-z0-9_]+& actions\\) \\{ (return )?actions\\." $code -1 -}}
 {{- $guards := list -}}{{- $effects := list -}}
@@ -166,6 +173,8 @@ public:
 
     // It reached its final state.
     virtual void onFinished() {}
+    // It reached a terminate state.
+    virtual void onTerminated() {}
 {{- range $exits }}
     // It left by its exit point "{{ . }}".
     virtual void onExit{{ include "pascal" . }}() {}
@@ -195,8 +204,12 @@ public:
 
     // Starts the machine, again if it runs, in its initial state{{ if $entries }} or at an entry point{{ end }}.
     void enterFsm(Entry entry = Entry::initial);
-    // Stops the machine: it ignores every event until entered again.
+    // Stops the machine: it leaves its states, running their exit behaviours, and
+    // ignores every event until entered again.
     void stopFsm();
+    // Ends the machine at once, as a terminate state does: no exit behaviour runs,
+    // and it ignores every event until entered again.
+    void terminateFsm();
     // Tells listener when the machine ends; nullptr tells no one.
     void setListener({{ $listener }}* listener);
 {{- with include "eventIds" . }}
@@ -206,7 +219,7 @@ public:
 {{- end }}
 
 private:
-{{- if $ends }}
+{{- if $reports }}
     void report();
 {{ end }}
     struct Machine;
@@ -251,6 +264,14 @@ namespace internal {
 struct {{ . }} {};
 {{- end }}
 }  // namespace internal
+{{- if $halts }}
+
+// Whether the machine reached a terminate state, its own or one of a machine it
+// runs: it ends once the current event is done.
+struct status {
+    bool terminated = false;
+};
+{{- end }}
 {{- with $subs }}
 
 // The machines the submachine states run, and the entry point each starts at next.
@@ -272,15 +293,21 @@ struct {{ $fsm }}::Machine {
     // Hands what the machine of "{{ .Name }}" reports to this one.
     struct {{ include "pascal" .Name }}Listener : {{ include "machineClass" .Submachine }}Listener {
         explicit {{ include "pascal" .Name }}Listener({{ $fsm }}& fsm) : fsm{fsm} {}
+        void onTerminated() override {
+            fsm.machine_->status.terminated = true;
+            if (!fsm.machine_->busy) {
+                fsm.report();
+            }
+        }
 {{- if has (printf "%s_finished" $sid) $internal }}
         void onFinished() override {
-            {{ include "adapterProcess" (dict "event" (printf "internal::%s_finished{}" $sid) "ends" $ends) }}
+            {{ include "adapterProcess" (dict "event" (printf "internal::%s_finished{}" $sid) "reports" $reports) }}
         }
 {{- end -}}
 {{- range Children .Name -}}
 {{- if and (eq .Kind "exit-point") (has (printf "%s_exit_%s" $sid (include "cid" .Name)) $internal) }}
         void onExit{{ include "pascal" .Name }}() override {
-            {{ include "adapterProcess" (dict "event" (printf "internal::%s_exit_%s{}" $sid (include "cid" .Name)) "ends" $ends) }}
+            {{ include "adapterProcess" (dict "event" (printf "internal::%s_exit_%s{}" $sid (include "cid" .Name)) "reports" $reports) }}
         }
 {{- end -}}
 {{- end }}
@@ -292,9 +319,9 @@ struct {{ $fsm }}::Machine {
 {{- range $subs }}
           {{ include "sid" .Name }}_listener{fsm},
 {{- end }}
-          sm{actions, machines} {
+          sm{actions, machines, status} {
 {{- range $subs }}
-        {{ include "sid" .Name }}.stopFsm();
+        {{ include "sid" .Name }}.terminateFsm();
         {{ include "sid" .Name }}.setListener(&{{ include "sid" .Name }}_listener);
 {{- end }}
     }
@@ -316,7 +343,7 @@ struct {{ $fsm }}::Machine {
         }
         busy = true;
         sm.process_event(event);
-        while (!queue.empty()) {
+        while (!queue.empty() && !status.terminated) {
             auto next = std::move(queue.front());
             queue.pop_front();
             next();
@@ -329,9 +356,14 @@ struct {{ $fsm }}::Machine {
 {{- range $subs }}
     {{ include "pascal" .Name }}Listener {{ include "sid" .Name }}_listener;
 {{- end }}
+    ::status status;
     sml::sm<machine{{ if $defer }}, sml::defer_queue<std::deque>{{ end }}> sm;
     bool busy = false;
     std::deque<std::function<void()>> queue;
+{{- else if $halts }}
+    explicit Machine({{ $actions }}& actions) : sm{actions, status} {}
+    ::status status;
+    sml::sm<machine{{ if $defer }}, sml::defer_queue<std::deque>{{ end }}> sm;
 {{- else }}
     explicit Machine({{ $actions }}& actions) : sm{actions} {}
     sml::sm<machine{{ if $defer }}, sml::defer_queue<std::deque>{{ end }}> sm;
@@ -363,6 +395,10 @@ void {{ $fsm }}::enterFsm(Entry entry) {
 
 void {{ $fsm }}::stopFsm() {
     machine_->sm.process_event(internal::stop{});
+    terminateFsm();
+}
+
+void {{ $fsm }}::terminateFsm() {
     machine_.reset();
     machine_ = std::make_unique<Machine>({{ if $subs }}*this, {{ end }}actions_{{ range $subs }}, {{ include "sid" .Name }}_{{ end }});
 }
@@ -370,13 +406,23 @@ void {{ $fsm }}::stopFsm() {
 void {{ $fsm }}::setListener({{ $listener }}* listener) {
     listener_ = listener;
 }
-{{- with $ends }}
+{{- if $reports }}
 
 void {{ $fsm }}::report() {
-{{- $literal := false }}{{ range . }}{{ if ne (first .) "sml::X" }}{{ $literal = true }}{{ end }}{{ end }}
+{{- $literal := false }}{{ range $ends }}{{ if ne (first .) "sml::X" }}{{ $literal = true }}{{ end }}{{ end }}
 {{- if $literal }}
     using namespace sml::literals;
 {{- end }}
+{{- if $halts }}
+    if (machine_->status.terminated) {
+        terminateFsm();
+        if (listener_ != nullptr) {
+            listener_->onTerminated();
+        }
+        return;
+    }
+{{- end }}
+{{- with $ends }}
     if (listener_ == nullptr) {
         return;
     }
@@ -386,6 +432,7 @@ void {{ $fsm }}::report() {
         listener_->{{ last $end }}();
 {{- end }}
     }
+{{- end }}
 }
 {{- end }}
 {{- with include "eventIds" . }}
@@ -579,6 +626,9 @@ return sml::make_transition_table(
 {{- warn "state %q: Boost.SML has no do activities; %s is written as a comment" $s.Name (join ", " .) -}}
 {{- $out = append $out (include "comment" (joinNonEmpty "\n" (printf "do / %s" (join ", " .)) $s.DoNote)) -}}
 {{- end -}}
+{{- if $s.IsTerminate -}}
+{{- $out = append $out "\n⟨src⟩ + sml::on_entry<sml::_> / [](::status& s) { s.terminated = true; }" -}}
+{{- end -}}
 {{- range $s.Defer -}}
 {{- $out = append $out (printf "%s\n⟨src⟩ + sml::event<⟨e:%s⟩> / sml::defer" (include "comment" (index $s.DeferNotes .)) (include "cid" .)) -}}
 {{- end -}}
@@ -613,7 +663,10 @@ return sml::make_transition_table(
 {{- define "pseudoWarnings" -}}{{- /* . = *State: the kinds SML has no counterpart for */ -}}
 {{- $s := . -}}
 {{- if .IsTerminate -}}
-{{- warn "state %q: Boost.SML has no terminate; written as X, which ends only its own region" .Name -}}
+{{- $parallel := false }}{{ range Ancestors .Name }}{{ if (State .).IsParallel }}{{ $parallel = true }}{{ end }}{{ end -}}
+{{- if $parallel -}}
+{{- warn "state %q: Boost.SML finishes the current event in the other regions before the machine terminates" .Name -}}
+{{- end -}}
 {{- else if eq .Kind "history-deep" -}}
 {{- warn "state %q: Boost.SML has only shallow history; written as a shallow one" .Name -}}
 {{- else if eq .Kind "fork" -}}
@@ -739,7 +792,8 @@ return sml::make_transition_table(
 {{- define "ref" -}}{{- /* . = state name: the state as SML writes it, a join as the end of its region */ -}}
 {{- $s := State . -}}
 {{- if and (eq $s.Kind "entry-point") (not $s.Parent) }}sml::state<::internal::stopped>
-{{- else if or $s.IsFinal $s.IsTerminate (eq $s.Kind "join") }}sml::X
+{{- else if $s.IsTerminate }}sml::state<::internal::terminated>
+{{- else if or $s.IsFinal (eq $s.Kind "join") }}sml::X
 {{- else if HasTable . }}sml::state<⟨s:{{ include "sid" . }}⟩>
 {{- else }}{{ include "str" . }}
 {{- end -}}
@@ -747,7 +801,7 @@ return sml::make_transition_table(
 
 {{- define "sid" -}}{{- /* . = state name: its struct's name, kept apart from the names the file defines */ -}}
 {{- $id := include "cid" . -}}
-{{- if has $id (list "machine" "sml" "event" "internal" "submachines" "actions") }}{{ $id }}_state{{ else }}{{ $id }}{{ end -}}
+{{- if has $id (list "machine" "sml" "event" "internal" "submachines" "actions" "status") }}{{ $id }}_state{{ else }}{{ $id }}{{ end -}}
 {{- end -}}
 
 {{- define "eventIds" -}}{{- /* . = anything: every event's struct name, one per line, in order of first use */ -}}
@@ -776,8 +830,8 @@ return sml::make_transition_table(
 {{- if eq $id "initial" }}initial_point{{ else }}{{ $id }}{{ end -}}
 {{- end -}}
 
-{{- define "adapterProcess" -}}{{- /* . = dict "event" an internal event "ends" whether the machine reports: a submachine listener's body */ -}}
-{{- if .ends -}}
+{{- define "adapterProcess" -}}{{- /* . = dict "event" an internal event "reports" whether the machine reports: a submachine listener's body */ -}}
+{{- if .reports -}}
 if (fsm.machine_->process({{ .event }})) {
                 fsm.report();
             }

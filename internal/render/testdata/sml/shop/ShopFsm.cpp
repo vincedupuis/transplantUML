@@ -36,10 +36,17 @@ struct stopped {};
 struct enter {};
 struct stop {};
 struct enter_reorder {};
+struct terminated {};
 struct helpdesk_finished {};
 struct helpdesk_exit_escalated {};
 struct aftersales_finished {};
 }  // namespace internal
+
+// Whether the machine reached a terminate state, its own or one of a machine it
+// runs: it ends once the current event is done.
+struct status {
+    bool terminated = false;
+};
 
 // The machines the submachine states run, and the entry point each starts at next.
 struct submachines {
@@ -109,7 +116,7 @@ struct machine {
             sml::state<::internal::stopped> + sml::event<::internal::enter_reorder> / loadBasket = sml::state<checkout>,
             "browsing"_s + sml::event<event::buy> = sml::state<checkout>,
             "browsing"_s + sml::event<event::quickBuy> = sml::state<checkout>,
-            "browsing"_s + sml::event<event::fraud> = sml::X,
+            "browsing"_s + sml::event<event::fraud> = sml::state<::internal::terminated>,
             "browsing"_s + sml::event<event::help> = "helpdesk"_s,
             "browsing"_s + sml::event<event::emergency> / [](::submachines& s) { s.helpdesk_entry = SupportFsm::Entry::urgent; } = "helpdesk"_s,
             "helpdesk"_s + sml::on_entry<sml::_> / (openChat, [](::submachines& s) { s.helpdesk.enterFsm(std::exchange(s.helpdesk_entry, SupportFsm::Entry::initial)); }),
@@ -132,6 +139,7 @@ struct machine {
             // Money returned.
             // terminate:
             // Fraud closes the shop.
+            sml::state<::internal::terminated> + sml::on_entry<sml::_> / [](::status& s) { s.terminated = true; },
             "browsing"_s + sml::event<::internal::stop> = sml::state<::internal::stopped>,
             "helpdesk"_s + sml::event<::internal::stop> = sml::state<::internal::stopped>,
             sml::state<checkout> + sml::event<::internal::stop> = sml::state<::internal::stopped>,
@@ -148,6 +156,12 @@ struct ShopFsm::Machine {
     // Hands what the machine of "helpdesk" reports to this one.
     struct HelpdeskListener : SupportFsmListener {
         explicit HelpdeskListener(ShopFsm& fsm) : fsm{fsm} {}
+        void onTerminated() override {
+            fsm.machine_->status.terminated = true;
+            if (!fsm.machine_->busy) {
+                fsm.report();
+            }
+        }
         void onFinished() override {
             if (fsm.machine_->process(internal::helpdesk_finished{})) {
                 fsm.report();
@@ -164,6 +178,12 @@ struct ShopFsm::Machine {
     // Hands what the machine of "aftersales" reports to this one.
     struct AftersalesListener : SupportFsmListener {
         explicit AftersalesListener(ShopFsm& fsm) : fsm{fsm} {}
+        void onTerminated() override {
+            fsm.machine_->status.terminated = true;
+            if (!fsm.machine_->busy) {
+                fsm.report();
+            }
+        }
         void onFinished() override {
             if (fsm.machine_->process(internal::aftersales_finished{})) {
                 fsm.report();
@@ -176,10 +196,10 @@ struct ShopFsm::Machine {
         : machines{.helpdesk = helpdesk, .aftersales = aftersales},
           helpdesk_listener{fsm},
           aftersales_listener{fsm},
-          sm{actions, machines} {
-        helpdesk.stopFsm();
+          sm{actions, machines, status} {
+        helpdesk.terminateFsm();
         helpdesk.setListener(&helpdesk_listener);
-        aftersales.stopFsm();
+        aftersales.terminateFsm();
         aftersales.setListener(&aftersales_listener);
     }
 
@@ -199,7 +219,7 @@ struct ShopFsm::Machine {
         }
         busy = true;
         sm.process_event(event);
-        while (!queue.empty()) {
+        while (!queue.empty() && !status.terminated) {
             auto next = std::move(queue.front());
             queue.pop_front();
             next();
@@ -211,6 +231,7 @@ struct ShopFsm::Machine {
     ::submachines machines;
     HelpdeskListener helpdesk_listener;
     AftersalesListener aftersales_listener;
+    ::status status;
     sml::sm<machine> sm;
     bool busy = false;
     std::deque<std::function<void()>> queue;
@@ -242,6 +263,10 @@ void ShopFsm::enterFsm(Entry entry) {
 
 void ShopFsm::stopFsm() {
     machine_->sm.process_event(internal::stop{});
+    terminateFsm();
+}
+
+void ShopFsm::terminateFsm() {
     machine_.reset();
     machine_ = std::make_unique<Machine>(*this, actions_, helpdesk_, aftersales_);
 }
@@ -251,6 +276,13 @@ void ShopFsm::setListener(ShopFsmListener* listener) {
 }
 
 void ShopFsm::report() {
+    if (machine_->status.terminated) {
+        terminateFsm();
+        if (listener_ != nullptr) {
+            listener_->onTerminated();
+        }
+        return;
+    }
     if (listener_ == nullptr) {
         return;
     }

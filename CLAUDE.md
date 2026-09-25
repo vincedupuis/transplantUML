@@ -148,7 +148,10 @@ warnings.
   Every machine waits in `internal::stopped` until `enterFsm(Entry)` (the initial state or one of its entry points)
   and ends in `X` or one of its exit points, which `report` tells the `<Name>FsmListener`; `stopFsm` sends `internal::stop`, which every state of the
   machine's table answers by going back to `stopped` (SML exits active inner states and regions first), then
-  rebuilds the SML machine, and the names `enterFsm`/`stopFsm` keep them apart from event methods. A submachine state runs the other
+  rebuilds the SML machine (`terminateFsm`, which runs no exit behaviour), and the names `enterFsm`/`stopFsm`/
+  `terminateFsm` keep them apart from event methods. A terminate state is `internal::terminated`, whose entry sets
+  the injected `status.terminated`; `report` checks it after the event, so a terminate at any depth, or in a
+  submachine (whose listener sets the flag), ends the machine and tells `onTerminated`. A submachine state runs the other
   generated machine, which the constructor takes by reference: its entry and exit behaviours call `enterFsm` and
   `stopFsm` through the `submachines` struct SML injects, and a listener per submachine state turns what that machine
   reports into internal events, queued by `Machine::process` while an event is being processed.

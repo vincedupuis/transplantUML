@@ -34,7 +34,7 @@ symbol, and so on. Warnings go to stderr and never fail the conversion.
 | Initial                                | `Initial` on the machine / the state                  | `initial` attr, `<initial>`                             | `[*] -->`                                           | `*` on the initial state                  |
 | Effect of the initial transition       | `InitialActions` on the machine / the state           | `<initial><transition>` content (on a state only ⚠)     | `[*] --> X : / act`                                 | on `enterFsm`; transient in a state       |
 | Final                                  | `final`                                               | `<final>`                                               | `state X <<end>>`                                   | `sml::X`                                  |
-| Terminate                              | `terminate`                                           | `<final>` ⚠                                             | `state X <<end>>` ⚠                                 | `sml::X` ⚠                                |
+| Terminate                              | `terminate`                                           | `<final>` ⚠                                             | `state X <<end>>` ⚠                                 | ends the machine, `onTerminated`          |
 | Shallow / deep history                 | `history-shallow`, `history-deep`                     | `<history>`                                             | `<<history>>`, `<<history*>>`                       | `(sml::H)` on the initial state; deep ⚠   |
 | Choice                                 | `choice`                                              | transient state with guarded eventless transitions      | `<<choice>>`                                        | state with guarded anonymous transitions  |
 | Junction                               | `junction`                                            | transient state, `tpuml:kind="junction"`                | filled circle (`<<start>>`)                         | state with guarded anonymous transitions  |
@@ -348,11 +348,13 @@ The machine waits, ignoring every event, until `enterFsm()` starts it in its ini
 `enterFsm(KioskFsm::Entry::p)` starts it at its entry point `p` instead.
 Either one starts the machine again from the beginning if it is already running.
 `stopFsm()` leaves the current state, running the exit behaviours of the active states, and makes it wait again.
+`terminateFsm()` makes it wait again at once, running no exit behaviour, as a terminate state does.
 These names keep them apart from the events' methods; an event named like one of them warns, since the files would
 not compile.
 
 `setListener` takes a `KioskFsmListener`, which the machine tells when it ends.
-`onFinished()` is called when it reaches its final state, or a terminate state.
+`onFinished()` is called when it reaches its final state.
+`onTerminated()` is called when it reaches a terminate state, at any depth, once the current event is done.
 `onExitP()` is called when it leaves by its exit point `p`.
 The machine stops before telling it.
 
@@ -382,6 +384,8 @@ helpdesk.human();      // the submachine's events go to its instance
   When it leaves by an exit point, the submachine state takes that point's transition.
 - Leaving the submachine state on an event of its own stops the machine with `stopFsm`, which runs the exit
   behaviours of its active states, then runs the submachine state's exit behaviour.
+- A terminate state in the machine terminates the submachine state's machine too, without exit behaviours, and it
+  tells its own listener `onTerminated()`.
 - The machine may finish while it is being entered.
   The outer machine then queues what it reports and handles it once the current event is done.
 - `ShopFsm.h` only declares `class SupportFsm;`.
@@ -428,7 +432,10 @@ Things to know:
   and its variables are listed on the actions interface, whose implementation holds them.
   Do activities also become comments, with a warning.
 - The machine's own entry points are the values of `Entry`, and its exit points are states that end it.
-  A state's entry and exit points, fork, local transitions and terminate warn as the coverage table shows.
+  A state's entry and exit points, fork and local transitions warn as the coverage table shows.
+- A terminate state is `sml::state<internal::terminated>`, which its region stays in.
+  Entering it flags the machine, which ends once the current event is done.
+  In an orthogonal state, the other regions may still act on that event first, so it warns there.
 
 ## SCXML
 

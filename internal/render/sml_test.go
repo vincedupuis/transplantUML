@@ -118,7 +118,6 @@ func TestSMLWarnings(t *testing.T) {
 		`transition work -> check: the action "retries = retries + 1" is not a name; it is not written`,
 		`transition work -> check: Boost.SML has no time triggers; written on the event after_retryDelay, which the application raises retryDelay after entering work`,
 		`the exit behaviour of "outer": the action "log('bye')" is not a name; it is not written`,
-		`state "stop": Boost.SML has no terminate; written as X, which ends only its own region`,
 	}
 	if !reflect.DeepEqual([]string(warnings), want) {
 		t.Errorf("warnings =\n%s\nwant\n%s", strings.Join(warnings, "\n"), strings.Join(want, "\n"))
@@ -155,6 +154,30 @@ func TestSMLMachinePointWarnings(t *testing.T) {
 	}
 	if !reflect.DeepEqual([]string(warnings), want) {
 		t.Errorf("warnings =\n%s\nwant\n%s", strings.Join(warnings, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// A terminate ends the machine once the current event is done, which in an
+// orthogonal state lets the other regions act on it first.
+func TestSMLTerminateInRegionWarns(t *testing.T) {
+	sm := &model.StateMachine{
+		Initial: "p",
+		States: []*model.State{
+			{Name: "p", Kind: model.Parallel},
+			{Name: "r1", Parent: "p", Kind: model.Normal, Initial: "a"},
+			{Name: "a", Parent: "r1", Kind: model.Normal},
+			{Name: "t", Parent: "r1", Kind: model.Terminate},
+			{Name: "r2", Parent: "p", Kind: model.Normal},
+		},
+		Transitions: []*model.Transition{{Source: "a", Targets: []string{"t"}, Event: "e"}},
+	}
+	if err := sm.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	_, warnings := smlFiles(t, sm)
+	want := []string{`state "t": Boost.SML finishes the current event in the other regions before the machine terminates`}
+	if !reflect.DeepEqual([]string(warnings), want) {
+		t.Errorf("warnings = %q, want %q", warnings, want)
 	}
 }
 
@@ -427,18 +450,22 @@ func TestSMLCompiles(t *testing.T) {
 // desk runs the machine agent in a submachine state, which it enters at the
 // machine's initial state or at one of its entry points, and leaves when the
 // machine completes, when it leaves by its exit point, or on an event of its
-// own. The entry point quick completes agent at once, while desk enters it.
+// own. The entry point quick completes agent at once, while desk enters it,
+// and broken terminates it at once. agent also terminates from inside the
+// composite state person, which ends desk too.
 const desk = `fsm desk {
   initial state idle {
     on ask goto help
     on hurry goto fast
     on rush goto quick
+    on crash goto broken
   }
   submachine help : agent {
     entry / open
     exit / close
     entry point fast
     entry point quick
+    entry point broken
     exit point up / page goto top
     on quit goto idle
     goto idle
@@ -449,6 +476,7 @@ const desk = `fsm desk {
 const agent = `fsm agent {
   entry point fast goto person
   entry point quick goto final
+  entry point broken goto terminate
   exit point up
   initial state bot {
     entry / greet
@@ -460,13 +488,16 @@ const agent = `fsm agent {
     exit / release
     on solved goto final
     on escalate goto up
+    initial state talking { on hangup goto terminate }
   }
 }`
 
 // A submachine state runs a machine of its own, generated from another
 // document: this links desk and agent and runs them, checking the actions
 // they take in turn. Leaving the submachine state early, or stopping desk,
-// runs the exit behaviour of agent's active state first.
+// runs the exit behaviour of agent's active state first. A terminate in agent
+// ends both machines without running any exit behaviour, even while desk is
+// entering agent, and desk then ignores its events.
 func TestSMLSubmachineRuns(t *testing.T) {
 	cxx, include := smlToolchain(t)
 	var files []File
@@ -483,6 +514,7 @@ func TestSMLSubmachineRuns(t *testing.T) {
 
 struct Listener : DeskFsmListener {
   void onFinished() override { trace.push_back("finished"); }
+  void onTerminated() override { trace.push_back("terminated"); }
 };
 
 void step(const char* what) {
@@ -527,6 +559,18 @@ int main() {
   step("hurry, stopFsm");
   help.solved();
   step("solved");
+  fsm.enterFsm();
+  fsm.hurry();
+  help.hangup();
+  step("hurry, hangup");
+  fsm.ask();
+  help.human();
+  step("ask, human");
+  fsm.enterFsm();
+  fsm.crash();
+  step("crash");
+  fsm.ask();
+  step("ask");
 }
 `
 	dir := t.TempDir()
@@ -553,6 +597,10 @@ human:
 hurry, quit: open assign release close
 hurry, stopFsm: open assign release close
 solved:
+hurry, hangup: open assign terminated
+ask, human:
+crash: open terminated
+ask:
 `
 	if string(out) != want {
 		t.Errorf("the program printed\n%s\nwant\n%s", out, want)

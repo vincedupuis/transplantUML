@@ -135,6 +135,10 @@ void KioskFsm::enterFsm(Entry entry) {
 
 void KioskFsm::stopFsm() {
     machine_->sm.process_event(internal::stop{});
+    terminateFsm();
+}
+
+void KioskFsm::terminateFsm() {
     machine_.reset();
     machine_ = std::make_unique<Machine>(actions_);
 }
