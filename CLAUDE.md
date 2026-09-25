@@ -7,8 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `fsm` is a Go CLI that converts state machine documents. Any supported input format is parsed into one
 format-neutral model (`internal/model`) of a UML state machine, which is then written back out either by a built-in
 emitter (document formats: SCXML, JSON) or through a Go `text/template` (free-form text: PlantUML, code, docs).
-Template rendering is output-only. The bundled `assets/puml.gotmpl` (embedded in the binary, used when `-t` is
-omitted) produces PlantUML.
+Template rendering is output-only. The bundled templates are embedded in the binary and `-t` takes their name when
+no file has it: `assets/puml.gotmpl` (`puml`, used when `-t` is omitted) produces PlantUML.
 
 The user keeps one source document and generates outputs from it; round-tripping is *not* a goal. The goal is to
 cover as much of UML as possible on the input side and, on the output side, to write what the format can express

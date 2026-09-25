@@ -102,6 +102,29 @@ func TestCustomTemplate(t *testing.T) {
 	}
 }
 
+// -t takes the name of a built-in template when no file has that name.
+func TestBuiltinTemplates(t *testing.T) {
+	def, _, err := runCLI(t, "-i", example)
+	if err != nil {
+		t.Fatal(err)
+	}
+	puml, _, err := runCLI(t, "-i", example, "-t", "puml")
+	if err != nil || puml != def {
+		t.Errorf("-t puml differs from the default: %v\n%s", err, puml)
+	}
+
+	// A file of that name wins over the built-in template.
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "puml"), []byte(`mine`), 0o644)
+	wd, _ := os.Getwd()
+	abs, _ := filepath.Abs(example)
+	os.Chdir(dir)
+	defer os.Chdir(wd)
+	if out, _, err := runCLI(t, "-i", abs, "-t", "puml"); err != nil || out != "mine" {
+		t.Errorf("-t puml with a file named puml = %q, %v", out, err)
+	}
+}
+
 func TestNoArgsPrintsUsage(t *testing.T) {
 	out, _, err := runCLI(t)
 	if err != nil {
@@ -130,6 +153,7 @@ func TestErrors(t *testing.T) {
 		{[]string{"-i", noext, "-f", "yaml"}, `unknown input format "yaml"`},
 		{[]string{"-i", example, "-F", "yaml"}, `unknown output format "yaml"`},
 		{[]string{"-i", filepath.Join(dir, "missing.scxml")}, "reading input"},
+		{[]string{"-i", example, "-t", "nope"}, "built-in templates: puml"},
 		{[]string{"-i", bad}, `unknown target "zzz"`},
 		{[]string{"-i", bad}, `unknown initial state "nope"`},
 	}

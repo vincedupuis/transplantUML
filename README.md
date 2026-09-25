@@ -96,14 +96,14 @@ output against something other than the project itself and skip when their tool 
 ## Usage
 
 ```
-fsm -i input [-f format] [-t template.gotmpl | -F format] [-o output]
+fsm -i input [-f format] [-t template | -F format] [-o output]
 ```
 
 | Flag                    | Meaning                                                                                               |
 |-------------------------|-------------------------------------------------------------------------------------------------------|
 | `-i`, `--input`         | Input file (required).                                                                                |
 | `-f`, `--input-format`  | Input format: `scxml`, `json`, `fsm`. Default: inferred from the extension (`.scxml`/`.xml`, `.json`, `.fsm`). |
-| `-t`, `--template`      | Go template file to render with. Default: the built-in PlantUML template (`assets/puml.gotmpl`).      |
+| `-t`, `--template`      | Go template file to render with, or a built-in one: `puml` (the default). A file wins.                |
 | `-F`, `--output-format` | Write a document format instead of running a template: `scxml`, `json`. Mutually exclusive with `-t`. |
 | `-o`, `--output`        | Output file. Default: stdout.                                                                         |
 | `-h`, `--help`          | Show usage.                                                                                           |

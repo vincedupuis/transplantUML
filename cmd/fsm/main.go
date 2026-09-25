@@ -4,8 +4,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"strings"
 
@@ -45,7 +47,7 @@ type options struct {
 func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 	var opts options
 	cmd := &cobra.Command{
-		Use:   "fsm -i input [-f format] [-t template.gotmpl | -F format] [-o output]",
+		Use:   "fsm -i input [-f format] [-t template | -F format] [-o output]",
 		Short: "Convert state machine documents",
 		Long: "fsm parses a state machine document into a format-neutral model and renders\n" +
 			"that model either through a Go template (PlantUML by default) or with a\n" +
@@ -64,7 +66,7 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 	f := cmd.Flags()
 	f.StringVarP(&opts.input, "input", "i", "", "input file (required)")
 	f.StringVarP(&opts.inputFormat, "input-format", "f", "", "input format, one of: "+strings.Join(format.ParserNames(), ", ")+" (default: from the input file extension)")
-	f.StringVarP(&opts.tmplFile, "template", "t", "", "Go template file to render the model with (default: built-in PlantUML template)")
+	f.StringVarP(&opts.tmplFile, "template", "t", "", "Go template file to render the model with, or the name of a built-in one: "+strings.Join(assets.TemplateNames(), ", ")+" (default: puml)")
 	f.StringVarP(&opts.outputFormat, "output-format", "F", "", "emit a built-in output format instead of a template, one of: "+strings.Join(format.EmitterNames(), ", "))
 	f.StringVarP(&opts.output, "output", "o", "", "output file (default: stdout)")
 
@@ -108,13 +110,9 @@ func convert(opts options, stdout, stderr io.Writer) error {
 			return err
 		}
 	default:
-		tmpl := assets.PlantUML
-		if opts.tmplFile != "" {
-			data, err := os.ReadFile(opts.tmplFile)
-			if err != nil {
-				return fmt.Errorf("reading template: %w", err)
-			}
-			tmpl = string(data)
+		tmpl, err := template(opts.tmplFile)
+		if err != nil {
+			return err
 		}
 		text, w, err := render.Render(sm, tmpl)
 		if err != nil {
@@ -133,6 +131,22 @@ func convert(opts options, stdout, stderr io.Writer) error {
 	}
 	fmt.Fprintln(stderr, "output written to", opts.output)
 	return nil
+}
+
+// template returns the template -t names: a file when one exists at that
+// path, a built-in template otherwise, PlantUML when -t is not given.
+func template(name string) (string, error) {
+	if name == "" {
+		return assets.PlantUML, nil
+	}
+	data, err := os.ReadFile(name)
+	if err == nil {
+		return string(data), nil
+	}
+	if builtin, ok := assets.Templates[name]; ok && errors.Is(err, fs.ErrNotExist) {
+		return builtin, nil
+	}
+	return "", fmt.Errorf("reading template: %w (built-in templates: %s)", err, strings.Join(assets.TemplateNames(), ", "))
 }
 
 // report prints the warnings a parser, emitter or template raised: what the
