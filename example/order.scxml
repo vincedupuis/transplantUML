@@ -19,14 +19,14 @@
   </state>
 
   <state id="check">
-    <transition cond="total == 0" target="rejected"/>
-    <transition cond="total &gt; 1000" target="review"/>
-    <transition cond="total &lt;= 1000" target="payment"/>
+    <transition cond="isEmpty" target="rejected"/>
+    <transition cond="isLarge" target="review"/>
+    <transition cond="not (isEmpty or isLarge)" target="payment"/>
   </state>
 
   <state id="review" tpuml:stereotype="manual">
     <tpuml:note>A human approves large orders.</tpuml:note>
-    <invoke type="http://example.com/ticket" src="review-queue"/>
+    <invoke type="tpuml:do" src="reviewTicket"/>
     <transition event="approve" target="payment"/>
     <transition event="reject" target="rejected"/>
   </state>
@@ -35,19 +35,19 @@
     <invoke src="payment.scxml"/>
     <transition event="done.invoke" target="paid"/>
     <transition event="error.payment" target="retry">
-      <assign location="attempts" expr="attempts + 1"/>
+      <script>countAttempt</script>
     </transition>
   </state>
 
   <!-- A junction: the same guarded branching as a choice, but the guards are
        static, evaluated before the compound transition starts. -->
   <state id="retry" tpuml:kind="junction">
-    <transition cond="attempts &lt; 3" target="payment"/>
-    <transition cond="attempts &gt;= 3" target="rejected"/>
+    <transition cond="canRetry" target="payment"/>
+    <transition cond="not canRetry" target="rejected"/>
   </state>
 
   <state id="paid">
-    <onentry><log expr="'order paid'"/></onentry>
+    <onentry><script>confirmOrder</script></onentry>
     <transition event="ship" target="shipped"/>
     <transition event="fraud" target="killed"/>
   </state>

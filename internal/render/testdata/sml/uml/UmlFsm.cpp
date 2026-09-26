@@ -110,8 +110,9 @@ struct both {
 struct outer {
     auto operator()() const {
         using namespace sml::literals;
+        const auto greet = [](UmlFsmActions& actions) { actions.greet(); };
         return sml::make_transition_table(
-            *"outer.initial"_s / [] {} = "inner"_s,
+            *"outer.initial"_s / greet = "inner"_s,
             "inner"_s + sml::event<event::again> = "inner"_s,
             // Not drawn.
             "inner"_s + sml::event<event::note> / [] {}
@@ -123,27 +124,31 @@ struct machine {
     auto operator()() const {
         using namespace sml::literals;
         using sml::operator!, sml::operator&&, sml::operator||, sml::operator,;
+        const auto tooManyRetries = [](const UmlFsmActions& actions) { return actions.tooManyRetries(); };
+        const auto startClock = [](UmlFsmActions& actions) { actions.startClock(); };
+        const auto countRetry = [](UmlFsmActions& actions) { actions.countRetry(); };
+        const auto sayBye = [](UmlFsmActions& actions) { actions.sayBye(); };
         return sml::make_transition_table(
             *sml::state<::internal::stopped> + sml::event<::internal::enter> = "check"_s,
-            // "check"_s [retries > 3] = sml::X
-            // "check"_s [retries <= 3] = "work"_s
+            "check"_s [tooManyRetries] = sml::X,
+            "check"_s [!tooManyRetries] = "work"_s,
             "merge"_s = "work"_s,
             // work:
             // «worker»
             // Runs the job.
-            // invariant: retries >= 0
+            // invariant: counting and not (stalled or aborted)
             // Never negative.
             // variable: progress = 0
             // Starts the clock.
-            "work"_s + sml::on_entry<sml::_> / ([](::timers& t) { t.start(::timers::work_after_5s, std::chrono::seconds{5}); }, [](::timers& t, const UmlFsmActions& actions) { t.start(::timers::work_after_retryDelay, actions.retryDelay()); }),
+            "work"_s + sml::on_entry<sml::_> / (startClock, [](::timers& t) { t.start(::timers::work_after_5s, std::chrono::seconds{5}); }, [](::timers& t, const UmlFsmActions& actions) { t.start(::timers::work_after_retryDelay, actions.retryDelay()); }),
             "work"_s + sml::on_exit<sml::_> / ([](::timers& t) { t.cancel(::timers::work_after_5s); }, [](::timers& t) { t.cancel(::timers::work_after_retryDelay); }),
-            // do / invoke(job.py, http://example.com/worker)
+            // do / runJob
             // Runs in a worker.
             // Kept until the job ends.
             "work"_s + sml::event<event::pause> / sml::defer,
             "work"_s + sml::event<event::resume> / sml::defer,
             // Timed out.
-            "work"_s + sml::event<::internal::work_after_5s> / [] {} = "check"_s,
+            "work"_s + sml::event<::internal::work_after_5s> / countRetry = "check"_s,
             "work"_s + sml::event<::internal::work_after_retryDelay> = "check"_s,
             "work"_s + sml::event<event::split> = sml::state<both>,
             "work"_s + sml::event<event::abort> = sml::state<::internal::terminated>,
@@ -154,7 +159,7 @@ struct machine {
             "sub"_s + sml::event<event::back> = "merge"_s,
             "sub"_s + sml::event<::internal::sub_finished> = sml::X,
             // Says goodbye.
-            sml::state<outer> + sml::on_exit<sml::_> / [] {},
+            sml::state<outer> + sml::on_exit<sml::_> / sayBye,
             sml::state<outer> = sml::X,
             sml::state<::internal::terminated> + sml::on_entry<sml::_> / [](::status& s) { s.terminated = true; },
             "work"_s + sml::event<::internal::stop> = sml::state<::internal::stopped>,

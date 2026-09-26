@@ -7,8 +7,8 @@
   <tpuml:note>Every UML concept the model holds,
 in one document.</tpuml:note>
   <state id="check" tpuml:kind="choice">
-    <transition cond="retries > 3" target="failed"/>
-    <transition cond="retries &lt;= 3" target="work"/>
+    <transition cond="tooManyRetries" target="failed"/>
+    <transition cond="not tooManyRetries" target="work"/>
   </state>
   <state id="split" tpuml:kind="fork">
     <transition target="left right"/>
@@ -19,7 +19,7 @@ in one document.</tpuml:note>
   <state id="sync" tpuml:kind="join">
     <transition target="done"/>
   </state>
-  <state id="work" tpuml:stereotype="worker" tpuml:invariant="retries >= 0" tpuml:defer="pause resume">
+  <state id="work" tpuml:stereotype="worker" tpuml:invariant="counting and not (stalled or aborted)" tpuml:defer="pause resume">
     <tpuml:note>Runs the job.</tpuml:note>
     <tpuml:note about="entry">Starts the clock.</tpuml:note>
     <tpuml:note about="do">Runs in a worker.</tpuml:note>
@@ -29,7 +29,7 @@ in one document.</tpuml:note>
       <data id="progress" expr="0"/>
     </datamodel>
     <onentry>
-      <script>log('start')</script>
+      <script>startClock</script>
       <send event="after.5s" delay="5s" id="work.after.5s"/>
       <send event="after.retryDelay" delayexpr="retryDelay" id="work.after.retryDelay"/>
     </onentry>
@@ -37,10 +37,10 @@ in one document.</tpuml:note>
       <cancel sendid="work.after.5s"/>
       <cancel sendid="work.after.retryDelay"/>
     </onexit>
-    <invoke type="http://example.com/worker" src="job.py"/>
+    <invoke type="tpuml:do" src="runJob"/>
     <transition event="after.5s" target="check">
       <tpuml:note>Timed out.</tpuml:note>
-      <script>retries = retries + 1</script>
+      <script>countRetry</script>
     </transition>
     <transition event="after.retryDelay" target="check"/>
     <transition event="split" target="split"/>
@@ -63,12 +63,12 @@ in one document.</tpuml:note>
   <state id="outer">
     <initial>
       <transition target="inner">
-        <script>log('hi')</script>
+        <script>greet</script>
       </transition>
     </initial>
     <tpuml:note about="exit">Says goodbye.</tpuml:note>
     <onexit>
-      <script>log('bye')</script>
+      <script>sayBye</script>
     </onexit>
     <transition event="done.state.outer" target="done"/>
     <state id="in" tpuml:kind="entry-point">

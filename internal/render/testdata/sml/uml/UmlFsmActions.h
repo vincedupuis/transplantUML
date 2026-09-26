@@ -13,6 +13,15 @@ class UmlFsmActions {
 public:
     virtual ~UmlFsmActions() = default;
 
+    // Guards
+    virtual bool tooManyRetries() const = 0;
+
+    // Actions
+    virtual void countRetry() = 0;
+    virtual void greet() = 0;
+    virtual void sayBye() = 0;
+    virtual void startClock() = 0;
+
     // Delays, read when a timer starts
     virtual std::chrono::milliseconds retryDelay() const = 0;
 };

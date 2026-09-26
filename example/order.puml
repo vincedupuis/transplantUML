@@ -8,25 +8,25 @@ endlegend
 state new
 state check <<choice>>
 state "«manual»\nreview" as review <<manual>>
-review : do / invoke(review-queue, http://example.com/ticket)
+review : do / reviewTicket
 note right of review : A human approves large orders.
 state "payment: payment.scxml" as payment
 state retry <<start>>
 state paid
-paid : entry / log('order paid')
+paid : entry / confirmOrder
 state shipped <<end>>
 state rejected <<end>>
 state killed <<end>>
 new --> check: submit
-check --> rejected: [ total == 0 ]
-check --> review: [ total > 1000 ]
-check --> payment: [ total <= 1000 ]
+check --> rejected: [ isEmpty ]
+check --> review: [ isLarge ]
+check --> payment: [ not (isEmpty or isLarge) ]
 review --> payment: approve
 review --> rejected: reject
 payment --> paid
-payment --> retry: error.payment\n/ attempts = attempts + 1
-retry --> payment: [ attempts < 3 ]
-retry --> rejected: [ attempts >= 3 ]
+payment --> retry: error.payment\n/ countAttempt
+retry --> payment: [ canRetry ]
+retry --> rejected: [ not canRetry ]
 paid --> shipped: ship
 paid --> killed: fraud
 @enduml

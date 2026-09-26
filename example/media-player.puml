@@ -26,18 +26,18 @@ state playback {
     resume --> last
     last --> playing
     playing --> paused: pause
-    playing --> playing: next\n/ track = track + 1
+    playing --> playing: next\n/ nextTrack
     paused --> playing: play
     paused --> eject: stop
 }
-playback : entry / log('engine on')
-playback : exit / log('engine off')
-playback : [ track >= 1 ]
+playback : entry / startEngine
+playback : exit / stopEngine
+playback : [ hasTrack ]
 stopped --> resume: play
 stopped --> loading: open
 loading --> start: loaded
 loading --> stopped: failed
-playback : volume\n/ volume = _event.data
+playback : volume\n/ setVolume
 playback --> stopped: stop
 eject --> stopped
 @enduml

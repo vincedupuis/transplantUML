@@ -49,7 +49,7 @@ const (
 type StateMachine struct {
 	Name           string        `json:"name,omitempty"`
 	Initial        string        `json:"initial,omitempty"`
-	InitialActions []string      `json:"initialActions,omitempty"` // effect of the initial transition
+	InitialActions []string      `json:"initialActions,omitempty"` // effect of the initial transition, names
 	Variables      []Variable    `json:"variables,omitempty"`      // context attributes guards and actions refer to
 	Note           string        `json:"note,omitempty"`
 	States         []*State      `json:"states"`
@@ -67,13 +67,13 @@ type State struct {
 	Parent         string     `json:"parent,omitempty"` // "" means top level
 	Kind           StateKind  `json:"kind"`
 	Initial        string     `json:"initial,omitempty"`        // compound states only
-	InitialActions []string   `json:"initialActions,omitempty"` // effect of the transition to Initial
-	OnEntry        []string   `json:"onEntry,omitempty"`        // entry behaviour
-	OnExit         []string   `json:"onExit,omitempty"`         // exit behaviour
-	Do             []string   `json:"do,omitempty"`             // do activity, runs while the state is active
+	InitialActions []string   `json:"initialActions,omitempty"` // effect of the transition to Initial, names
+	OnEntry        []string   `json:"onEntry,omitempty"`        // entry behaviour, names
+	OnExit         []string   `json:"onExit,omitempty"`         // exit behaviour, names
+	Do             []string   `json:"do,omitempty"`             // do activity, names, runs while the state is active
 	Defer          []string   `json:"defer,omitempty"`          // events queued rather than consumed while here
 	Submachine     string     `json:"submachine,omitempty"`     // referenced state machine (submachine state)
-	Invariant      string     `json:"invariant,omitempty"`      // condition that holds while the state is active
+	Invariant      string     `json:"invariant,omitempty"`      // condition (see IsCondition) that holds while the state is active
 	Variables      []Variable `json:"variables,omitempty"`      // attributes scoped to this state
 	Stereotype     string     `json:"stereotype,omitempty"`     // «stereotype» shown on diagrams
 	Note           string     `json:"note,omitempty"`
@@ -92,9 +92,9 @@ type Transition struct {
 	Source  string         `json:"source"`
 	Targets []string       `json:"targets,omitempty"` // empty means targetless (stays in Source)
 	Event   string         `json:"event,omitempty"`   // trigger; empty with no After means a completion transition
-	After   string         `json:"after,omitempty"`   // time trigger: fires after this delay in Source (e.g. "5s")
-	Cond    string         `json:"cond,omitempty"`    // guard
-	Actions []string       `json:"actions,omitempty"` // effect
+	After   string         `json:"after,omitempty"`   // time trigger: fires after this delay in Source, a duration ("5s", "250ms") or a name
+	Cond    string         `json:"cond,omitempty"`    // guard: a condition (see IsCondition), or "else"
+	Actions []string       `json:"actions,omitempty"` // effect, names
 	Kind    TransitionKind `json:"kind,omitempty"`    // "" means external
 	Note    string         `json:"note,omitempty"`
 }
@@ -274,6 +274,15 @@ func (sm *StateMachine) Validate() error {
 	var errs []error
 	fail := func(format string, args ...any) { errs = append(errs, fmt.Errorf(format, args...)) }
 
+	names := func(what string, list []string) {
+		for _, a := range list {
+			if !IsName(a) {
+				fail("%s %q is not a name", what, a)
+			}
+		}
+	}
+	names("the machine's initial action", sm.InitialActions)
+
 	byName := make(map[string]*State, len(sm.States))
 	for _, s := range sm.States {
 		if s.Name == "" {
@@ -312,6 +321,13 @@ func (sm *StateMachine) Validate() error {
 		}
 		if s.Initial == "" && len(s.InitialActions) > 0 {
 			fail("state %q: has initial actions but no initial state", s.Name)
+		}
+		names(fmt.Sprintf("state %q: the initial action", s.Name), s.InitialActions)
+		names(fmt.Sprintf("state %q: the entry action", s.Name), s.OnEntry)
+		names(fmt.Sprintf("state %q: the exit action", s.Name), s.OnExit)
+		names(fmt.Sprintf("state %q: the do activity", s.Name), s.Do)
+		if s.Invariant != "" && !IsCondition(s.Invariant) {
+			fail("state %q: the invariant [%s] is not made of names, not, and, or and parentheses", s.Name, s.Invariant)
 		}
 		if s.Initial != "" {
 			init, ok := byName[s.Initial]
@@ -395,6 +411,13 @@ func (sm *StateMachine) Validate() error {
 		if t.Event != "" && t.After != "" {
 			fail("transition #%d (%s): has both an event and a time trigger", i, t.Source)
 		}
+		if t.After != "" && !IsDelay(t.After) {
+			fail("transition #%d (%s): the delay %q is neither a duration, such as 5s or 250ms, nor a name", i, t.Source, t.After)
+		}
+		if t.Cond != "" && t.Cond != "else" && !IsCondition(t.Cond) {
+			fail("transition #%d (%s): the guard [%s] is not made of names, not, and, or and parentheses", i, t.Source, t.Cond)
+		}
+		names(fmt.Sprintf("transition #%d (%s): the action", i, t.Source), t.Actions)
 		switch t.Kind {
 		case "", External, Local, Internal:
 		default:

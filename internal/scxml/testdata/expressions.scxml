@@ -1,0 +1,25 @@
+<!--
+  What the model does not hold: guards, invariants and actions that are not
+  names, and executable content other than a <script> holding a name. Each is
+  an error.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="s">
+  <state id="s">
+    <initial><transition target="inner"><log expr="'hi'"/></transition></initial>
+    <onentry>
+      <assign location="n" expr="n + 1"/>
+      <raise event="tick"/>
+      <send event="ping"/>
+      <if cond="n > 3"><log expr="'big'"/></if>
+    </onentry>
+    <onexit>
+      <cancel sendid="ping"/>
+      <script src="cleanup.js"/>
+    </onexit>
+    <invoke src="a.scxml"/>
+    <invoke src="b.scxml"/>
+    <invoke type="http://example.com/worker" src="job"><param name="p" expr="1"/></invoke>
+    <transition event="e" type="internal"><log label="evt" expr="_event.name"/></transition>
+    <state id="inner"/>
+  </state>
+</scxml>

@@ -2,7 +2,7 @@
 title edge
 [*] --> a
 state a
-a : entry / log('hi')
+a : entry / sayHi
 state p {
     [*] --> r1a
     state r1a

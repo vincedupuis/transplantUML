@@ -15,7 +15,10 @@ the `file` function; `render.Files` splits the output at those marks and `-o` th
 The user keeps one source document and generates outputs from it; round-tripping is *not* a goal. The goal is to
 cover as much of UML as possible on the input side and, on the output side, to write what the format can express
 and **warn** (never silently drop) about the rest. Parsers, emitters and `render.Render` all return
-`model.Warnings`; `cmd/fsm` prints them to stderr as `fsm: warning: …`.
+`model.Warnings`; `cmd/fsm` prints them to stderr as `fsm: warning: …`. Guards, actions, do activities,
+invariants and named delays hold names only (`model.IsName`, `model.IsCondition`: names with `not`/`and`/`or`/
+parentheses, `model.IsDelay`: a duration or a name), which generated code calls as functions; anything else is an
+error from `Validate`, never a warning.
 
 ## Commands
 
@@ -66,19 +69,19 @@ warnings.
   names avoid stdlib clashes
   (`jsonsm`, not `json`).
 - **`internal/scxml`** — `Parser` is a recursive `etree` walk over `<state>/<parallel>/<final>/<history>` children
-  (direct children only, so `<initial>`'s inner `<transition>` is not mistaken for a real transition). Executable
-  content is flattened to strings; unknown elements are kept as raw XML, normalized by `rawXML` (unindented,
-  canonical escaping) so the string is stable. What SCXML has no element for comes from the `tpuml` extension
+  (direct children only, so `<initial>`'s inner `<transition>` is not mistaken for a real transition). An action is
+  a `<script>` holding a name (`actions`); any other executable content is a parser error, and so is an
+  `<invoke>` that is neither a submachine nor a do activity named by its `src`. What SCXML has no element for comes from the `tpuml` extension
   namespace (`ExtNamespace`; matched by URI, not prefix): `tpuml:kind`, `tpuml:defer`, `tpuml:invariant`,
   `tpuml:stereotype`, `<tpuml:note>` (on a state, `about="entry|exit|do|invariant|defer"` says what it
   describes). Three idioms are recognised without markup: transient states as choice/fork (`connectorKind`),
   `<send delay>`+`<cancel>` as a time trigger (`timers`), and `done.state`/`done.invoke` as the completion event
   (`completes`); the emitter writes completion transitions back on those events. Anything else unknown under a state or the root raises a
   parser warning. `Emitter` (`emit.go`) rebuilds the tree from `Parent` links, writes
-  the initial child as an attribute, turns action strings back into `<script>` bodies — except those that are
-  XML, which are re-inserted as elements — writes a fork's transitions as one multi-target transition and an
+  the initial child as an attribute, writes each action as a `<script>` holding its name and each do activity as
+  `<invoke type="tpuml:do" src>`, writes a fork's transitions as one multi-target transition and an
   `else` branch last with no `cond` (engines take the first enabled transition), declares the extension
-  namespace only when used, and warns for join, terminate, local, defer and free-text do activities, and leaves out a
+  namespace only when used, and warns for join, terminate, local and defer, and leaves out a
   submachine state's entry and exit points with a warning. States it cannot reach from the top level are an error.
 - **`internal/fsm`** — the command's own DSL (`fsm name { state s { on ev [guard] / actions goto target } }`), an
   ANTLR4 grammar in `fsm.g4`. `parser/` is generated from it (`make generate`, Go target with `-visitor
@@ -170,7 +173,8 @@ warnings.
 - Test fixtures: `example/coffee-machine.scxml` (simple, flat), `internal/scxml/testdata/edge.scxml`
   (parallel, `<initial>` element, deep history, final, onentry, multi-target) and `internal/scxml/testdata/uml.scxml`
   (every UML concept: connectors, terminate, submachine, do, defer, invariant, variables, time trigger, local and
-  internal transitions, notes, stereotype; also exercises every warning). Add new concepts to `uml.scxml` and its
+  internal transitions, notes, stereotype; also exercises every warning). `internal/scxml/testdata/expressions.scxml`
+  holds the executable content that is an error (`TestExpressionErrors`). Add new concepts to `uml.scxml` and its
   goldens (`internal/render/testdata/uml.puml`, `internal/scxml/testdata/uml.emitted.scxml`) and to the warning
   lists in `TestPlantUMLWarnings`, `TestEmitWarnings` and `TestUMLConcepts`.
 - `example/` has one document per group of concepts (see the README table) with its rendered `.puml` beside it.

@@ -17,23 +17,23 @@ state on {
     state "«actuator»\ncooling" as cooling <<actuator>>
     state steady
     state last <<history>>
-    decide --> heating: [ current < target - 1 ]
-    decide --> cooling: [ current > target + 1 ]
+    decide --> heating: [ tooCold ]
+    decide --> cooling: [ tooWarm ]
     decide --> steady
     heating --> decide: after(60s)
     cooling --> decide: after(60s)
-    steady --> decide: after(5m)
+    steady --> decide: after(300s)
     last --> decide
 }
-on : entry / display.on()
-on : do / sample sensor every 10s
-on : exit / display.off()
+on : entry / displayOn
+on : do / sampleSensor
+on : exit / displayOff
 on : schedule / defer
-on : [ target > 5 ]
+on : [ aboveMinimum ]
 state fault <<end>>
 off --> on: power
 on --> off: power
 on --> fault: sensorError
 note on link : Unrecoverable.
-on : setTarget\n/ target = value
+on : setTarget\n/ setTarget
 @enduml

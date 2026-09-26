@@ -686,7 +686,7 @@ return sml::make_transition_table(
 {{- /* the machine waits in internal::stopped until enterFsm */ -}}
 {{- $enter := "\n*sml::state<::internal::stopped> + sml::event<::internal::enter>" -}}
 {{- range $initials -}}
-{{- $enter = printf "%s%s = %s" $enter (include "actions" (dict "list" (InitialActionsOf "") "what" "the machine's initial transition")) (include "ref" .State) -}}
+{{- $enter = printf "%s%s = %s" $enter (include "actions" (dict "list" (InitialActionsOf ""))) (include "ref" .State) -}}
 {{- else -}}
 {{- $enter = print $enter " / [] {}" -}}
 {{- end -}}
@@ -699,8 +699,7 @@ return sml::make_transition_table(
 {{- with InitialActionsOf $scope -}}
 {{- $from := include "str" (ternary "initial" (printf "%s.initial" $scope) (eq $scope "")) -}}
 {{- $mark := ternary (printf "%s(sml::H)" $from) (printf "*%s" $from) (not (not (HistoryOf $scope))) -}}
-{{- $what := ternary "the machine's initial transition" (printf "the initial transition of %q" $scope) (eq $scope "") -}}
-{{- $out = append $out (printf "\n%s%s = %s" $mark (include "actions" (dict "list" . "what" $what)) (include "ref" $init)) -}}
+{{- $out = append $out (printf "\n%s%s = %s" $mark (include "actions" (dict "list" .)) (include "ref" $init)) -}}
 {{- end -}}
 {{- end -}}
 {{- range States -}}
@@ -795,8 +794,8 @@ return sml::make_transition_table(
 {{- if and $s.IsPseudo (or $s.OnEntry $s.OnExit) -}}
 {{- warn "state %q: Boost.SML's final state X has no entry or exit behaviour; it is not written" $s.Name -}}
 {{- else -}}
-{{- if or $s.OnEntry $start }}{{ $out = append $out (printf "%s\n⟨src⟩ + sml::on_entry<sml::_>%s" (include "comment" $s.EntryNote) (include "actions" (dict "list" $s.OnEntry "after" $start "what" (printf "the entry behaviour of %q" $s.Name)))) }}{{ end -}}
-{{- if or $s.OnExit $stop }}{{ $out = append $out (printf "%s\n⟨src⟩ + sml::on_exit<sml::_>%s" (include "comment" $s.ExitNote) (include "actions" (dict "list" $s.OnExit "before" $stop "what" (printf "the exit behaviour of %q" $s.Name)))) }}{{ end -}}
+{{- if or $s.OnEntry $start }}{{ $out = append $out (printf "%s\n⟨src⟩ + sml::on_entry<sml::_>%s" (include "comment" $s.EntryNote) (include "actions" (dict "list" $s.OnEntry "after" $start))) }}{{ end -}}
+{{- if or $s.OnExit $stop }}{{ $out = append $out (printf "%s\n⟨src⟩ + sml::on_exit<sml::_>%s" (include "comment" $s.ExitNote) (include "actions" (dict "list" $s.OnExit "before" $stop))) }}{{ end -}}
 {{- end -}}
 {{- with $s.Do -}}
 {{- warn "state %q: Boost.SML has no do activities; %s is written as a comment" $s.Name (join ", " .) -}}
@@ -917,55 +916,34 @@ return sml::make_transition_table(
 {{- $trigger = printf " + sml::event<::internal::%s_finished>" (include "sid" $from.Name) -}}
 {{- else if $t.After -}}
 {{- $trigger = printf " + sml::event<::internal::%s>" (include "timerId" $t) -}}
-{{- if not (include "delayExpr" $t.After) -}}
-{{- warn "%s: the delay %q is neither a duration nor a name; no timer is written for it" $label $t.After -}}
-{{- else if regexMatch "^[0-9]+\\.([0-9]*ms|[0-9]{4,}s)$" $t.After -}}
+{{- if regexMatch "^[0-9]+\\.([0-9]*ms|[0-9]{4,}s)$" $t.After -}}
 {{- warn "%s: the delay %s is rounded down to whole milliseconds" $label $t.After -}}
 {{- end -}}
 {{- else if $t.Event -}}
 {{- $trigger = printf " + sml::event<⟨e:%s⟩>" (include "cid" $t.Event) -}}
 {{- end -}}
 {{- $guard := "" -}}
-{{- $bad := false -}}
 {{- if and $t.Cond (ne $t.Cond "else") (ne $mode "outer") -}}
-{{- if regexMatch "^[A-Za-z0-9_()! \t\n]*$" $t.Cond -}}
 {{- $guard = regexReplaceAll "[A-Za-z_][A-Za-z0-9_]*" $t.Cond "⟨g:$0⟩" | replace "⟨g:and⟩" "&&" | replace "⟨g:or⟩" "||" -}}
 {{- $guard = printf " [%s]" (regexReplaceAll "⟨g:not⟩\\s*" $guard "!") -}}
-{{- else -}}
-{{- $bad = true -}}
-{{- $guard = printf " [%s]" $t.Cond -}}
-{{- warn "%s: the guard [%s] is not made of names; the transition is written as a comment" $label $t.Cond -}}
-{{- end -}}
 {{- end -}}
 {{- $row := "" -}}
 {{- if eq $mode "inner" -}}
 {{- $row = printf "⟨src⟩%s = sml::X" $guard -}}
 {{- else -}}
-{{- $row = printf "⟨src⟩%s%s%s" $trigger $guard (include "actions" (dict "list" $t.Actions "after" $enterBy "what" $label)) -}}
+{{- $row = printf "⟨src⟩%s%s%s" $trigger $guard (include "actions" (dict "list" $t.Actions "after" $enterBy)) -}}
 {{- if $tgt }}{{ $row = printf "%s = %s" $row (include "ref" $tgt) }}{{ else if not $t.Actions }}{{ $row = print $row " / [] {}" }}{{ end -}}
 {{- include "comment" $t.Note -}}
-{{- end -}}
-{{- if $bad }}
-// {{ $row }}
-{{- else }}
+{{- end }}
 {{ $row }}
 {{- end -}}
-{{- end -}}
 
-{{- define "actions" -}}{{- /* . = dict "list" actions "what" whose, and "before" and "after" lambdas to run around them: " / a" or " / (a, b)", names only */ -}}
+{{- define "actions" -}}{{- /* . = dict "list" actions, and "before" and "after" lambdas to run around them: " / a" or " / (a, b)" */ -}}
 {{- $names := default list .before -}}
-{{- $what := .what -}}
-{{- range .list -}}
-{{- if regexMatch "^[A-Za-z_][A-Za-z0-9_]*$" . -}}
-{{- $names = append $names (printf "⟨a:%s⟩" .) -}}
-{{- else -}}
-{{- warn "%s: the action %q is not a name; it is not written" $what . -}}
-{{- end -}}
-{{- end -}}
+{{- range .list }}{{ $names = append $names (printf "⟨a:%s⟩" .) }}{{ end -}}
 {{- $names = concat $names (default list .after) -}}
 {{- if eq (len $names) 1 }} / {{ first $names }}
 {{- else if $names }} / ({{ join ", " $names }})
-{{- else if .list }} / [] {}
 {{- end -}}
 {{- end -}}
 
@@ -1023,7 +1001,7 @@ fsm.machine_->process({{ .event }});
 {{- define "timerList" -}}{{- /* . = anything: the timers, one per line as "owner⟪t⟫id⟪t⟫delay", one per source and delay of a time trigger; its owner, which starts it, is the source or, for a region, its orthogonal state */ -}}
 {{- $out := list -}}
 {{- range Transitions -}}
-{{- if and .After (include "delayExpr" .After) -}}
+{{- if .After -}}
 {{- $owner := .Source }}{{ if IsRegion .Source }}{{ $owner = (State .Source).Parent }}{{ end -}}
 {{- $out = append $out (printf "%s⟪t⟫%s⟪t⟫%s" $owner (include "timerId" .) .After) -}}
 {{- end -}}
@@ -1035,7 +1013,7 @@ fsm.machine_->process({{ .event }});
 {{- printf "%s_after_%s" (include "sid" .Source) .After | include "cid" -}}
 {{- end -}}
 
-{{- define "delayExpr" -}}{{- /* . = delay: the std::chrono duration it stands for, actions.name() for a named one, nothing for anything else */ -}}
+{{- define "delayExpr" -}}{{- /* . = delay: the std::chrono duration it stands for, or actions.name() for a named one */ -}}
 {{- if regexMatch "^[0-9]+(\\.[0-9]+)?(ms|s)$" . -}}
 {{- $unit := regexFind "(ms|s)$" . -}}
 {{- $parts := splitList "." (trimSuffix $unit .) -}}
@@ -1047,7 +1025,7 @@ fsm.machine_->process({{ .event }});
 {{- if and (eq $unit "s") (eq (mod $ms 1000) 0) }}std::chrono::seconds{ {{- div $ms 1000 -}} }
 {{- else }}std::chrono::milliseconds{ {{- $ms -}} }
 {{- end -}}
-{{- else if regexMatch "^[A-Za-z_][A-Za-z0-9_]*$" . }}actions.{{ . }}()
+{{- else }}actions.{{ . }}()
 {{- end -}}
 {{- end -}}
 

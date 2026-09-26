@@ -43,11 +43,11 @@ symbol, and so on. Warnings go to stderr and never fail the conversion.
 | Entry / exit point                     | `entry-point`, `exit-point`                           | transient state inside the compound, `tpuml:kind`       | `<<entryPoint>>`, `<<exitPoint>>`                   | the machine's: `Entry`, listener; else ⚠  |
 | Connection point reference             | entry / exit point whose parent is a submachine state | left out ⚠                                              | `<<entryPoint>>`, `<<exitPoint>>` on its border     | that machine's `Entry` and listener       |
 | Entry / exit behaviour                 | `OnEntry`, `OnExit`                                   | `<onentry>`, `<onexit>`                                 | `X : entry / …`, `X : exit / …`                     | `+ sml::on_entry<sml::_> / …`             |
-| Do activity                            | `Do`                                                  | `<invoke>`                                              | `X : do / …`                                        | comment ⚠                                 |
+| Do activity                            | `Do`                                                  | `<invoke type="tpuml:do" src>`                          | `X : do / …`                                        | comment ⚠                                 |
 | Deferred events                        | `Defer`                                               | `tpuml:defer` ⚠                                         | `X : ev / defer`                                    | `/ sml::defer`, with `defer_queue`        |
 | State invariant                        | `Invariant`                                           | `tpuml:invariant`                                       | `X : [ cond ]`                                      | comment                                   |
 | Variables                              | `Variables` on the machine / the state                | `<datamodel>`                                           | `legend` / `X : name = value`                       | comment; the actions hold them            |
-| Trigger, guard, effect                 | `Event`, `Cond`, `Actions`                            | `event`, `cond`, executable content                     | `A --> B : ev [ g ] / act`                          | event method, guard and action methods    |
+| Trigger, guard, effect                 | `Event`, `Cond`, `Actions`                            | `event`, `cond`, `<script>` holding a name              | `A --> B : ev [ g ] / act`                          | event method, guard and action methods    |
 | Time trigger `after(5s)`               | `After`                                               | `<send delay(expr)>` in `<onentry>`, `<cancel>` on exit | `after(5s)`                                         | a timer through `FsmTimers`               |
 | Completion transition                  | no `Event`, no `After`                                | eventless, or on `done.state` / `done.invoke`           | unlabelled arrow                                    | anonymous transition                      |
 | External / local / internal transition | `Kind`                                                | `type="internal"`; `tpuml:kind="local"` ⚠               | `X : ev / act` for internal; local drawn external ⚠ | no target for internal; local ⚠           |
@@ -57,6 +57,20 @@ symbol, and so on. Warnings go to stderr and never fail the conversion.
 
 ⚠ = written as an approximation, with a warning. Not modelled: signal vs. call events, change events (`when(…)` —
 use a guard on a completion transition), protocol state machines.
+
+### Guards and actions are names
+
+Guards, actions, do activities, invariants and named delays name functions, which the generated code calls.
+They hold no expressions, so every output language can use them.
+
+- An action or a do activity is a name: letters, digits and `_`, not starting with a digit, such as `addLine`.
+- A guard or an invariant is names joined by `not`, `and`, `or` and parentheses, such as
+  `card and not (blocked or expired)`.
+- A guard may also be `else`, on a choice or junction branch.
+- A time trigger's delay is a duration, such as `5s`, `1.5s` or `250ms`, or a name, such as `after(authTimeout)`.
+
+Anything else is an error, whatever the input format: `retries > 3`, `x = 1`, `log('hi')`, `delayexpr="t * 2"`.
+In SCXML, an action is a `<script>` holding a name, and any other executable content is an error.
 
 ## Requirements
 
@@ -184,7 +198,7 @@ type TransitionKind string
 type StateMachine struct {
   Name           string
   Initial        string     // top-level initial state
-  InitialActions []string   // effect of the initial transition
+  InitialActions []string   // effect of the initial transition, names
   Variables      []Variable // context attributes
   Note           string
   States         []*State
@@ -201,13 +215,13 @@ type State struct {
   Parent         string // "" = top level
   Kind           StateKind
   Initial        string   // for compound states
-  InitialActions []string // effect of the transition to Initial
-  OnEntry        []string // entry behaviour
-  OnExit         []string // exit behaviour
-  Do             []string // do activity
+  InitialActions []string // effect of the transition to Initial, names
+  OnEntry        []string // entry behaviour, names
+  OnExit         []string // exit behaviour, names
+  Do             []string // do activity, names
   Defer          []string // deferred events
   Submachine     string   // referenced machine, for submachine states
-  Invariant      string
+  Invariant      string   // a condition, like a guard
   Variables      []Variable
   Stereotype     string
   Note           string
@@ -221,9 +235,9 @@ type Transition struct {
   Source  string
   Targets []string       // empty = targetless
   Event   string         // trigger; none and no After = completion transition
-  After   string         // time trigger, e.g. "5s"
-  Cond    string         // guard
-  Actions []string       // effect
+  After   string         // time trigger: a duration ("5s", "250ms") or a name
+  Cond    string         // guard: names with not, and, or, parentheses; or "else"
+  Actions []string       // effect, names
   Kind    TransitionKind // "" = external
   Note    string
 }
@@ -232,6 +246,8 @@ type Transition struct {
 `State` has the predicates `IsNormal`, `IsParallel`, `IsFinal`, `IsTerminate`, `IsHistory`, `IsDeepHistory`,
 `IsConnector` (choice, junction, fork, join, entry/exit point) and `IsPseudo` (anything but normal and parallel).
 `Transition` has `IsExternal`, `IsLocal`, `IsInternal` and `Trigger()`, which returns the event or `after(delay)`.
+`IsName` and `IsCondition` check an action and a guard; `Validate` rejects a model whose guards and actions fail them
+(see [Guards and actions are names](#guards-and-actions-are-names)).
 
 The JSON emitted by `-F json` is this structure with camelCase keys (`onEntry`, `targets`, …); empty
 optional fields are omitted and `kind` defaults to `normal` when reading. JSON holds the whole model, so it never
@@ -307,7 +323,7 @@ It draws everything in the coverage table above. Things to know:
   no symbol either and is drawn as a final state. PlantUML ignores description lines on a final state, so its entry
   and exit behaviours are written into its note.
 - Local transitions are drawn as external ones, and a note on an internal transition is not drawn. Both warn.
-- The machine name becomes the diagram `title`; real line breaks in actions and behaviours become `\n`.
+- The machine name becomes the diagram `title`; real line breaks in guards and variable values become `\n`.
 
 ### The built-in Boost.SML template
 
@@ -386,7 +402,6 @@ public:
 - `after(90s)` is written as `std::chrono::seconds{90}`, and `after(1.5s)` as `std::chrono::milliseconds{1500}`.
   A delay finer than a millisecond is rounded down, with a warning.
 - A named delay, `after(authTimeout)`, is a method of the actions interface, read each time the timer starts.
-- Any other delay, such as SCXML's `delayexpr="t * 2"`, starts no timer, with a warning.
 
 ### Submachine states
 
@@ -429,8 +444,6 @@ Things to know:
 - A guard `[inStock]` calls `inStock()` on the actions, and an action `/ addLine` calls `addLine()`.
   A name used both ways is one method that returns `bool` and is not `const`.
 - A guard made of names, `not`, `and`, `or` and parentheses becomes SML's `!`, `&&` and `||`.
-- Any other guard, such as SCXML's `retries > 3`, turns its transition into a comment, with a warning.
-- An action that is not a name is left out, with a warning.
 - Inside `KioskFsm.cpp`, the SML code sits in an anonymous namespace.
   Events are empty structs in `namespace event`.
   Simple states and pseudostates are string-literal states, `"idle"_s`.
@@ -473,13 +486,16 @@ Things to know:
 
 `<state>`, `<parallel>`, `<final>`, `<history type="shallow|deep">`, `initial` attribute and `<initial>` element,
 `<transition>` (`event`, `cond`, multiple `target`s, `type="internal"`), `<onentry>`, `<onexit>`, `<datamodel>` with
-`<data>` (on the machine and on states, as variables) and `<invoke>`. Executable content is kept as text: `<script>`
-verbatim, `<log>`/`<assign>`/`<raise>`/`<send>`/`<cancel>` in a short readable form, anything else as its XML.
+`<data>` (on the machine and on states, as variables) and `<invoke>`.
+An action is a `<script>` holding a name, `<script>addLine</script>`.
+Any other executable content (`<log>`, `<assign>`, `<raise>`, `<if>`, `<script src>`, …) is an error, as is a
+`<send>` or `<cancel>` that is not a time trigger.
 Elements with no place in the model (`<donedata>`, a top-level `<script>`, …) are dropped with a warning.
 
 `<invoke>` is a **submachine state** when it invokes another SCXML document (`type` absent or `scxml`, with a `src`)
-and a **do activity** otherwise: `invoke(src)` or `invoke(src, type)` for a plain element, its XML when it has
-`<param>`, `<finalize>` or `<content>` children.
+and a **do activity** otherwise, named by its `src`: `<invoke type="tpuml:do" src="spin"/>`.
+Another `type` is not kept, with a warning.
+An `<invoke>` with children or without `src`, and a second SCXML `<invoke>` in one state, are errors.
 
 ### Idioms recognised as UML
 
@@ -523,8 +539,7 @@ equivalent, not byte-identical, to the one it came from:
 
 - the initial child is written as an `initial` attribute, or as an `<initial>` element when its transition has an
   effect; `<scxml>` takes no `<initial>` element, so the machine's own initial effect is left out with a warning;
-- executable content becomes `<script>` bodies holding the text the parser produced, except for elements it kept as
-  XML, which are written back as themselves;
+- each action becomes a `<script>` holding its name, and each do activity `<invoke type="tpuml:do" src="name"/>`;
 - a time trigger becomes `<send event="after.D" delay="D" id="…">` in `<onentry>`, the matching `<cancel>` in
   `<onexit>`, and a transition on that event;
 - a completion transition waits for `done.state.S` on a compound or parallel state and `done.invoke.S.submachine`
@@ -534,8 +549,7 @@ equivalent, not byte-identical, to the one it came from:
 
 Warnings name what SCXML can only approximate: join (the first region to reach it leaves the parallel state),
 terminate (a `<final>`, which runs exit actions), local transitions (written external), deferred events (ignored by
-engines), free-text do activities (written as `<invoke>` content), and a completion transition that cannot wait for
-a do activity.
+engines), and a completion transition that cannot wait for a do activity.
 
 ## The fsm language
 

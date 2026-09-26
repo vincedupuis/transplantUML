@@ -104,18 +104,12 @@ func TestSMLFiles(t *testing.T) {
 func TestSMLWarnings(t *testing.T) {
 	_, warnings := smlFilesOf(t, "../scxml/testdata/uml.scxml")
 	want := []string{
-		`the initial transition of "outer": the action "log('hi')" is not a name; it is not written`,
 		`state "in": Boost.SML has no entry points; transitions to it enter "outer" at its initial state, and its own transitions are not written`,
 		`state "out": Boost.SML has no exit points; the transitions to and from it are not written`,
 		`transition inner -> inner: Boost.SML has no local transitions; written as an external one`,
-		`transition check -> failed: the guard [retries > 3] is not made of names; the transition is written as a comment`,
-		`transition check -> work: the guard [retries <= 3] is not made of names; the transition is written as a comment`,
 		`state "split": Boost.SML has no fork; transitions to it enter "both", whose regions start in their initial states, and its own transitions are not written`,
 		`state "sync": Boost.SML has no join; transitions to it end their region (X), and its outgoing transition is taken once every region of "both" has ended`,
-		`the entry behaviour of "work": the action "log('start')" is not a name; it is not written`,
-		`state "work": Boost.SML has no do activities; invoke(job.py, http://example.com/worker) is written as a comment`,
-		`transition work -> check: the action "retries = retries + 1" is not a name; it is not written`,
-		`the exit behaviour of "outer": the action "log('bye')" is not a name; it is not written`,
+		`state "work": Boost.SML has no do activities; runJob is written as a comment`,
 	}
 	if !reflect.DeepEqual([]string(warnings), want) {
 		t.Errorf("warnings =\n%s\nwant\n%s", strings.Join(warnings, "\n"), strings.Join(want, "\n"))
@@ -736,8 +730,8 @@ enter, start, fire 30s: start 30000 start 1000 cancel 1000 ding
 
 // A delay becomes a std::chrono duration, in seconds when it is whole ones. A
 // named delay is read from the actions. A timer on a region that holds states
-// starts with its orthogonal state. What has to be rounded, is not a delay, or clashes with a
-// guard is said.
+// starts with its orthogonal state. What has to be rounded, or clashes with a
+// guard, is said.
 func TestSMLDelays(t *testing.T) {
 	sm := &model.StateMachine{
 		Name: "d", Initial: "a",
@@ -753,7 +747,6 @@ func TestSMLDelays(t *testing.T) {
 			{Source: "a", Targets: []string{"p"}, After: "2.0s"},
 			{Source: "a", Targets: []string{"p"}, After: "250ms"},
 			{Source: "a", Targets: []string{"p"}, After: "1.2345s"},
-			{Source: "a", Targets: []string{"p"}, After: "x + 1"},
 			{Source: "a", Targets: []string{"p"}, After: "ok", Cond: "ok"},
 			{Source: "r1", Targets: []string{"a"}, After: "3s"},
 		},
@@ -764,7 +757,6 @@ func TestSMLDelays(t *testing.T) {
 	files, warnings := smlFiles(t, sm)
 	wantWarnings := []string{
 		`transition a -> p: the delay 1.2345s is rounded down to whole milliseconds`,
-		`transition a -> p: the delay "x + 1" is neither a duration nor a name; no timer is written for it`,
 		`transition r1 -> a: Boost.SML has no transitions from inside a composite state; written as a transition of "p"`,
 		`delay "ok": its method ok clashes with a guard or action of that name; the files do not compile`,
 	}
@@ -791,8 +783,5 @@ func TestSMLDelays(t *testing.T) {
 				t.Errorf("%s lacks %q:\n%s", name, want, content[name])
 			}
 		}
-	}
-	if strings.Contains(content["DFsm.cpp"], "x + 1") && strings.Contains(content["DFsm.cpp"], "t.start(::timers::a_after_x") {
-		t.Errorf("a delay that is not one starts a timer:\n%s", content["DFsm.cpp"])
 	}
 }

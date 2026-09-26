@@ -26,9 +26,9 @@ queued and handled once playback starts.</tpuml:note>
     <transition event="failed" target="stopped"/>
   </state>
 
-  <state id="playback" initial="playing" tpuml:invariant="track &gt;= 1">
-    <onentry><log expr="'engine on'"/></onentry>
-    <onexit><log expr="'engine off'"/></onexit>
+  <state id="playback" initial="playing" tpuml:invariant="hasTrack">
+    <onentry><script>startEngine</script></onentry>
+    <onexit><script>stopEngine</script></onexit>
 
     <state id="start" tpuml:kind="entry-point">
       <transition target="playing"/>
@@ -47,7 +47,7 @@ queued and handled once playback starts.</tpuml:note>
     <state id="playing">
       <transition event="pause" target="paused"/>
       <transition event="next" target="playing" tpuml:kind="local">
-        <assign location="track" expr="track + 1"/>
+        <script>nextTrack</script>
       </transition>
     </state>
 
@@ -57,7 +57,7 @@ queued and handled once playback starts.</tpuml:note>
     </state>
 
     <transition event="volume" type="internal">
-      <assign location="volume" expr="_event.data"/>
+      <script>setVolume</script>
     </transition>
     <transition event="stop" target="stopped"/>
   </state>

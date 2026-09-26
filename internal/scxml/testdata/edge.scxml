@@ -1,6 +1,6 @@
 <scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" name="edge" initial="a">
   <state id="a">
-    <onentry><log expr="'hi'"/></onentry>
+    <onentry><script>sayHi</script></onentry>
     <transition event="go" target="p"/>
     <transition event="multi" target="a b"/>
   </state>

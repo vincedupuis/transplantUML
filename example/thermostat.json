@@ -12,11 +12,11 @@
       "name": "on",
       "kind": "normal",
       "initial": "decide",
-      "onEntry": ["display.on()"],
-      "onExit": ["display.off()"],
-      "do": ["sample sensor every 10s"],
+      "onEntry": ["displayOn"],
+      "onExit": ["displayOff"],
+      "do": ["sampleSensor"],
       "defer": ["schedule"],
-      "invariant": "target > 5"
+      "invariant": "aboveMinimum"
     },
     { "name": "decide", "parent": "on", "kind": "choice" },
     { "name": "heating", "parent": "on", "kind": "normal", "stereotype": "actuator", "note": "Burner on." },
@@ -29,13 +29,13 @@
     { "source": "off", "targets": ["on"], "event": "power" },
     { "source": "on", "targets": ["off"], "event": "power" },
     { "source": "on", "targets": ["fault"], "event": "sensorError", "note": "Unrecoverable." },
-    { "source": "on", "event": "setTarget", "actions": ["target = value"], "kind": "internal" },
+    { "source": "on", "event": "setTarget", "actions": ["setTarget"], "kind": "internal" },
     { "source": "last", "targets": ["decide"] },
-    { "source": "decide", "targets": ["heating"], "cond": "current < target - 1" },
-    { "source": "decide", "targets": ["cooling"], "cond": "current > target + 1" },
+    { "source": "decide", "targets": ["heating"], "cond": "tooCold" },
+    { "source": "decide", "targets": ["cooling"], "cond": "tooWarm" },
     { "source": "decide", "targets": ["steady"] },
     { "source": "heating", "targets": ["decide"], "after": "60s" },
     { "source": "cooling", "targets": ["decide"], "after": "60s" },
-    { "source": "steady", "targets": ["decide"], "after": "5m" }
+    { "source": "steady", "targets": ["decide"], "after": "300s" }
   ]
 }

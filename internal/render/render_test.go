@@ -32,7 +32,8 @@ func renderWith(t *testing.T, path, tmpl string) (string, model.Warnings) {
 	return out, warnings
 }
 
-// parseFile parses path with the parser its extension names.
+// parseFile parses path with the parser its extension names and validates
+// the model, as the command does before rendering.
 func parseFile(t *testing.T, path string) *model.StateMachine {
 	t.Helper()
 	src, err := os.ReadFile(path)
@@ -46,6 +47,9 @@ func parseFile(t *testing.T, path string) *model.StateMachine {
 	sm, _, err := parser.Parse(src)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if err := sm.Validate(); err != nil {
+		t.Fatalf("%s: %v", path, err)
 	}
 	return sm
 }
@@ -144,12 +148,12 @@ func TestPlantUMLApproximations(t *testing.T) {
 	sm := &model.StateMachine{
 		Name: "m", Initial: "a.b",
 		States: []*model.State{
-			{Name: "a.b", Kind: model.Normal, OnEntry: []string{"one\ntwo"}, Stereotype: "st"},
+			{Name: "a.b", Kind: model.Normal, OnEntry: []string{"hello"}, Stereotype: "st"},
 			{Name: "my-comp", Kind: model.Normal, Initial: "in"},
 			{Name: "h", Parent: "my-comp", Kind: model.HistoryShallow, Note: "remembers"},
 			{Name: "in", Parent: "my-comp", Kind: model.Normal},
 			{Name: "c", Kind: model.Choice, Stereotype: "mine"},
-			{Name: "done", Kind: model.Final, OnEntry: []string{"bye()"}, Note: "over"},
+			{Name: "done", Kind: model.Final, OnEntry: []string{"bye"}, Note: "over"},
 			{Name: "p", Kind: model.Parallel},
 			{Name: "r", Parent: "p", Kind: model.Normal, Note: "region"},
 			{Name: "r1", Parent: "r", Kind: model.Normal},
@@ -158,7 +162,7 @@ func TestPlantUMLApproximations(t *testing.T) {
 			{Name: "q2", Parent: "q", Kind: model.Normal},
 		},
 		Transitions: []*model.Transition{
-			{Source: "a.b", Targets: []string{"my-comp"}, Event: "go"},
+			{Source: "a.b", Targets: []string{"my-comp"}, Event: "go", Cond: "ready\nand set"},
 			{Source: "h", Targets: []string{"in"}, Note: "default"},
 			{Source: "a.b", Targets: []string{"r"}, Event: "into"},
 			{Source: "in", Targets: []string{"c"}, Event: "end"},
@@ -176,14 +180,14 @@ func TestPlantUMLApproximations(t *testing.T) {
 		"\ntitle m\n",
 		"\n[*] --> a_b\n",
 		"\nstate \"«st»\\na.b\" as a_b <<st>>\n",
-		"\na_b : entry / one\\ntwo\n",
+		"\na_b : entry / hello\n",
 		"\nstate \"my-comp\" as my_comp {\n",
 		"\n    state h <<history>>\n    note right of h : remembers\n",
 		"\n    h --> in\n    note on link : default\n",
 		"\nstate c <<choice>>\n",
-		"\nstate done <<end>>\nnote right of done\n    entry / bye()\n    over\nend note\n",
+		"\nstate done <<end>>\nnote right of done\n    entry / bye\n    over\nend note\n",
 		"\nstate p {\n    state r1\n    --\n    state q {\n        state q1\n        --\n        state q2\n    }\n}\n",
-		"\na_b --> my_comp: go\n",
+		"\na_b --> my_comp: go\\n[ ready\\nand set ]\n",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output lacks %q:\n%s", want, out)

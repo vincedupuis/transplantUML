@@ -7,9 +7,13 @@
 // <transition> with multiple targets and type="internal", executable content
 // in <onentry>, <onexit> and <transition>, <datamodel>/<data> on the machine
 // and on states, and <invoke> (a do activity, or a submachine state when it
-// invokes another SCXML document). Executable content is stored as text:
-// <script> bodies verbatim, common elements (<log>, <assign>, <raise>, <send>,
-// <cancel>) rendered to a short readable form, anything else as its XML.
+// invokes another SCXML document).
+//
+// Guards and actions hold names only, which the generated code calls as
+// functions (model.IsName, model.IsCondition): an action is a <script> whose
+// body is a name, a do activity an <invoke> whose src is a name, and a cond or
+// tpuml:invariant names joined by not, and, or and parentheses. Any other
+// executable content is an error.
 //
 // Two SCXML idioms are recognised as UML concepts: a transient state (no
 // content, only eventless transitions) is a choice when it branches on
@@ -75,12 +79,20 @@ func (Parser) Parse(src []byte) (*model.StateMachine, model.Warnings, error) {
 			p.warn.Addf("<%s> at the top level is not supported and was dropped", c.Tag)
 		}
 	}
+	if err := errors.Join(p.errs...); err != nil {
+		return nil, p.warn, err
+	}
 	return p.sm, p.warn, nil
 }
 
 type parser struct {
 	sm   *model.StateMachine
 	warn model.Warnings
+	errs []error
+}
+
+func (p *parser) fail(format string, args ...any) {
+	p.errs = append(p.errs, fmt.Errorf(format, args...))
 }
 
 var stateKinds = map[string]model.StateKind{
@@ -115,7 +127,11 @@ func (p *parser) state(el *etree.Element, parent string) {
 		Note:       note(el),
 	}
 	if kind == model.Normal {
-		st.Initial, st.InitialActions = initialOf(el)
+		var init *etree.Element
+		st.Initial, init = initialOf(el)
+		if init != nil {
+			st.InitialActions = p.actions(st.Name, "<initial>", init, nil)
+		}
 	}
 	st.Variables = p.datamodel(el)
 	p.aboutNotes(st, el)
@@ -135,7 +151,7 @@ func (p *parser) state(el *etree.Element, parent string) {
 			Targets: targets(t.SelectAttrValue("target", "")),
 			Event:   t.SelectAttrValue("event", ""),
 			Cond:    t.SelectAttrValue("cond", ""),
-			Actions: executableContent(t, nil),
+			Actions: p.actions(st.Name, "<transition>", t, nil),
 			Note:    note(t),
 		}
 		if completes(st, tr.Event, invokeID) {
@@ -157,10 +173,10 @@ func (p *parser) state(el *etree.Element, parent string) {
 		transitions = append(transitions, tr)
 	}
 	for _, e := range el.SelectElements("onentry") {
-		st.OnEntry = append(st.OnEntry, executableContent(e, skip)...)
+		st.OnEntry = append(st.OnEntry, p.actions(st.Name, "<onentry>", e, skip)...)
 	}
 	for _, e := range el.SelectElements("onexit") {
-		st.OnExit = append(st.OnExit, executableContent(e, skip)...)
+		st.OnExit = append(st.OnExit, p.actions(st.Name, "<onexit>", e, skip)...)
 	}
 
 	if k := ext(el, "kind"); k != "" {
@@ -222,27 +238,31 @@ func completes(st *model.State, event, invokeID string) bool {
 }
 
 // invoke maps an <invoke> element: invoking another SCXML document is a
-// submachine state, anything else is a do activity. It reports whether the
-// element made st a submachine state.
+// submachine state, anything else is a do activity, named by its src. It
+// reports whether the element made st a submachine state.
 func (p *parser) invoke(st *model.State, inv *etree.Element) bool {
 	typ := inv.SelectAttrValue("type", "")
 	src := joinNonEmpty(" ", inv.SelectAttrValue("src", ""), inv.SelectAttrValue("srcexpr", ""))
 	isSCXML := typ == "" || typ == "scxml" || strings.HasPrefix(typ, "http://www.w3.org/TR/scxml")
-	if isSCXML {
-		typ = "" // the default, not worth repeating
-	}
-	simple := len(inv.ChildElements()) == 0 && src != ""
 	switch {
-	case simple && isSCXML && st.Submachine == "":
+	case len(inv.ChildElements()) > 0 || src == "":
+		p.fail("state %q: an <invoke> with content or without src is not supported; a do activity is an <invoke> whose src is a name", st.Name)
+	case isSCXML && st.Submachine == "":
 		st.Submachine = src
 		return true
-	case simple:
-		st.Do = append(st.Do, "invoke("+joinNonEmpty(", ", src, typ)+")")
+	case isSCXML:
+		p.fail("state %q: a state runs one submachine, but it invokes %q and %q", st.Name, st.Submachine, src)
 	default:
-		st.Do = append(st.Do, rawXML(inv))
+		if typ != doType {
+			p.warn.Addf("state %q: the type %q of the do activity %q is not kept", st.Name, typ, src)
+		}
+		st.Do = append(st.Do, src)
 	}
 	return false
 }
+
+// doType is the <invoke> type the emitter writes for a do activity.
+const doType = extPrefix + ":do"
 
 // timer is a <send delay> in <onentry> and its <cancel> in <onexit>: the SCXML
 // idiom for a UML time trigger.
@@ -318,15 +338,15 @@ func targets(attr string) []string {
 // initialOf resolves the initial child of a <scxml> or <state> element: the
 // initial attribute, else the <initial> element's transition target, else the
 // first state-like child in document order (per the SCXML spec). It also
-// returns the executable content of the <initial> element's transition, UML's
-// effect of the initial transition.
-func initialOf(el *etree.Element) (string, []string) {
+// returns the <initial> element's transition, whose executable content is
+// UML's effect of the initial transition.
+func initialOf(el *etree.Element) (string, *etree.Element) {
 	if v := el.SelectAttrValue("initial", ""); v != "" {
 		return v, nil
 	}
 	if init := el.SelectElement("initial"); init != nil {
 		if t := init.SelectElement("transition"); t != nil {
-			return t.SelectAttrValue("target", ""), executableContent(t, nil)
+			return t.SelectAttrValue("target", ""), t
 		}
 	}
 	for _, child := range el.ChildElements() {
@@ -337,39 +357,22 @@ func initialOf(el *etree.Element) (string, []string) {
 	return "", nil
 }
 
-// executableContent converts the children of an <onentry>, <onexit> or
-// <transition> element to one string per action, leaving out the elements in
-// skip (those already consumed as a time trigger) and tpuml annotations.
-func executableContent(el *etree.Element, skip map[*etree.Element]bool) []string {
+// actions reads the executable content of an <onentry>, <onexit> or
+// <transition> element of the state named state, one action per <script>,
+// leaving out the elements in skip (those already consumed as a time trigger)
+// and tpuml annotations. Any other element is an error; model.Validate checks
+// that each script holds a name.
+func (p *parser) actions(state, in string, el *etree.Element, skip map[*etree.Element]bool) []string {
 	var out []string
 	for _, c := range el.ChildElements() {
-		if skip[c] || isExt(c) {
-			continue
-		}
-		attr := func(name string) string { return c.SelectAttrValue(name, "") }
-		switch c.Tag {
-		case "script":
-			if src := attr("src"); src != "" {
-				out = append(out, "script("+src+")")
-			} else {
-				out = append(out, strings.TrimSpace(c.Text()))
-			}
-		case "log":
-			out = append(out, "log("+joinNonEmpty(": ", attr("label"), attr("expr"))+")")
-		case "assign":
-			value := attr("expr")
-			if value == "" {
-				value = strings.TrimSpace(c.Text())
-			}
-			out = append(out, attr("location")+" = "+value)
-		case "raise":
-			out = append(out, "raise "+attr("event"))
-		case "send":
-			out = append(out, "send "+joinNonEmpty(" ", attr("event"), attr("eventexpr")))
-		case "cancel":
-			out = append(out, "cancel "+joinNonEmpty(" ", attr("sendid"), attr("sendidexpr")))
+		switch {
+		case skip[c] || isExt(c):
+		case c.Tag == "script" && c.SelectAttrValue("src", "") == "":
+			out = append(out, strings.TrimSpace(c.Text()))
+		case c.Tag == "script":
+			p.fail("state %q: <script src> in %s is not supported; an action is a <script> holding a name", state, in)
 		default:
-			out = append(out, rawXML(c))
+			p.fail("state %q: <%s> in %s is not supported; an action is a <script> holding a name", state, c.Tag, in)
 		}
 	}
 	return out

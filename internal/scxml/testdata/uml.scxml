@@ -9,8 +9,8 @@ in one document.</tpuml:note>
 
   <!-- A transient state branching on guards is a choice. -->
   <state id="check">
-    <transition cond="retries > 3" target="failed"/>
-    <transition cond="retries &lt;= 3" target="work"/>
+    <transition cond="tooManyRetries" target="failed"/>
+    <transition cond="not tooManyRetries" target="work"/>
   </state>
 
   <!-- A transient state with one multi-target transition is a fork. -->
@@ -26,7 +26,7 @@ in one document.</tpuml:note>
     <transition target="done"/>
   </state>
 
-  <state id="work" tpuml:stereotype="worker" tpuml:defer="pause resume" tpuml:invariant="retries >= 0">
+  <state id="work" tpuml:stereotype="worker" tpuml:defer="pause resume" tpuml:invariant="counting and not (stalled or aborted)">
     <tpuml:note>Runs the job.</tpuml:note>
     <!-- Notes on what a state lists say what they are about. -->
     <tpuml:note about="entry">Starts the clock.</tpuml:note>
@@ -37,7 +37,7 @@ in one document.</tpuml:note>
       <data id="progress" expr="0"/>
     </datamodel>
     <onentry>
-      <log expr="'start'"/>
+      <script>startClock</script>
       <send event="tick" delay="5s" id="workTimer"/>
       <send event="retry" delayexpr="retryDelay" id="retryTimer"/>
     </onentry>
@@ -45,10 +45,10 @@ in one document.</tpuml:note>
       <cancel sendid="workTimer"/>
       <cancel sendid="retryTimer"/>
     </onexit>
-    <invoke type="http://example.com/worker" src="job.py"/>
+    <invoke type="http://example.com/worker" src="runJob"/>
     <transition event="tick" target="check">
       <tpuml:note>Timed out.</tpuml:note>
-      <assign location="retries" expr="retries + 1"/>
+      <script>countRetry</script>
     </transition>
     <transition event="retry" target="check"/>
     <transition event="split" target="split"/>
@@ -68,11 +68,11 @@ in one document.</tpuml:note>
   </state>
 
   <state id="outer">
-    <initial><transition target="inner"><log expr="'hi'"/></transition></initial>
+    <initial><transition target="inner"><script>greet</script></transition></initial>
     <tpuml:note about="exit">Says goodbye.</tpuml:note>
     <tpuml:note about="initial">Not a thing a state lists.</tpuml:note>
     <tpuml:note about="defer">Names no event.</tpuml:note>
-    <onexit><log expr="'bye'"/></onexit>
+    <onexit><script>sayBye</script></onexit>
     <transition event="done.state.outer" target="done"/>
     <state id="in" tpuml:kind="entry-point"><transition target="inner"/></state>
     <state id="out" tpuml:kind="exit-point"><transition target="sub"/></state>

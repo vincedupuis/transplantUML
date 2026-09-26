@@ -84,6 +84,15 @@ func TestValidateErrors(t *testing.T) {
 			sm.Transitions = append(sm.Transitions, &Transition{Source: "h", Targets: []string{"f"}})
 		}, `a history state has at most one outgoing transition, its default, has 2`},
 		{"history default outside", func(sm *StateMachine) { sm.Transitions[1].Targets = []string{"a"} }, `a history state's default leads inside "b", "a" is not inside it`},
+		{"machine initial action", func(sm *StateMachine) { sm.InitialActions = []string{"log('hi')"} }, `the machine's initial action "log('hi')" is not a name`},
+		{"initial action", func(sm *StateMachine) { sm.States[1].InitialActions = []string{"x()"} }, `state "b": the initial action "x()" is not a name`},
+		{"entry action", func(sm *StateMachine) { sm.States[0].OnEntry = []string{"x = 1"} }, `state "a": the entry action "x = 1" is not a name`},
+		{"exit action", func(sm *StateMachine) { sm.States[0].OnExit = []string{"a.b"} }, `state "a": the exit action "a.b" is not a name`},
+		{"do activity", func(sm *StateMachine) { sm.States[0].Do = []string{"invoke(job.py)"} }, `state "a": the do activity "invoke(job.py)" is not a name`},
+		{"operator as action", func(sm *StateMachine) { sm.Transitions[0].Actions = []string{"and"} }, `transition #0 (a): the action "and" is not a name`},
+		{"invariant", func(sm *StateMachine) { sm.States[0].Invariant = "n >= 0" }, `state "a": the invariant [n >= 0] is not made of names, not, and, or and parentheses`},
+		{"delay", func(sm *StateMachine) { sm.Transitions[0].Event = ""; sm.Transitions[0].After = "t * 2" }, `transition #0 (a): the delay "t * 2" is neither a duration, such as 5s or 250ms, nor a name`},
+		{"guard", func(sm *StateMachine) { sm.Transitions[0].Cond = "retries > 3" }, `transition #0 (a): the guard [retries > 3] is not made of names, not, and, or and parentheses`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -237,4 +246,45 @@ func names(states []*State) string {
 		out[i] = s.Name
 	}
 	return strings.Join(out, ",")
+}
+
+// A condition is names joined by and, or, not and parentheses, as the fsm
+// grammar has it.
+func TestIsCondition(t *testing.T) {
+	for _, c := range []string{"a", "not a", "a and b", "a or b and not c", "(a or b) and c", " ( a ) ", "card and not (blocked or expired)", "a_1\nand\tb"} {
+		if !IsCondition(c) {
+			t.Errorf("IsCondition(%q) = false", c)
+		}
+	}
+	for _, c := range []string{"", "a b", "a and", "or a", "not", "not not a", "(a", "a)", "()", "!a", "a && b", "a > 3", "a()", "a.b", "1a", "and"} {
+		if IsCondition(c) {
+			t.Errorf("IsCondition(%q) = true", c)
+		}
+	}
+}
+
+func TestIsDelay(t *testing.T) {
+	for _, d := range []string{"5s", "1.5s", "250ms", "0.25ms", "retryDelay"} {
+		if !IsDelay(d) {
+			t.Errorf("IsDelay(%q) = false", d)
+		}
+	}
+	for _, d := range []string{"", "5", "5 s", "5min", ".5s", "1.s", "t * 2", "delay()", "and"} {
+		if IsDelay(d) {
+			t.Errorf("IsDelay(%q) = true", d)
+		}
+	}
+}
+
+func TestIsName(t *testing.T) {
+	for _, n := range []string{"a", "_x", "addLine", "a1"} {
+		if !IsName(n) {
+			t.Errorf("IsName(%q) = false", n)
+		}
+	}
+	for _, n := range []string{"", "1a", "a b", "a()", "a.b", "x = 1", "not", "and", "or"} {
+		if IsName(n) {
+			t.Errorf("IsName(%q) = true", n)
+		}
+	}
 }

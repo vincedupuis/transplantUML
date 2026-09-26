@@ -64,15 +64,15 @@ func TestEmitWarnings(t *testing.T) {
 		t.Errorf("warnings =\n%s\nwant\n%s", strings.Join(warnings, "\n"), strings.Join(want, "\n"))
 	}
 
-	sm := &model.StateMachine{States: []*model.State{{Name: "s", Kind: model.Normal, Do: []string{"spin the wheel"}}}}
+	sm := &model.StateMachine{States: []*model.State{{Name: "s", Kind: model.Normal, Do: []string{"spin"}}}}
 	out, warnings, err := Emitter{}.Emit(sm)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(out), `<invoke type="tpuml:do">`) || !strings.Contains(string(out), "<content>spin the wheel</content>") {
-		t.Errorf("free-text do activity not written as invoke content:\n%s", out)
+	if !strings.Contains(string(out), `<invoke type="tpuml:do" src="spin"/>`) {
+		t.Errorf("do activity not written as an invoke of its name:\n%s", out)
 	}
-	if len(warnings) != 1 || !strings.Contains(warnings[0], "cannot run the do activity") {
+	if len(warnings) != 0 {
 		t.Errorf("warnings = %q", warnings)
 	}
 }
@@ -176,19 +176,19 @@ func TestEmitDeclaresExtensionOnlyWhenUsed(t *testing.T) {
 }
 
 // execContentSM exercises every executable-content shape the emitter handles:
-// a plain script body, an action that is already XML, exit actions, and a
-// targetless internal transition. Shared with the schema test (schema_test.go).
+// entry and exit actions, a guard made of names, and a targetless internal
+// transition. Shared with the schema test (schema_test.go).
 func execContentSM() *model.StateMachine {
 	return &model.StateMachine{
 		Initial: "s",
 		States: []*model.State{{
 			Name:    "s",
 			Kind:    model.Normal,
-			OnEntry: []string{"x = 1;", `<if cond="n > 3"><log expr="'big'"/></if>`},
-			OnExit:  []string{"log(bye)"},
+			OnEntry: []string{"start", "count"},
+			OnExit:  []string{"stop"},
 		}},
 		Transitions: []*model.Transition{
-			{Source: "s", Event: "e", Cond: "n > 3", Kind: model.Internal, Actions: []string{"raise tick"}},
+			{Source: "s", Event: "e", Cond: "big and not (small or empty)", Kind: model.Internal, Actions: []string{"tick"}},
 		},
 	}
 }
@@ -197,8 +197,9 @@ func TestEmitExecutableContent(t *testing.T) {
 	sm := execContentSM()
 	out := string(emit(t, sm))
 	for _, want := range []string{
-		"<onentry>", "<script>x = 1;</script>", `<if cond="n > 3">`, `<log expr="'big'"/>`,
-		"<onexit>", `<transition event="e" cond="n > 3" type="internal">`,
+		"<onentry>\n      <script>start</script>\n      <script>count</script>\n    </onentry>",
+		"<onexit>\n      <script>stop</script>\n    </onexit>",
+		`<transition event="e" cond="big and not (small or empty)" type="internal">`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("emitted SCXML is missing %q:\n%s", want, out)

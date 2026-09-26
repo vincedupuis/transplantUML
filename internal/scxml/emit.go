@@ -16,8 +16,8 @@ import (
 // triggers as a delayed <send> cancelled on exit, submachines and do
 // activities as <invoke>); the rest is recorded in the tpuml extension
 // namespace and reported as a warning, since an SCXML engine will not honour
-// it. Executable content, which the parser flattens to strings, comes back as
-// <script> bodies unless the string is raw XML, which is re-inserted as is.
+// it. Each action, a name, is a <script> holding it, and each do activity an
+// <invoke> whose src is its name.
 type Emitter struct{}
 
 func (Emitter) Emit(sm *model.StateMachine) ([]byte, model.Warnings, error) {
@@ -114,20 +114,24 @@ func (e *emitter) children(el *etree.Element, parent string) error {
 		e.datamodel(child, s.Variables)
 
 		transitions := e.sm.OutgoingTransitions(s.Name)
-		onentry, onexit := append([]string(nil), s.OnEntry...), append([]string(nil), s.OnExit...)
-		for _, delay := range delays(transitions) {
-			id := s.Name + ".after." + eventSafe(delay)
-			send := etree.NewElement("send")
-			send.CreateAttr("event", afterEvent(delay))
-			send.CreateAttr(delayAttr(delay), delay)
-			send.CreateAttr("id", id)
-			cancel := etree.NewElement("cancel")
-			cancel.CreateAttr("sendid", id)
-			onentry = append(onentry, rawXML(send))
-			onexit = append(onexit, rawXML(cancel))
+		timed := delays(transitions)
+		if len(s.OnEntry)+len(timed) > 0 {
+			onentry := child.CreateElement("onentry")
+			executable(onentry, s.OnEntry)
+			for _, delay := range timed {
+				send := onentry.CreateElement("send")
+				send.CreateAttr("event", afterEvent(delay))
+				send.CreateAttr(delayAttr(delay), delay)
+				send.CreateAttr("id", timerID(s, delay))
+			}
 		}
-		actions(child, "onentry", onentry)
-		actions(child, "onexit", onexit)
+		if len(s.OnExit)+len(timed) > 0 {
+			onexit := child.CreateElement("onexit")
+			executable(onexit, s.OnExit)
+			for _, delay := range timed {
+				onexit.CreateElement("cancel").CreateAttr("sendid", timerID(s, delay))
+			}
+		}
 		e.invokes(child, s)
 
 		for _, t := range scxmlTransitions(s, transitions) {
@@ -268,34 +272,10 @@ func (e *emitter) invokes(el *etree.Element, s *model.State) {
 		inv.CreateAttr("src", s.Submachine)
 	}
 	for _, do := range s.Do {
-		if child, ok := parseElement(do); ok {
-			el.AddChild(child)
-			continue
-		}
 		inv := el.CreateElement("invoke")
-		if src, typ, ok := parseInvoke(do); ok {
-			setAttr(inv, "type", typ)
-			inv.CreateAttr("src", src)
-			continue
-		}
-		inv.CreateAttr("type", extPrefix+":do")
-		inv.CreateElement("content").SetText(do)
-		e.warn.Addf("state %q: SCXML cannot run the do activity %q; written as <invoke> content", s.Name, do)
+		inv.CreateAttr("type", doType)
+		inv.CreateAttr("src", do)
 	}
-}
-
-// parseInvoke reads the parser's compact form of an <invoke>: "invoke(src)"
-// or "invoke(src, type)". The type is the last comma-separated part when it
-// looks like a type (no spaces or parentheses); anything else is all source.
-func parseInvoke(s string) (src, typ string, ok bool) {
-	if !strings.HasPrefix(s, "invoke(") || !strings.HasSuffix(s, ")") {
-		return "", "", false
-	}
-	src = strings.TrimSuffix(strings.TrimPrefix(s, "invoke("), ")")
-	if i := strings.LastIndex(src, ", "); i >= 0 && !strings.ContainsAny(src[i+2:], " ()") {
-		src, typ = src[:i], src[i+2:]
-	}
-	return src, typ, src != ""
 }
 
 func (e *emitter) datamodel(el *etree.Element, vars []model.Variable) {
@@ -375,6 +355,9 @@ func delays(transitions []*model.Transition) []string {
 	return out
 }
 
+// timerID names the <send> of a time trigger of s, which its <cancel> refers to.
+func timerID(s *model.State, delay string) string { return s.Name + ".after." + eventSafe(delay) }
+
 // afterEvent names the event a time trigger's <send> raises.
 func afterEvent(delay string) string { return "after." + eventSafe(delay) }
 
@@ -411,37 +394,11 @@ func (e *emitter) leftovers() error {
 	return errors.Join(errs...)
 }
 
-// actions writes an <onentry>/<onexit> wrapper, unless there is nothing to put in it.
-func actions(el *etree.Element, tag string, list []string) {
-	if len(list) > 0 {
-		executable(el.CreateElement(tag), list)
-	}
-}
-
-// executable turns flattened action strings back into executable content:
-// a string that is XML (the parser keeps unknown elements that way) is
-// inserted as an element, anything else becomes a <script> body, which the
-// parser reads back verbatim.
+// executable writes each action, a name, as a <script> holding it.
 func executable(el *etree.Element, list []string) {
 	for _, a := range list {
-		if child, ok := parseElement(a); ok {
-			el.AddChild(child)
-			continue
-		}
 		el.CreateElement("script").SetText(a)
 	}
-}
-
-func parseElement(s string) (*etree.Element, bool) {
-	if !strings.HasPrefix(strings.TrimSpace(s), "<") {
-		return nil, false
-	}
-	doc := etree.NewDocument()
-	if err := doc.ReadFromString(s); err != nil {
-		return nil, false
-	}
-	root := doc.Root()
-	return root, root != nil
 }
 
 // canonical escapes only what XML requires, leaving quotes and apostrophes

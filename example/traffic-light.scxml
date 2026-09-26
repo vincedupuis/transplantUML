@@ -20,7 +20,7 @@
     </onentry>
     <onexit>
       <cancel sendid="redTimer"/>
-      <assign location="cycles" expr="cycles + 1"/>
+      <script>countCycle</script>
     </onexit>
     <transition event="expired" target="green"/>
   </state>
@@ -34,8 +34,8 @@
       <cancel sendid="greenTimer"/>
     </onexit>
     <transition event="expired" target="amber"/>
-    <transition event="button" cond="!requested" type="internal">
-      <assign location="requested" expr="true"/>
+    <transition event="button" cond="not requested" type="internal">
+      <script>requestCrossing</script>
     </transition>
     <transition event="button" cond="requested" target="amber"/>
   </state>
@@ -43,7 +43,7 @@
   <state id="amber">
     <onentry>
       <send event="expired" delay="3s" id="amberTimer"/>
-      <assign location="requested" expr="false"/>
+      <script>clearRequest</script>
     </onentry>
     <onexit>
       <cancel sendid="amberTimer"/>

@@ -9,14 +9,14 @@ legend
 endlegend
 [*] --> red
 state red
-red : exit / cycles = cycles + 1
+red : exit / countCycle
 state green
 note right of green : Cut short when a pedestrian is waiting.
 state amber
-amber : entry / requested = false
+amber : entry / clearRequest
 red --> green: after(30s)
 green --> amber: after(25s)
-green : button\n[ !requested ]\n/ requested = true
+green : button\n[ not requested ]\n/ requestCrossing
 green --> amber: button\n[ requested ]
 amber --> red: after(3s)
 @enduml
