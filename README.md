@@ -196,7 +196,7 @@ type StateKind string
 type TransitionKind string
 
 type StateMachine struct {
-  Name           string
+  Name           string     // required
   Initial        string     // top-level initial state
   InitialActions []string   // effect of the initial transition, names
   Variables      []Variable // context attributes
@@ -246,8 +246,10 @@ type Transition struct {
 `State` has the predicates `IsNormal`, `IsParallel`, `IsFinal`, `IsTerminate`, `IsHistory`, `IsDeepHistory`,
 `IsConnector` (choice, junction, fork, join, entry/exit point) and `IsPseudo` (anything but normal and parallel).
 `Transition` has `IsExternal`, `IsLocal`, `IsInternal` and `Trigger()`, which returns the event or `after(delay)`.
+A submachine state's `Submachine` is the name of the machine it runs, never a file; `Validate` rejects one holding `.`, `/` or `\`.
 `IsName` and `IsCondition` check an action and a guard; `Validate` rejects a model whose guards and actions fail them
 (see [Guards and actions are names](#guards-and-actions-are-names)).
+`Validate` also rejects a machine without a name, so an SCXML document needs the `name` attribute and a JSON document the `name` key.
 
 The JSON emitted by `-F json` is this structure with camelCase keys (`onEntry`, `targets`, …); empty
 optional fields are omitted and `kind` defaults to `normal` when reading. JSON holds the whole model, so it never
@@ -406,8 +408,7 @@ public:
 ### Submachine states
 
 A submachine state runs another machine, generated from its own document with `-t sml`.
-The machine is named after the submachine state's reference, without its extension: `payment.scxml` gives
-`PaymentFsm`.
+The submachine state's reference is the name of the machine it runs: `payment` gives `PaymentFsm`.
 The constructor takes one instance of it per submachine state, and each state needs its own:
 
 ```cpp
@@ -440,7 +441,7 @@ helpdesk.human();      // the submachine's events go to its instance
 
 Things to know:
 
-- The names come from the machine's name in PascalCase, `my-shop` giving `MyShopFsm`, and `MachineFsm` when it has none.
+- The names come from the machine's name in PascalCase, `my-shop` giving `MyShopFsm`.
 - A guard `[inStock]` calls `inStock()` on the actions, and an action `/ addLine` calls `addLine()`.
   A name used both ways is one method that returns `bool` and is not `const`.
 - A guard made of names, `not`, `and`, `or` and parentheses becomes SML's `!`, `&&` and `||`.
@@ -492,8 +493,9 @@ Any other executable content (`<log>`, `<assign>`, `<raise>`, `<if>`, `<script s
 `<send>` or `<cancel>` that is not a time trigger.
 Elements with no place in the model (`<donedata>`, a top-level `<script>`, …) are dropped with a warning.
 
-`<invoke>` is a **submachine state** when it invokes another SCXML document (`type` absent or `scxml`, with a `src`)
-and a **do activity** otherwise, named by its `src`: `<invoke type="tpuml:do" src="spin"/>`.
+`<invoke>` is a **submachine state** when it invokes another SCXML machine (`type` absent or `scxml`), whose name is
+its `src`: `<invoke src="payment"/>`.
+It is a **do activity** otherwise, named by its `src`: `<invoke type="tpuml:do" src="spin"/>`.
 Another `type` is not kept, with a warning.
 An `<invoke>` with children or without `src`, and a second SCXML `<invoke>` in one state, are errors.
 

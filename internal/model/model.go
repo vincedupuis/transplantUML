@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 )
 
 // StateKind classifies a State.
@@ -47,7 +48,7 @@ const (
 // StateMachine is the root of the model. Hierarchy is expressed through
 // State.Parent rather than nesting; the root has the empty name "".
 type StateMachine struct {
-	Name           string        `json:"name,omitempty"`
+	Name           string        `json:"name"`
 	Initial        string        `json:"initial,omitempty"`
 	InitialActions []string      `json:"initialActions,omitempty"` // effect of the initial transition, names
 	Variables      []Variable    `json:"variables,omitempty"`      // context attributes guards and actions refer to
@@ -274,6 +275,10 @@ func (sm *StateMachine) Validate() error {
 	var errs []error
 	fail := func(format string, args ...any) { errs = append(errs, fmt.Errorf(format, args...)) }
 
+	if sm.Name == "" {
+		fail("the machine has no name")
+	}
+
 	names := func(what string, list []string) {
 		for _, a := range list {
 			if !IsName(a) {
@@ -348,6 +353,9 @@ func (sm *StateMachine) Validate() error {
 		}
 		if s.Submachine != "" && !s.IsNormal() {
 			fail("state %q: only normal states can reference a submachine", s.Name)
+		}
+		if strings.ContainsAny(s.Submachine, `./\`) {
+			fail("state %q: the submachine %q is not a machine's name; a submachine state refers to the machine it runs by its name, not by its file", s.Name, s.Submachine)
 		}
 		for _, n := range []struct {
 			what       string

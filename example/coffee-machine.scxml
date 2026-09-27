@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="idle">
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" name="coffee-machine" initial="idle">
     <!-- Idle State: Coffee machine is off -->
     <state id="idle">
         <transition event="power_on" target="ready"/>

@@ -32,7 +32,7 @@
   </state>
 
   <state id="payment">
-    <invoke src="payment.scxml"/>
+    <invoke src="payment"/>
     <transition event="done.invoke" target="paid"/>
     <transition event="error.payment" target="retry">
       <script>countAttempt</script>

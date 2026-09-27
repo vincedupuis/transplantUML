@@ -30,7 +30,7 @@ public:
     enum class Entry { initial };
 
     // The machines the submachine states run, one each:
-    // sub runs "child.scxml" in the state "sub".
+    // sub runs "child" in the state "sub".
     // timers runs the timers of the time triggers.
     explicit UmlFsm(UmlFsmActions& actions, FsmTimers& timers, ChildFsm& sub);
     ~UmlFsm() override;

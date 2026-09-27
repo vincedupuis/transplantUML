@@ -11,7 +11,7 @@ import (
 // with states of its own, r2 a leaf that stands for its region. c has a history.
 func tablesSample() *model.StateMachine {
 	return &model.StateMachine{
-		Initial: "idle",
+		Name: "m", Initial: "idle",
 		States: []*model.State{
 			{Name: "idle", Kind: model.Normal},
 			{Name: "fk", Kind: model.Fork},
@@ -95,7 +95,7 @@ func TestTables(t *testing.T) {
 // references, which stand for that state; a state's own points are not.
 func TestLiftPoints(t *testing.T) {
 	sm := &model.StateMachine{
-		Initial: "a",
+		Name: "m", Initial: "a",
 		States: []*model.State{
 			{Name: "a", Kind: model.Normal},
 			{Name: "in", Kind: model.EntryPoint},

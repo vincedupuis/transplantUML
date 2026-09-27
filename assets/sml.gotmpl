@@ -978,9 +978,8 @@ return sml::make_transition_table(
 {{- if regexMatch "^[0-9]" $name }}_{{ end }}{{ $name -}}
 {{- end -}}
 
-{{- define "machineClass" -}}{{- /* . = a submachine state's Submachine: the class of the machine it names, its file's name without extension */ -}}
-{{- $base := base . -}}
-{{- include "pascal" (trimSuffix (ext $base) $base) }}Fsm
+{{- define "machineClass" -}}{{- /* . = a submachine state's Submachine: the class of the machine it names */ -}}
+{{- include "pascal" . }}Fsm
 {{- end -}}
 
 {{- define "entryId" -}}{{- /* . = an entry point's name: its Entry value, kept apart from initial */ -}}

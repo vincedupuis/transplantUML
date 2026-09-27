@@ -10,7 +10,7 @@ state check <<choice>>
 state "«manual»\nreview" as review <<manual>>
 review : do / reviewTicket
 note right of review : A human approves large orders.
-state "payment: payment.scxml" as payment
+state "payment: payment" as payment
 state retry <<start>>
 state paid
 paid : entry / confirmOrder

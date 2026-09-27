@@ -62,7 +62,7 @@ in one document.</tpuml:note>
   </parallel>
 
   <state id="sub">
-    <invoke id="helper" src="child.scxml"/>
+    <invoke id="helper" src="child"/>
     <transition event="back" target="merge"/>
     <transition event="done.invoke.helper" target="done"/>
   </state>

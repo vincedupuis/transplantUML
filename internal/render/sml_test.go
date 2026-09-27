@@ -89,14 +89,10 @@ func TestSMLGolden(t *testing.T) {
 
 // The files come in the order an include needs them, named after the machine.
 func TestSMLFiles(t *testing.T) {
-	files, _ := smlFiles(t, &model.StateMachine{})
-	want := []string{"FsmTimers.h", "MachineFsmEvents.h", "MachineFsmActions.h", "MachineFsm.h", "MachineFsm.cpp"}
+	files, _ := smlFiles(t, &model.StateMachine{Name: "my-coffee machine"})
+	want := []string{"FsmTimers.h", "MyCoffeeMachineFsmEvents.h", "MyCoffeeMachineFsmActions.h", "MyCoffeeMachineFsm.h", "MyCoffeeMachineFsm.cpp"}
 	if got := fileNames(files); !reflect.DeepEqual(got, want) {
 		t.Errorf("files = %v, want %v", got, want)
-	}
-	files, _ = smlFiles(t, &model.StateMachine{Name: "my-coffee machine"})
-	if got := files[1].Name; got != "MyCoffeeMachineFsmEvents.h" {
-		t.Errorf("first file = %q", got)
 	}
 }
 
@@ -153,7 +149,7 @@ func TestSMLMachinePointWarnings(t *testing.T) {
 // orthogonal state lets the other regions act on it first.
 func TestSMLTerminateInRegionWarns(t *testing.T) {
 	sm := &model.StateMachine{
-		Initial: "p",
+		Name: "m", Initial: "p",
 		States: []*model.State{
 			{Name: "p", Kind: model.Parallel},
 			{Name: "r1", Parent: "p", Kind: model.Normal, Initial: "a"},
@@ -389,7 +385,7 @@ func smlStandIns(t *testing.T, sm *model.StateMachine) []File {
 		if s.Submachine == "" {
 			continue
 		}
-		name := strings.TrimSuffix(filepath.Base(s.Submachine), filepath.Ext(s.Submachine))
+		name := s.Submachine
 		if _, ok := points[name]; !ok {
 			names = append(names, name)
 		}

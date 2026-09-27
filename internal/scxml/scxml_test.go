@@ -197,7 +197,7 @@ func TestUMLConcepts(t *testing.T) {
 		t.Errorf("computed time trigger = %+v", *computed)
 	}
 
-	if got := sm.State("sub").Submachine; got != "child.scxml" {
+	if got := sm.State("sub").Submachine; got != "child" {
 		t.Errorf("submachine = %q", got)
 	}
 
@@ -233,7 +233,7 @@ func TestConnectorIdiom(t *testing.T) {
 			if name == "forced normal" {
 				attr = ` tpuml:kind="normal"`
 			}
-			src := `<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:tpuml="` + ExtNamespace + `" initial="s">` +
+			src := `<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:tpuml="` + ExtNamespace + `" name="m" initial="s">` +
 				`<state id="s"` + attr + `>` + c.body + `</state><state id="x"/><state id="y"/></scxml>`
 			sm, _, err := Parser{}.Parse([]byte(src))
 			if err != nil {
@@ -276,7 +276,7 @@ func TestParserWarnings(t *testing.T) {
 // without a warning.
 func TestInvokeForms(t *testing.T) {
 	src := `<scxml xmlns="http://www.w3.org/2005/07/scxml"><state id="s">
-	  <invoke type="http://www.w3.org/TR/scxml/" src="a.scxml"/>
+	  <invoke type="http://www.w3.org/TR/scxml/" src="a"/>
 	  <invoke type="tpuml:do" src="spin"/>
 	  <invoke type="x" src="blink"/>
 	</state></scxml>`
@@ -285,7 +285,7 @@ func TestInvokeForms(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := sm.State("s")
-	if s.Submachine != "a.scxml" {
+	if s.Submachine != "a" {
 		t.Errorf("submachine = %q", s.Submachine)
 	}
 	if want := []string{"spin", "blink"}; !reflect.DeepEqual(s.Do, want) {
@@ -340,7 +340,7 @@ func TestExpressionErrors(t *testing.T) {
 	}
 	want := []string{
 		`state "s": <log> in <initial> is not supported; an action is a <script> holding a name`,
-		`state "s": a state runs one submachine, but it invokes "a.scxml" and "b.scxml"`,
+		`state "s": a state runs one submachine, but it invokes "a" and "b"`,
 		`state "s": an <invoke> with content or without src is not supported; a do activity is an <invoke> whose src is a name`,
 		`state "s": <log> in <transition> is not supported; an action is a <script> holding a name`,
 		`state "s": <assign> in <onentry> is not supported; an action is a <script> holding a name`,
@@ -358,7 +358,7 @@ func TestExpressionErrors(t *testing.T) {
 // A <script>, a cond or a tpuml:invariant that holds more than names parses,
 // and the model rejects it.
 func TestExpressionsInvalid(t *testing.T) {
-	src := `<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:tpuml="` + ExtNamespace + `" initial="s">
+	src := `<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:tpuml="` + ExtNamespace + `" name="m" initial="s">
 	  <state id="s" tpuml:invariant="n >= 0">
 	    <onentry><script>x = 1;</script></onentry>
 	    <transition event="e" cond="n > 3" target="s"/>
@@ -392,12 +392,12 @@ func TestErrors(t *testing.T) {
 // submachine's completion only when nothing else is invoked there.
 func TestCompletionEvent(t *testing.T) {
 	for src, want := range map[string]string{
-		`<state id="s"><invoke src="m.scxml"/><transition event="done.invoke" target="s"/></state>`:                                "",
-		`<state id="s"><invoke src="m.scxml"/><transition event="done.invoke.*" target="s"/></state>`:                              "",
-		`<state id="s"><invoke id="i" src="m.scxml"/><transition event="done.invoke.j" target="s"/></state>`:                       "done.invoke.j",
-		`<state id="s"><invoke src="m.scxml"/><invoke src="job.py" type="x"/><transition event="done.invoke" target="s"/></state>`: "done.invoke",
-		`<state id="s"><invoke src="job.py" type="x"/><transition event="done.invoke" target="s"/></state>`:                        "done.invoke",
-		`<state id="s"><state id="a"/><transition event="done.state.a" target="s"/></state>`:                                       "done.state.a",
+		`<state id="s"><invoke src="m"/><transition event="done.invoke" target="s"/></state>`:                                "",
+		`<state id="s"><invoke src="m"/><transition event="done.invoke.*" target="s"/></state>`:                              "",
+		`<state id="s"><invoke id="i" src="m"/><transition event="done.invoke.j" target="s"/></state>`:                       "done.invoke.j",
+		`<state id="s"><invoke src="m"/><invoke src="job.py" type="x"/><transition event="done.invoke" target="s"/></state>`: "done.invoke",
+		`<state id="s"><invoke src="job.py" type="x"/><transition event="done.invoke" target="s"/></state>`:                  "done.invoke",
+		`<state id="s"><state id="a"/><transition event="done.state.a" target="s"/></state>`:                                 "done.state.a",
 	} {
 		sm, _, err := Parser{}.Parse([]byte(`<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0">` + src + `</scxml>`))
 		if err != nil {

@@ -7,7 +7,7 @@ import (
 
 func sample() *StateMachine {
 	return &StateMachine{
-		Initial: "a",
+		Name: "m", Initial: "a",
 		States: []*State{
 			{Name: "a", Kind: Normal},
 			{Name: "b", Kind: Normal, Initial: "b1"},
@@ -35,6 +35,7 @@ func TestValidateErrors(t *testing.T) {
 		mutate func(*StateMachine)
 		want   string
 	}{
+		{"no name", func(sm *StateMachine) { sm.Name = "" }, `the machine has no name`},
 		{"duplicate", func(sm *StateMachine) { sm.States = append(sm.States, &State{Name: "a", Kind: Normal}) }, `duplicate state name "a"`},
 		{"unknown parent", func(sm *StateMachine) { sm.States[2].Parent = "nope" }, `unknown parent "nope"`},
 		{"final parent", func(sm *StateMachine) { sm.States[2].Parent = "f" }, `cannot have children`},
@@ -63,6 +64,7 @@ func TestValidateErrors(t *testing.T) {
 		{"choice with trigger", func(sm *StateMachine) { sm.States[0].Kind = Choice }, `cannot have a trigger`},
 		{"final source", func(sm *StateMachine) { sm.Transitions[0].Source = "f" }, `final state "f" cannot have outgoing transitions`},
 		{"terminate source", func(sm *StateMachine) { sm.States[0].Kind = Terminate }, `terminate state "a" cannot have outgoing transitions`},
+		{"submachine as a file", func(sm *StateMachine) { sm.States[0].Submachine = "pay/payment.scxml" }, `state "a": the submachine "pay/payment.scxml" is not a machine's name`},
 		{"submachine on parallel", func(sm *StateMachine) { sm.States[0].Kind = Parallel; sm.States[0].Submachine = "m" }, `only normal states can reference a submachine`},
 		{"entry note alone", func(sm *StateMachine) { sm.States[0].EntryNote = "n" }, `has a note on its entry behaviour but no entry behaviour`},
 		{"exit note alone", func(sm *StateMachine) { sm.States[0].ExitNote = "n" }, `has a note on its exit behaviour but no exit behaviour`},

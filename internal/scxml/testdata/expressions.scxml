@@ -3,7 +3,7 @@
   names, and executable content other than a <script> holding a name. Each is
   an error.
 -->
-<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="s">
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" name="expressions" initial="s">
   <state id="s">
     <initial><transition target="inner"><log expr="'hi'"/></transition></initial>
     <onentry>
@@ -16,8 +16,8 @@
       <cancel sendid="ping"/>
       <script src="cleanup.js"/>
     </onexit>
-    <invoke src="a.scxml"/>
-    <invoke src="b.scxml"/>
+    <invoke src="a"/>
+    <invoke src="b"/>
     <invoke type="http://example.com/worker" src="job"><param name="p" expr="1"/></invoke>
     <transition event="e" type="internal"><log label="evt" expr="_event.name"/></transition>
     <state id="inner"/>

@@ -36,7 +36,7 @@ func TestRoundTrip(t *testing.T) {
 }
 
 func TestParseDefaults(t *testing.T) {
-	sm, _, err := Parser{}.Parse([]byte(`{"initial":"a","states":[{"name":"a"}]}`))
+	sm, _, err := Parser{}.Parse([]byte(`{"name":"m","initial":"a","states":[{"name":"a"}]}`))
 	if err != nil {
 		t.Fatal(err)
 	}

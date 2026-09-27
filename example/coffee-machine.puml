@@ -1,4 +1,5 @@
 @startuml
+title coffee-machine
 [*] --> idle
 state idle
 state ready

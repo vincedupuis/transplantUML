@@ -32,7 +32,7 @@ state both {
     --
     state right
 }
-state "sub: child.scxml" as sub
+state "sub: child" as sub
 state outer {
     [*] --> inner: / greet
     state in <<entryPoint>>
