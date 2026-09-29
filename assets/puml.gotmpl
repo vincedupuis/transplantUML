@@ -25,7 +25,11 @@ a state where it first sees its name, so an arrow to a nested state that has
 not been declared yet would create a copy in the wrong place, and an arrow
 between states of a parallel region is only accepted inside that region.
 Arrows that cross the boundary of any region but the first are refused by
-PlantUML altogether; they raise a warning instead.
+PlantUML altogether.
+
+What PlantUML cannot draw as the model means it raises a warning and is said
+in a note instead: on the state concerned, or on the parallel state for what
+belongs to one of its anonymous regions.
 */ -}}
 @startuml
 {{- with .Name }}
@@ -49,7 +53,7 @@ title {{ . }}
 
 {{- define "state" -}}{{- /* . = *State */ -}}
 {{- if .IsTerminate -}}
-{{- warn "state %q: PlantUML has no terminate symbol; drawn as a final state" .Name -}}
+{{- warn "state %q: PlantUML has no terminate symbol; drawn as a final state, which its note calls a terminate" .Name -}}
 {{- end -}}
 {{- if .IsParallel }}
 state {{ template "decl" . }} {
@@ -72,7 +76,7 @@ state {{ template "decl" . }}
 {{- if and .Stereotype (not .IsPseudo) }}{{ $label = printf "«%s»\\n%s" .Stereotype $label }}{{ end -}}
 {{- if ne $label $id }}"{{ $label }}" as {{ end }}{{ $id }}
 {{- if .IsPseudo }} <<{{ template "stereotype" .Kind }}>>
-{{- with .Stereotype }}{{ warn "state %q: PlantUML allows one stereotype per state; «%s» is not drawn" $.Name . }}{{ end -}}
+{{- with .Stereotype }}{{ warn "state %q: PlantUML allows one stereotype per state; «%s» goes into its note" $.Name . }}{{ end -}}
 {{- else }}{{ with .Stereotype }} <<{{ . }}>>{{ end }}{{ end -}}
 {{- end -}}
 
@@ -96,7 +100,7 @@ state {{ template "decl" . }}
 {{- end -}}
 {{- if include "isRegion" $region.Name -}}
 {{- if or $region.OnEntry $region.OnExit $region.Do $region.Defer $region.Invariant $region.Variables $region.Stereotype $region.Note $region.Submachine -}}
-{{- warn "region %q: PlantUML regions are anonymous; its behaviours, stereotype and note are not drawn" $region.Name -}}
+{{- warn "region %q: PlantUML regions are anonymous; its behaviours, stereotype and note join the note on %q" $region.Name $region.Parent -}}
 {{- end -}}
 {{- template "scope" $region.Name -}}
 {{- else -}}
@@ -117,12 +121,14 @@ state {{ template "decl" . }}
 {{- if or .IsFinal .IsTerminate -}}
 {{- /* PlantUML ignores description lines on an <<end>> state; the note carries them instead */ -}}
 {{- $lines := list -}}
+{{- if .IsTerminate }}{{ $lines = append $lines "terminate, drawn as a final state" }}{{ end -}}
+{{- with .Stereotype }}{{ $lines = append $lines (printf "«%s»" .) }}{{ end -}}
 {{- range .OnEntry }}{{ $lines = append $lines (printf "entry / %s" .) }}{{ end -}}
 {{- range .OnExit }}{{ $lines = append $lines (printf "exit / %s" .) }}{{ end -}}
 {{- with include "stateNote" . }}{{ $lines = append $lines . }}{{ end -}}
 {{- template "note" (dict "id" $id "text" (join "\n" $lines)) -}}
 {{- else if .IsPseudo -}}
-{{- template "note" (dict "id" $id "text" .Note) -}}
+{{- template "note" (dict "id" $id "text" (joinNonEmpty "\n" (surround "«" .Stereotype "»") (include "stateNote" .))) -}}
 {{- else -}}
 {{- range .OnEntry }}
 {{ $id }} : entry / {{ template "text" . }}
@@ -154,7 +160,64 @@ state {{ template "decl" . }}
 {{- with .ExitNote }}{{ $lines = append $lines (printf "exit: %s" .) }}{{ end -}}
 {{- range $event, $note := .DeferNotes }}{{ $lines = append $lines (printf "%s / defer: %s" $event $note) }}{{ end -}}
 {{- with .InvariantNote }}{{ $lines = append $lines (printf "invariant: %s" .) }}{{ end -}}
+{{- with include "undrawn" . }}{{ $lines = append $lines . }}{{ end -}}
+{{- if .IsParallel -}}
+{{- range Children .Name -}}
+{{- if include "isRegion" .Name -}}
+{{- $region := .Name -}}
+{{- range splitList "\n" (include "regionLines" .) }}{{ if . }}{{ $lines = append $lines (printf "region %s: %s" $region .) }}{{ end }}{{ end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
 {{- join "\n" $lines -}}
+{{- end -}}
+
+{{- define "undrawn" -}}{{- /* . = *State that is not a region: its transitions PlantUML cannot draw, one line each */ -}}
+{{- $lines := list -}}
+{{- range $t := OutgoingTransitions .Name -}}
+{{- if or $t.IsInternal (not $t.Targets) -}}
+{{- with $t.Note }}{{ $lines = append $lines (printf "%s: %s" (default "internal transition" $t.Trigger) .) }}{{ end -}}
+{{- else -}}
+{{- range $target := $t.Targets -}}
+{{- if include "unreachable" (dict "t" $t "target" $target) -}}
+{{- $lines = append $lines (printf "not drawn: --> %s%s" $target (prefix ": " (include "plainLabel" $t))) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- join "\n" $lines -}}
+{{- end -}}
+
+{{- define "regionLines" -}}{{- /* . = *State, a compound region: what its anonymous body cannot show, one line each */ -}}
+{{- $lines := list -}}
+{{- with .Stereotype }}{{ $lines = append $lines (printf "«%s»" .) }}{{ end -}}
+{{- with .Submachine }}{{ $lines = append $lines (printf "submachine %s" .) }}{{ end -}}
+{{- range .OnEntry }}{{ $lines = append $lines (printf "entry / %s" .) }}{{ end -}}
+{{- range .Do }}{{ $lines = append $lines (printf "do / %s" .) }}{{ end -}}
+{{- range .OnExit }}{{ $lines = append $lines (printf "exit / %s" .) }}{{ end -}}
+{{- range .Defer }}{{ $lines = append $lines (printf "%s / defer" .) }}{{ end -}}
+{{- with .Invariant }}{{ $lines = append $lines (printf "[ %s ]" .) }}{{ end -}}
+{{- range .Variables }}{{ $lines = append $lines (printf "%s%s" .Name (prefix " = " .Value)) }}{{ end -}}
+{{- with .Note }}{{ $lines = append $lines (replace "\n" " " .) }}{{ end -}}
+{{- range $t := OutgoingTransitions .Name -}}
+{{- if or $t.IsInternal (not $t.Targets) -}}
+{{- $lines = append $lines (include "plainLabel" $t) -}}
+{{- else -}}
+{{- range $t.Targets }}{{ $lines = append $lines (printf "--> %s%s" . (prefix ": " (include "plainLabel" $t))) }}{{ end -}}
+{{- end -}}
+{{- end -}}
+{{- join "\n" $lines -}}
+{{- end -}}
+
+{{- define "unreachable" -}}{{- /* . = dict "t" *Transition "target" name: why PlantUML cannot draw the arrow, or "" */ -}}
+{{- $scope := ScopeOf .t -}}
+{{- if include "isRegion" .target }}region
+{{- else if or (include "confined" (dict "state" .t.Source "scope" $scope)) (include "confined" (dict "state" .target "scope" $scope)) }}confined
+{{- end -}}
+{{- end -}}
+
+{{- define "plainLabel" -}}{{- /* . = *Transition: "trigger [cond] / actions" on one line, for a note */ -}}
+{{- joinNonEmpty " " .Trigger (surround "[" .Cond "]") (prefix "/ " (join ", " .Actions)) -}}
 {{- end -}}
 
 {{- define "note" -}}{{- /* . = dict "id" state alias "text" note text (nothing drawn when empty) */ -}}
@@ -199,19 +262,20 @@ endlegend
 {{- $t := . -}}
 {{- $scope := ScopeOf . -}}
 {{- if include "isRegion" .Source -}}
-{{- warn "region %q: PlantUML regions are anonymous; its transition (%s) is not drawn" .Source (include "labelText" $t) -}}
+{{- warn "region %q: PlantUML regions are anonymous; its transition (%s) is not drawn, and a note on %q says it" .Source (include "labelText" $t) (State .Source).Parent -}}
 {{- else if or .IsInternal (not .Targets) }}
 {{ template "id" .Source }} : {{ template "labelText" . }}
-{{- with .Note -}}{{- warn "transition %s (%s): PlantUML cannot attach a note to an internal transition" $t.Source $t.Trigger -}}{{- end -}}
+{{- with .Note -}}{{- warn "transition %s (%s): PlantUML cannot attach a note to an internal transition; it joins the note on %q" $t.Source $t.Trigger $t.Source -}}{{- end -}}
 {{- else -}}
-{{- if .IsLocal -}}{{- warn "transition %s -> %s: PlantUML has no local transitions; drawn as an external one" .Source (join " " .Targets) -}}{{- end -}}
+{{- if .IsLocal -}}{{- warn "transition %s -> %s: PlantUML has no local transitions; drawn as an external one marked «local»" .Source (join " " .Targets) -}}{{- end -}}
 {{- range $i, $target := .Targets -}}
-{{- if include "isRegion" $target -}}
-{{- warn "region %q: PlantUML regions are anonymous; the transition %s -> %s into it is not drawn" $target $t.Source $target -}}
-{{- else if or (include "confined" (dict "state" $t.Source "scope" $scope)) (include "confined" (dict "state" $target "scope" $scope)) -}}
-{{- warn "transition %s -> %s: PlantUML cannot draw arrows across the boundary of a parallel region other than the first" $t.Source $target -}}
+{{- $why := include "unreachable" (dict "t" $t "target" $target) -}}
+{{- if eq $why "region" -}}
+{{- warn "region %q: PlantUML regions are anonymous; the transition %s -> %s into it is not drawn, and a note on %q says it" $target $t.Source $target $t.Source -}}
+{{- else if $why -}}
+{{- warn "transition %s -> %s: PlantUML cannot draw arrows across the boundary of a parallel region other than the first; a note on %q says it" $t.Source $target $t.Source -}}
 {{- else }}
-{{ template "id" $t.Source }} --> {{ template "id" $target }}{{ with include "labelText" $t }}: {{ . }}{{ end }}
+{{ template "id" $t.Source }} --> {{ template "id" $target }}{{ with joinNonEmpty "\\n" (include "labelText" $t) (ternary "«local»" "" $t.IsLocal) }}: {{ . }}{{ end }}
 {{- if and (not $i) $t.Note -}}{{- template "linkNote" $t.Note -}}{{- end -}}
 {{- end -}}
 {{- end -}}

@@ -37,6 +37,7 @@ state "«secure»\ncheckout" as checkout <<secure>> {
     paying --> cancelled: abort
 }
 state split <<fork>>
+note right of split : not drawn: --> invoicing: / notify
 state shipping {
     [*] --> packing
     state packing
@@ -46,6 +47,7 @@ state shipping {
     [*] --> invoicing
     state invoicing
     state sent
+    note right of sent : not drawn: --> merge: [paidInFull]
     invoicing --> sent: sent
 }
 state merge <<join>>
@@ -54,7 +56,10 @@ state "aftersales: support" as aftersales
 state refunded <<end>>
 note right of refunded : Money returned.
 state terminate <<end>>
-note right of terminate : Fraud closes the shop.
+note right of terminate
+    terminate, drawn as a final state
+    Fraud closes the shop.
+end note
 state final <<end>>
 reorder --> checkout: / loadBasket
 browsing --> checkout: buy

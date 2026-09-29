@@ -1,0 +1,55 @@
+# example/kiosk.fsm without what Boost.SML cannot run: the do activity, the
+# local transition, the history's default transition with an effect, and
+# the transitions into or out of a nested state from another table. The
+# history makes every entry to ordering resume it, so each goes through H.
+
+| A self-service kiosk:
+  browse, pay, take the receipt. |
+fsm kiosk {
+  initial / boot goto idle
+  state idle {
+    entry / dim
+    on touch / wake goto ordering.H
+  }
+
+  state ordering {
+    entry / newBasket
+    exit / clearBasket, unlock
+    on abandon goto idle
+    | Nobody touched the screen. |
+    after(90s) goto idle
+
+    initial state browsing {
+      on add [inStock and (card or cash)] / addLine
+      on remove / dropLine goto browsing
+      on checkout [basket] goto paying
+    }
+
+    | The basket is locked from here on. |
+    state paying {
+      entry / lockBasket
+      invariant [basket and not (card and cash)]
+      on declined [not retries] goto browsing
+      goto final
+
+      initial state authorizing {
+        | Until the bank answers. |
+        on touch / defer
+        on approved / receipt goto final
+        after(authTimeout) [retries] / warn goto again
+      }
+
+      state again {
+        on card goto authorizing
+      }
+    }
+
+    on resume goto H
+    goto done
+  }
+
+  state done {
+    entry / print
+    on ack goto final
+  }
+}

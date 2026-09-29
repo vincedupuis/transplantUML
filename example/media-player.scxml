@@ -4,8 +4,9 @@
   invariants, and the three transition kinds.
 
   Entry and exit points are transient states inside the compound state,
-  marked tpuml:kind. "again" is a local transition (stays inside "playback",
-  no exit/entry of the compound); "volume" is internal (no state change).
+  marked tpuml:kind. "next" is a local transition, SCXML's type="internal"
+  with a target inside the source (stays inside "playback", no exit/entry of
+  the compound); "volume" is internal, without a target (no state change).
 -->
 <scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:tpuml="https://github.com/vincedupuis/transplantUML"
        version="1.0" name="media-player" initial="stopped">
@@ -46,9 +47,6 @@ queued and handled once playback starts.</tpuml:note>
 
     <state id="playing">
       <transition event="pause" target="paused"/>
-      <transition event="next" target="playing" tpuml:kind="local">
-        <script>nextTrack</script>
-      </transition>
     </state>
 
     <state id="paused">
@@ -56,6 +54,9 @@ queued and handled once playback starts.</tpuml:note>
       <transition event="stop" target="eject"/>
     </state>
 
+    <transition event="next" target="playing" type="internal">
+      <script>nextTrack</script>
+    </transition>
     <transition event="volume" type="internal">
       <script>setVolume</script>
     </transition>

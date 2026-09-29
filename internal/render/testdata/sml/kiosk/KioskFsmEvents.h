@@ -9,13 +9,11 @@ public:
     virtual void touch() = 0;
     virtual void abandon() = 0;
     virtual void resume() = 0;
-    virtual void back() = 0;
     virtual void add() = 0;
     virtual void remove() = 0;
     virtual void checkout() = 0;
-    virtual void approved() = 0;
     virtual void declined() = 0;
-    virtual void cancel() = 0;
+    virtual void approved() = 0;
     virtual void card() = 0;
     virtual void ack() = 0;
 };

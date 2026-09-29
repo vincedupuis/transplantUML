@@ -5,9 +5,11 @@ of a UML state machine, then writes that model back out: with a built-in emitter
 formats (SCXML, JSON), or through a Go template — so you can produce PlantUML, source code, documentation, or any
 other text.
 
-The idea is to keep **one** source document and generate every other representation from it. Each output writes
-what it can and **warns** about what it cannot: an SCXML engine has no deferred events, PlantUML has no terminate
-symbol, and so on. Warnings go to stderr and never fail the conversion.
+The idea is to keep **one** source document and generate every other representation from it.
+Each output writes what it can.
+Where a format has no counterpart for a concept but a workaround behaves the same, the output **warns**: PlantUML has no terminate symbol, so it draws a final state and a note.
+Where the output would behave differently, the conversion **fails**: an SCXML engine has no deferred events, so it would handle them at once.
+Warnings go to stderr and never fail the conversion.
 
 ## Features
 
@@ -19,43 +21,48 @@ symbol, and so on. Warnings go to stderr and never fail the conversion.
   library, with two built-in templates: PlantUML, and C++ for [Boost.SML](https://github.com/boost-ext/sml).
 - **Formats**: `scxml` and `json` are each accepted as input (`-f`) and produced as output (`-F`); `fsm`,
   the command's own compact language, is input only.
-- **Nothing dropped silently**: the parser warns about input it has no place for, and each output warns about
-  model features it can only approximate.
+- **Nothing dropped silently**: input the model has no place for is an error, and so is a model feature an output
+  cannot run; an output that runs one through a workaround warns.
 - **Validation**: dangling targets, unknown parents, duplicate ids, and similar mistakes are reported before anything
   is rendered.
 
 ## UML coverage
 
-| UML concept                            | Model                                                 | SCXML                                                   | PlantUML (built-in template)                        | Boost.SML (`-t sml`)                      |
-|----------------------------------------|-------------------------------------------------------|---------------------------------------------------------|-----------------------------------------------------|-------------------------------------------|
-| Simple, compound state                 | `normal`                                              | `<state>`                                               | `state X`, `state X { }`                            | `"X"_s`, a struct per compound state      |
-| Orthogonal state, regions              | `parallel`, children are the regions                  | `<parallel>`                                            | regions separated by `--`                           | one table, a `*` initial state per region |
-| Submachine state                       | `Submachine`                                          | `<invoke src>`                                          | `state "X: ref" as X`                               | runs that machine's generated class       |
-| Initial                                | `Initial` on the machine / the state                  | `initial` attr, `<initial>`                             | `[*] -->`                                           | `*` on the initial state                  |
-| Effect of the initial transition       | `InitialActions` on the machine / the state           | `<initial><transition>` content (on a state only ⚠)     | `[*] --> X : / act`                                 | on `enterFsm`; transient in a state       |
-| Final                                  | `final`                                               | `<final>`                                               | `state X <<end>>`                                   | `sml::X`                                  |
-| Terminate                              | `terminate`                                           | `<final>` ⚠                                             | `state X <<end>>` ⚠                                 | ends the machine, `onTerminated`          |
-| Shallow / deep history                 | `history-shallow`, `history-deep`                     | `<history>`                                             | `<<history>>`, `<<history*>>`                       | `(sml::H)` on the initial state; deep ⚠   |
-| Choice                                 | `choice`                                              | transient state with guarded eventless transitions      | `<<choice>>`                                        | state with guarded anonymous transitions  |
-| Junction                               | `junction`                                            | transient state, `tpuml:kind="junction"`                | filled circle (`<<start>>`)                         | state with guarded anonymous transitions  |
-| Fork                                   | `fork`                                                | transient state with one multi-target transition        | `<<fork>>`                                          | enters the orthogonal state ⚠             |
-| Join                                   | `join`                                                | transient state, `tpuml:kind="join"` ⚠                  | `<<join>>`                                          | regions end in `X`, then a completion ⚠   |
-| Entry / exit point                     | `entry-point`, `exit-point`                           | transient state inside the compound, `tpuml:kind`       | `<<entryPoint>>`, `<<exitPoint>>`                   | the machine's: `Entry`, listener; else ⚠  |
-| Connection point reference             | entry / exit point whose parent is a submachine state | left out ⚠                                              | `<<entryPoint>>`, `<<exitPoint>>` on its border     | that machine's `Entry` and listener       |
-| Entry / exit behaviour                 | `OnEntry`, `OnExit`                                   | `<onentry>`, `<onexit>`                                 | `X : entry / …`, `X : exit / …`                     | `+ sml::on_entry<sml::_> / …`             |
-| Do activity                            | `Do`                                                  | `<invoke type="tpuml:do" src>`                          | `X : do / …`                                        | comment ⚠                                 |
-| Deferred events                        | `Defer`                                               | `tpuml:defer` ⚠                                         | `X : ev / defer`                                    | `/ sml::defer`, with `defer_queue`        |
-| State invariant                        | `Invariant`                                           | `tpuml:invariant`                                       | `X : [ cond ]`                                      | comment                                   |
-| Variables                              | `Variables` on the machine / the state                | `<datamodel>`                                           | `legend` / `X : name = value`                       | comment; the actions hold them            |
-| Trigger, guard, effect                 | `Event`, `Cond`, `Actions`                            | `event`, `cond`, `<script>` holding a name              | `A --> B : ev [ g ] / act`                          | event method, guard and action methods    |
-| Time trigger `after(5s)`               | `After`                                               | `<send delay(expr)>` in `<onentry>`, `<cancel>` on exit | `after(5s)`                                         | a timer through `FsmTimers`               |
-| Completion transition                  | no `Event`, no `After`                                | eventless, or on `done.state` / `done.invoke`           | unlabelled arrow                                    | anonymous transition                      |
-| External / local / internal transition | `Kind`                                                | `type="internal"`; `tpuml:kind="local"` ⚠               | `X : ev / act` for internal; local drawn external ⚠ | no target for internal; local ⚠           |
-| Note                                   | `Note` on the machine, a state, a transition          | `<tpuml:note>`                                          | `note`, `note on link`                              | `//` comment                              |
-| Note on behaviour/invariant/deferral   | `EntryNote`, `DoNote`, …, `DeferNotes`                | `<tpuml:note about>` on the state                       | lines of the state's `note`                         | `//` comment before its row               |
-| Stereotype                             | `Stereotype`                                          | `tpuml:stereotype`                                      | `state "«s»\nX" as X <<s>>`                         | `// «s»` comment                          |
+| UML concept                            | Model                                                 | SCXML                                                                | PlantUML (built-in template)                        | Boost.SML (`-t sml`)                          |
+|----------------------------------------|-------------------------------------------------------|----------------------------------------------------------------------|-----------------------------------------------------|-----------------------------------------------|
+| Simple, compound state                 | `normal`                                              | `<state>`                                                            | `state X`, `state X { }`                            | `"X"_s`, a struct per compound state          |
+| Orthogonal state, regions              | `parallel`, children are the regions                  | `<parallel>`                                                         | regions separated by `--`                           | one table, a `*` initial state per region     |
+| Submachine state                       | `Submachine`                                          | `<invoke src>`                                                       | `state "X: ref" as X`                               | runs that machine's generated class           |
+| Initial                                | `Initial` on the machine / the state                  | `initial` attr, `<initial>`                                          | `[*] -->`                                           | `*` on the initial state                      |
+| Effect of the initial transition       | `InitialActions` on the machine / the state           | `<initial><transition>` content; the machine's ✗                     | `[*] --> X : / act`                                 | on `enterFsm`; transient in a state           |
+| Final                                  | `final`                                               | `<final>`                                                            | `state X <<end>>`                                   | `sml::X`                                      |
+| Terminate                              | `terminate`                                           | `<final>` at the top level ⚠; else ✗                                 | `state X <<end>>` ⚠                                 | ends the machine, `onTerminated`              |
+| Shallow / deep history                 | `history-shallow`, `history-deep`                     | `<history>`                                                          | `<<history>>`, `<<history*>>`                       | `(sml::H)` on the initial state; ⚠ or ✗       |
+| Choice                                 | `choice`                                              | transient state with guarded eventless transitions                   | `<<choice>>`                                        | state with guarded anonymous transitions      |
+| Junction                               | `junction`                                            | transient state, `tpuml:kind="junction"`                             | filled circle (`<<start>>`)                         | state with guarded anonymous transitions      |
+| Fork                                   | `fork`                                                | transient state with one multi-target transition                     | `<<fork>>`                                          | enters the orthogonal state ⚠ or ✗            |
+| Join                                   | `join`                                                | ✗                                                                    | `<<join>>`                                          | regions end in `X`, then a completion ⚠ or ✗  |
+| Entry / exit point                     | `entry-point`, `exit-point`                           | transient state inside the compound, `tpuml:kind`                    | `<<entryPoint>>`, `<<exitPoint>>`                   | the machine's: `Entry`, listener; else ⚠ or ✗ |
+| Connection point reference             | entry / exit point whose parent is a submachine state | ✗                                                                    | `<<entryPoint>>`, `<<exitPoint>>` on its border     | that machine's `Entry` and listener           |
+| Entry / exit behaviour                 | `OnEntry`, `OnExit`                                   | `<onentry>`, `<onexit>`                                              | `X : entry / …`, `X : exit / …`                     | `+ sml::on_entry<sml::_> / …`                 |
+| Do activity                            | `Do`                                                  | `<invoke type="tpuml:do" src>`                                       | `X : do / …`                                        | ✗                                             |
+| Deferred events                        | `Defer`                                               | ✗                                                                    | `X : ev / defer`                                    | `/ sml::defer`, with `defer_queue`            |
+| State invariant                        | `Invariant`                                           | `tpuml:invariant`                                                    | `X : [ cond ]`                                      | comment                                       |
+| Variables                              | `Variables` on the machine / the state                | `<datamodel>`                                                        | `legend` / `X : name = value`                       | comment; the actions hold them                |
+| Trigger, guard, effect                 | `Event`, `Cond`, `Actions`                            | `event`, `cond`, `<script>` holding a name                           | `A --> B : ev [ g ] / act`                          | event method, guard and action methods        |
+| Time trigger `after(5s)`               | `After`                                               | `<send delay(expr)>` in `<onentry>`, `<cancel>` on exit              | `after(5s)`                                         | a timer through `FsmTimers`                   |
+| Completion transition                  | no `Event`, no `After`                                | eventless, or on `done.state` / `done.invoke`; after a do activity ✗ | unlabelled arrow                                    | anonymous transition                          |
+| External / local / internal transition | `Kind`                                                | `type="internal"`, with a target for local                           | `X : ev / act` for internal; local drawn external ⚠ | no target for internal; local ✗               |
+| Note                                   | `Note` on the machine, a state, a transition          | `<tpuml:note>`                                                       | `note`, `note on link`                              | `//` comment                                  |
+| Note on behaviour/invariant/deferral   | `EntryNote`, `DoNote`, …, `DeferNotes`                | `<tpuml:note about>` on the state                                    | lines of the state's `note`                         | `//` comment before its row                   |
+| Stereotype                             | `Stereotype`                                          | `tpuml:stereotype`                                                   | `state "«s»\nX" as X <<s>>`                         | `// «s»` comment                              |
 
-⚠ = written as an approximation, with a warning. Not modelled: signal vs. call events, change events (`when(…)` —
+⚠ = written through a workaround that behaves the same, with a warning.
+In PlantUML, ⚠ means drawn differently, with a warning and a note in the diagram saying what is meant.
+✗ = an error: the output would not behave as the model does, so nothing is written.
+Boost.SML resumes a history whenever it enters the state, so entering such a state other than through its history is an error.
+A deep history in Boost.SML is an error when the state holds nested states.
+Not modelled: signal vs. call events, change events (`when(…)` —
 use a guard on a completion transition), protocol state machines.
 
 ### Guards and actions are names
@@ -134,7 +141,14 @@ Warnings are printed to stderr as `fsm: warning: …`, one per line, and do not 
 
 ```
 $ fsm -i machine.scxml -F scxml > out.scxml
-tpuml: warning: state "work": SCXML has no deferred events; written as tpuml:defer, which engines ignore
+fsm: warning: state "stop": SCXML has no terminate; written as a <final> state at the top level, which ends the machine
+```
+
+What the output cannot run is an error, reported after the warnings, and nothing is written:
+
+```
+$ fsm -i machine.scxml -F scxml > out.scxml
+fsm: state "work": SCXML has no deferred events
 ```
 
 ### Examples
@@ -144,7 +158,7 @@ tpuml: warning: state "work": SCXML has no deferred events; written as tpuml:def
 fsm -i example/coffee-machine.scxml -o coffee.puml
 
 # fsm -> C++ state machine on Boost.SML, five files in gen/
-fsm -i example/kiosk.fsm -t sml -o gen/
+fsm -i example/support.fsm -t sml -o gen/
 
 # SCXML -> your own template
 fsm -i example/coffee-machine.scxml -t my-template.gotmpl -o coffee.md
@@ -281,15 +295,20 @@ Templates use Go's [`text/template`](https://pkg.go.dev/text/template) syntax. A
 | `Initials table`             | the states a table starts in, each with its `.State` and `.Scope`        |
 | `ForkTarget fork`            | the state a fork's transitions enter together                            |
 | `JoinOwner join`             | the parallel state a join's sources lie in, or `""`                      |
+| `DefaultEntry outer inner`   | whether entering `outer` without naming a substate reaches `inner`       |
+| `AlwaysActive inner outer`   | whether `inner` is active whenever `outer` is                            |
 | `Lift transition`            | where a transition is written in the tables, or nil (see below)          |
 | `include "name" data`        | like `template`, but returns a string so it can be piped (`\| indent 4`) |
 | `prefix p s`                 | `p + s`, or `""` if `s` is empty                                         |
 | `surround p s q`             | `p + s + q`, or `""` if `s` is empty                                     |
 | `joinNonEmpty sep s...`      | joins the strings, skipping empty ones                                   |
 | `warn format args...`        | records a warning for the user (printf-style) and returns `""`           |
+| `error format args...`       | records an error (printf-style) and returns `""`; the rendering fails    |
 | `file name`                  | starts a file: the output up to the next `file` goes into `name`         |
 
-Call `warn` wherever the template leaves something out, so the user learns what the output does not show.
+Call `error` wherever the output would not behave as the model does, and `warn` wherever it gets the same
+behaviour through a workaround because the format has no exact counterpart.
+The rendering fails with every error the template recorded, after the warnings.
 
 The table functions serve templates that write one transition table per composite state, as Boost.SML does.
 A parallel state's regions are flattened into its own table.
@@ -314,17 +333,19 @@ It draws everything in the coverage table above. Things to know:
   `<<end>>`, history states `<<history>>` / `<<history*>>`, and `[*]` only marks the initial state. Names PlantUML
   would misread (a dot nests, a dash breaks an arrow) get an alias: `state "a.b" as a_b`.
 - A user stereotype is kept as `<<stereotype>>`, which PlantUML uses for skinparams but does not print, and shown
-  as `«stereotype»` above the name. Pseudo-states already carry their kind as stereotype, so theirs warns.
+  as `«stereotype»` above the name. Pseudo-states already carry their kind as stereotype, so theirs warns and goes
+  into their note.
 - Each scope (top level, compound state, region) declares its states before its transitions, and a transition is
   drawn in the innermost scope containing both its ends. PlantUML needs this: an arrow to a nested state that has
   not been declared yet would create a copy at the wrong level.
 - PlantUML refuses arrows across the boundary of any parallel region but the first; such transitions are skipped
-  with a warning. Regions are anonymous in PlantUML, so a compound region's own transitions, behaviours and note
-  cannot be drawn either.
+  with a warning, and the note on their source lists them. Regions are anonymous in PlantUML, so a compound
+  region's own transitions, behaviours and note are listed in the note on its parallel state instead.
 - A junction is drawn as a filled circle using `<<start>>`, since PlantUML has no junction stereotype. Terminate has
-  no symbol either and is drawn as a final state. PlantUML ignores description lines on a final state, so its entry
+  no symbol either and is drawn as a final state, whose note says it is a terminate. PlantUML ignores description lines on a final state, so its entry
   and exit behaviours are written into its note.
-- Local transitions are drawn as external ones, and a note on an internal transition is not drawn. Both warn.
+- Local transitions are drawn as external ones marked `«local»`, and a note on an internal transition joins the
+  note on its state. Both warn.
 - The machine name becomes the diagram `title`; real line breaks in guards and variable values become `\n`.
 
 ### The built-in Boost.SML template
@@ -333,7 +354,7 @@ It draws everything in the coverage table above. Things to know:
 It writes four files named after the machine, and `FsmTimers.h`, into the folder `-o` names:
 
 ```bash
-fsm -i example/kiosk.fsm -t sml -o gen/
+fsm -i internal/render/testdata/sml/kiosk.fsm -t sml -o gen/
 ```
 
 | File                | Holds                                                                        |
@@ -346,7 +367,8 @@ fsm -i example/kiosk.fsm -t sml -o gen/
 |                     | and `class KioskFsmListener`, the interface it tells when it ends            |
 | `KioskFsm.cpp`      | its implementation, the only file that includes SML                          |
 
-[`internal/render/testdata/sml/kiosk`](internal/render/testdata/sml/kiosk) holds what it makes of `example/kiosk.fsm`.
+That document is `example/kiosk.fsm` without what Boost.SML cannot run, and
+[`internal/render/testdata/sml/kiosk`](internal/render/testdata/sml/kiosk) holds what the template makes of it.
 The application implements the actions and sends the events:
 
 ```cpp
@@ -371,8 +393,8 @@ The machine waits, ignoring every event, until `enterFsm()` starts it in its ini
 Either one starts the machine again from the beginning if it is already running.
 `stopFsm()` leaves the current state, running the exit behaviours of the active states, and makes it wait again.
 `terminateFsm()` makes it wait again at once, running no exit behaviour, as a terminate state does.
-These names keep them apart from the events' methods; an event named like one of them warns, since the files would
-not compile.
+These names keep them apart from the events' methods; an event named like one of them is an error, since the files
+would not compile.
 
 `setListener` takes a `KioskFsmListener`, which the machine tells when it ends.
 `onFinished()` is called when it reaches its final state.
@@ -454,15 +476,19 @@ Things to know:
   SML takes an anonymous transition leaving a composite state once the composite state reaches `X`, which is UML's
   completion.
 - SML has no transitions into or out of a composite state's inside.
-  A transition with a trigger that leaves from inside is written for the composite state, so it fires in any of its
-  states.
   A completion transition that leaves from inside goes to `X` instead, and the composite state's own completion
-  transition takes it on.
-  A transition into the inside enters the composite state at its initial state.
-  Each of these warns.
+  transition takes it on, with a warning.
+  A transition that leaves a region is written for its orthogonal state, which is active exactly when the region is,
+  with a warning.
+  A transition into the inside enters the composite state, with a warning when that reaches the target through
+  initial states, and an error otherwise.
+  Any other transition leaving from inside is an error, since the composite state's would fire in all its states.
 - A choice or a junction is a state that anonymous transitions leave at once, tried in order, `else` last.
 - SML's history marks a region's initial state, `"browsing"_s(sml::H)`, so every entry into that region resumes it.
-  A default transition that leads elsewhere, or that has an effect, is not written and warns.
+  A transition that enters the state other than through its history is therefore an error.
+  So is a default transition that leads elsewhere than the initial state, or that has an effect.
+  A deep history is written as a shallow one, with a warning, when the state holds no nested states, and is an
+  error otherwise.
 - The machine waits in `sml::state<internal::stopped>`, which `enterFsm` leaves with the effect of the initial
   transition, `/ boot = "idle"_s`.
   Inside a state, an effect on the initial transition goes through a transient state,
@@ -472,11 +498,17 @@ Things to know:
   timer (see [Time triggers](#time-triggers)).
 - A join ends each region that reaches it in `X`.
   Its outgoing transition becomes the orthogonal state's completion transition, taken once every region has ended.
+  It warns, and it is an error when its incoming transitions do not all leave the regions of one orthogonal state.
+- A fork enters its orthogonal state, with a warning, when the regions start in the states it leads to and it has
+  no effect; otherwise it is an error.
 - Notes, stereotypes and invariants become `//` comments in `KioskFsm.cpp`, the machine's note goes on the class,
   and its variables are listed on the actions interface, whose implementation holds them.
-  Do activities also become comments, with a warning.
+  SML has no do activities, so one is an error, as are a multi-target transition, a local transition, and a
+  region's own behaviours.
 - The machine's own entry points are the values of `Entry`, and its exit points are states that end it.
-  A state's entry and exit points, fork and local transitions warn as the coverage table shows.
+  A transition to its entry point, or from its exit point, is an error.
+  A state's entry point enters the state, with a warning, when that reaches the state it leads to through initial
+  states and it has no guard or effect; otherwise it is an error, as is a state's exit point.
 - A terminate state is `sml::state<internal::terminated>`, which its region stays in.
   Entering it flags the machine, which ends once the current event is done.
   In an orthogonal state, the other regions may still act on that event first, so it warns there.
@@ -491,7 +523,8 @@ Things to know:
 An action is a `<script>` holding a name, `<script>addLine</script>`.
 Any other executable content (`<log>`, `<assign>`, `<raise>`, `<if>`, `<script src>`, …) is an error, as is a
 `<send>` or `<cancel>` that is not a time trigger.
-Elements with no place in the model (`<donedata>`, a top-level `<script>`, …) are dropped with a warning.
+SCXML elements with no place in the model (`<donedata>`, a top-level `<script>`, …) are an error.
+An element of another namespace, which SCXML engines ignore, is dropped with a warning.
 
 `<invoke>` is a **submachine state** when it invokes another SCXML machine (`type` absent or `scxml`), whose name is
 its `src`: `<invoke src="payment"/>`.
@@ -523,7 +556,7 @@ namespace `https://github.com/vincedupuis/transplantUML` (any prefix; `tpuml` be
 |------------------------------------------------------------------------------|--------------------------------------|-------------------------------------------|
 | `tpuml:kind="junction\|join\|entry-point\|exit-point\|choice\|fork\|normal"` | `<state>`                            | the pseudo-state kind (a transient state) |
 | `tpuml:kind="terminate"`                                                     | `<final>`                            | a terminate pseudo-state                  |
-| `tpuml:kind="local"`                                                         | `<transition>`                       | a local transition                        |
+| `tpuml:kind="local"`                                                         | `<transition>`                       | a local transition, as `type="internal"`  |
 | `tpuml:defer="e1 e2"`                                                        | `<state>`                            | deferred events                           |
 | `tpuml:invariant="expr"`                                                     | `<state>`                            | state invariant                           |
 | `tpuml:stereotype="name"`                                                    | `<state>`                            | stereotype                                |
@@ -536,22 +569,25 @@ See [`internal/scxml/testdata/uml.scxml`](internal/scxml/testdata/uml.scxml) for
 ### Writing SCXML (`-F scxml`)
 
 Everything the model holds is written, natively where SCXML has the element and through the extension vocabulary
-otherwise; the namespace is declared only when it is used. The document validates against the W3C schema. It is
+for what does not change how an engine runs the machine (kinds, notes, stereotypes, invariants); the namespace is declared only when it is used. The document validates against the W3C schema. It is
 equivalent, not byte-identical, to the one it came from:
 
 - the initial child is written as an `initial` attribute, or as an `<initial>` element when its transition has an
-  effect; `<scxml>` takes no `<initial>` element, so the machine's own initial effect is left out with a warning;
+  effect; `<scxml>` takes no `<initial>` element, so the machine's own initial effect is an error;
 - each action becomes a `<script>` holding its name, and each do activity `<invoke type="tpuml:do" src="name"/>`;
 - a time trigger becomes `<send event="after.D" delay="D" id="…">` in `<onentry>`, the matching `<cancel>` in
   `<onexit>`, and a transition on that event;
 - a completion transition waits for `done.state.S` on a compound or parallel state and `done.invoke.S.submachine`
   on a submachine state; elsewhere it stays eventless, which SCXML takes at once, so a simple state with a do
-  activity warns;
+  activity is an error;
+- a local transition is written as `type="internal"`, which SCXML runs as UML's local transition when the source is
+  compound and every target lies inside it; any other local transition is an error;
 - comments and anything the parser dropped are not preserved.
 
-Warnings name what SCXML can only approximate: join (the first region to reach it leaves the parallel state),
-terminate (a `<final>`, which runs exit actions), local transitions (written external), deferred events (ignored by
-engines), and a completion transition that cannot wait for a do activity.
+A terminate at the top level is written as a `<final>` state, which ends the machine the same way, with a warning.
+What SCXML would run differently is an error: join (the first region to reach it would leave the parallel state),
+a terminate inside a state or with exit actions, deferred events, a completion transition that cannot wait for a do
+activity, and the entry and exit points of a submachine state.
 
 ## The fsm language
 
@@ -723,14 +759,13 @@ submachine helpdesk : support {
 ```
 
 In the model, an entry or exit point whose parent is a submachine state is such a reference (`IsReference`).
-SCXML cannot enter or leave an invoked machine at a point, so the emitter leaves references out and warns.
-A transition to an entry point then enters the submachine state, and the transitions leaving an exit point are dropped.
+SCXML cannot enter or leave an invoked machine at a point, so a reference is an error for the SCXML emitter.
 
 A stereotype follows the declared name in UML's notation, as in `state checkout <<secure>> { … }` or
 `choice route <<audited>> { … }`.
 It sorts a state into a category of your own and changes nothing about how the machine behaves.
 Every declaration may carry one, and its name reaches `Stereotype` without the brackets.
-PlantUML draws none on a pseudostate or a region, and warns instead.
+PlantUML draws none on a pseudostate or a region, and warns instead, writing it in a note.
 
 A note is text between bars, written before the directive it describes:
 

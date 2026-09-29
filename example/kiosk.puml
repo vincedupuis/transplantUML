@@ -43,7 +43,7 @@ ordering --> idle: abandon
 ordering --> idle: after(90s)
 note on link : Nobody touched the screen.
 ordering --> ordering_H: resume
-ordering --> browsing: back
+ordering --> browsing: back\n«local»
 paying --> done: approved\n/ receipt
 done --> final: ack
 @enduml

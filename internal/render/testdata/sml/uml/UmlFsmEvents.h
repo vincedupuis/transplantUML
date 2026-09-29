@@ -15,6 +15,5 @@ public:
     virtual void r() = 0;
     virtual void back() = 0;
     virtual void leave() = 0;
-    virtual void again() = 0;
     virtual void note() = 0;
 };

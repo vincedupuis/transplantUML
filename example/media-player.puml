@@ -26,7 +26,6 @@ state playback {
     resume --> last
     last --> playing
     playing --> paused: pause
-    playing --> playing: next\n/ nextTrack
     paused --> playing: play
     paused --> eject: stop
 }
@@ -37,6 +36,7 @@ stopped --> resume: play
 stopped --> loading: open
 loading --> start: loaded
 loading --> stopped: failed
+playback --> playing: next\n/ nextTrack\n«local»
 playback : volume\n/ setVolume
 playback --> stopped: stop
 eject --> stopped

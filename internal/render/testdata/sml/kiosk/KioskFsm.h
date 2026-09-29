@@ -48,13 +48,11 @@ public:
     void touch() override;
     void abandon() override;
     void resume() override;
-    void back() override;
     void add() override;
     void remove() override;
     void checkout() override;
-    void approved() override;
     void declined() override;
-    void cancel() override;
+    void approved() override;
     void card() override;
     void ack() override;
 

@@ -46,7 +46,6 @@ public:
     void setListener(ShopFsmListener* listener);
 
     void buy() override;
-    void quickBuy() override;
     void fraud() override;
     void help() override;
     void emergency() override;
@@ -54,10 +53,8 @@ public:
     void approved() override;
     void cash() override;
     void card() override;
-    void abort() override;
     void packed() override;
     void sent() override;
-    void reopen() override;
     void back() override;
     void refund() override;
     void complain() override;

@@ -122,9 +122,6 @@ func TestUMLConcepts(t *testing.T) {
 	}
 	if want := []string{
 		`state "work": the type "http://example.com/worker" of the do activity "runJob" is not kept`,
-		`state "outer": a note about "initial" is not supported and was dropped`,
-		`state "outer": a note about a deferred event names no event and was dropped`,
-		`state "failed": <donedata> is not supported and was dropped`,
 	}; !reflect.DeepEqual([]string(warnings), want) {
 		t.Errorf("warnings = %q, want %q", warnings, want)
 	}
@@ -201,12 +198,14 @@ func TestUMLConcepts(t *testing.T) {
 		t.Errorf("submachine = %q", got)
 	}
 
+	// type="internal" is a local transition with a target nested in the
+	// source, and an internal one without a target.
 	inner := sm.OutgoingTransitions("inner")
-	if !inner[0].IsExternal() || !inner[1].IsLocal() || !inner[2].IsInternal() {
-		t.Errorf("transition kinds = %q %q %q", inner[0].Kind, inner[1].Kind, inner[2].Kind)
+	if again := sm.OutgoingTransitions("outer")[1]; !inner[0].IsExternal() || !again.IsLocal() || !inner[1].IsInternal() {
+		t.Errorf("transition kinds = %q %q %q", inner[0].Kind, again.Kind, inner[1].Kind)
 	}
-	if inner[2].Note != "Not drawn." {
-		t.Errorf("internal transition note = %q", inner[2].Note)
+	if inner[1].Note != "Not drawn." {
+		t.Errorf("internal transition note = %q", inner[1].Note)
 	}
 }
 
@@ -259,15 +258,54 @@ func TestExtensionPrefix(t *testing.T) {
 	}
 }
 
-func TestParserWarnings(t *testing.T) {
-	src := `<scxml xmlns="http://www.w3.org/2005/07/scxml"><script>x()</script><state id="s"><onentry/><foo/></state></scxml>`
+// An SCXML element the model has no place for would change what the machine
+// does, and so would a note the parser cannot place. An element of another
+// namespace, which engines ignore, is dropped with a warning.
+func TestParserUnsupported(t *testing.T) {
+	src := `<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:tpuml="https://github.com/vincedupuis/transplantUML" xmlns:qt="http://www.qt.io/2015/02/scxml-ext">
+	  <script>x</script>
+	  <state id="s"><onentry/><foo/><qt:editorinfo/>
+	    <tpuml:note about="initial">Not a thing a state lists.</tpuml:note>
+	    <tpuml:note about="defer">Names no event.</tpuml:note>
+	  </state>
+	  <final id="f"><donedata><content>failed</content></donedata></final>
+	</scxml>`
 	_, warnings, err := Parser{}.Parse([]byte(src))
+	want := []string{
+		`state "s": a note about "initial" is not supported; it is about entry, exit, do, invariant or defer`,
+		`state "s": a note about a deferred event names no event`,
+		`<foo> in state "s" is not supported`,
+		`<donedata> in state "f" is not supported`,
+		`<script> at the top level is not supported`,
+	}
+	if err == nil || !reflect.DeepEqual(strings.Split(err.Error(), "\n"), want) {
+		t.Errorf("errors =\n%v\nwant\n%s", err, strings.Join(want, "\n"))
+	}
+	wantWarnings := []string{`<qt:editorinfo> in state "s" belongs to "http://www.qt.io/2015/02/scxml-ext", which SCXML engines ignore; it was dropped`}
+	if !reflect.DeepEqual([]string(warnings), wantWarnings) {
+		t.Errorf("warnings = %q, want %q", warnings, wantWarnings)
+	}
+}
+
+// type="internal" with a target keeps the source active only when it is
+// compound and every target lies inside it; otherwise SCXML runs it as an
+// external transition.
+func TestTypeInternalWithTarget(t *testing.T) {
+	src := `<scxml xmlns="http://www.w3.org/2005/07/scxml" initial="c">
+	  <state id="c">
+	    <transition event="in" target="c1" type="internal"/>
+	    <transition event="self" target="c" type="internal"/>
+	    <state id="c1"><transition event="leaf" target="c1" type="internal"/></state>
+	  </state>
+	</scxml>`
+	sm, _, err := Parser{}.Parse([]byte(src))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{`state "s": <foo> is not supported and was dropped`, `<script> at the top level is not supported and was dropped`}
-	if !reflect.DeepEqual([]string(warnings), want) {
-		t.Errorf("warnings = %q, want %q", warnings, want)
+	for i, want := range []model.TransitionKind{model.Local, model.External, model.External} {
+		if got := sm.Transitions[i].Kind; got != want {
+			t.Errorf("%s: kind %q, want %q", sm.Transitions[i].Event, got, want)
+		}
 	}
 }
 

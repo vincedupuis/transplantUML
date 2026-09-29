@@ -3,6 +3,7 @@ title washing-machine
 [*] --> idle
 state idle
 state fill <<fork>>
+note right of fill : not drawn: --> spinning
 state running {
     [*] --> heating
     state heating
@@ -12,6 +13,7 @@ state running {
     --
     [*] --> spinning
     state spinning
+    note right of spinning : not drawn: --> drain: cycleDone
     spinning --> spinning: reverse
 }
 state drain <<join>>

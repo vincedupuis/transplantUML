@@ -44,14 +44,18 @@ func TestSCXMLValidatesAgainstW3CSchema(t *testing.T) {
 	if err != nil || len(examples) == 0 {
 		t.Fatalf("no examples found: %v", err)
 	}
-	for _, path := range append(examples, "testdata/edge.scxml", "testdata/uml.scxml") {
+	for _, path := range append(examples, "testdata/edge.scxml", "testdata/uml.scxml", "testdata/uml-scxml.scxml") {
 		t.Run(filepath.Base(path), func(t *testing.T) {
 			src, err := os.ReadFile(path)
 			if err != nil {
 				t.Fatal(err)
 			}
 			validateSCXML(t, "fixture "+path, src)
-			validateSCXML(t, "emitter output for "+path, emit(t, parseFile(t, path)))
+			// A document holding what SCXML cannot run has no output; see
+			// TestEmitBehaviourErrors.
+			if out, _, err := (Emitter{}).Emit(parseFile(t, path)); err == nil {
+				validateSCXML(t, "emitter output for "+path, out)
+			}
 		})
 	}
 

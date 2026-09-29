@@ -11,6 +11,8 @@ import (
 const (
 	example = "../../example/coffee-machine.scxml"
 	uml     = "../../internal/scxml/testdata/uml.scxml"
+	// umlSCXML is uml without what SCXML cannot run.
+	umlSCXML = "../../internal/scxml/testdata/uml-scxml.scxml"
 )
 
 func runCLI(t *testing.T, args ...string) (stdout, stderr string, err error) {
@@ -33,12 +35,12 @@ func TestDefaultTemplateToStdout(t *testing.T) {
 // Every built-in output format can be read back in: converting a document
 // through it must yield the same PlantUML as rendering the document directly.
 func TestRoundTripThroughFiles(t *testing.T) {
-	for _, input := range []string{example, uml} {
+	for input, formats := range map[string][]string{example: {"json", "scxml"}, uml: {"json"}, umlSCXML: {"scxml"}} {
 		fromSCXML, _, err := runCLI(t, "-i", input)
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, name := range []string{"json", "scxml"} {
+		for _, name := range formats {
 			t.Run(filepath.Base(input)+"/"+name, func(t *testing.T) {
 				dir := t.TempDir()
 				midPath := filepath.Join(dir, "m."+name)
@@ -63,7 +65,8 @@ func TestRoundTripThroughFiles(t *testing.T) {
 }
 
 // Warnings from the parser and from the output go to stderr, prefixed, and
-// never fail the conversion.
+// never fail the conversion. What the output cannot run fails it, after the
+// warnings.
 func TestWarningsOnStderr(t *testing.T) {
 	out, stderr, err := runCLI(t, "-i", uml)
 	if err != nil {
@@ -73,15 +76,21 @@ func TestWarningsOnStderr(t *testing.T) {
 		t.Errorf("unexpected output:\n%s", out)
 	}
 	for _, want := range []string{
-		"fsm: warning: state \"failed\": <donedata> is not supported and was dropped\n",
+		"fsm: warning: state \"work\": the type \"http://example.com/worker\" of the do activity \"runJob\" is not kept\n",
 		"fsm: warning: state \"stop\": PlantUML has no terminate symbol",
 	} {
 		if !strings.Contains(stderr, want) {
 			t.Errorf("stderr missing %q:\n%s", want, stderr)
 		}
 	}
-	if _, stderr, err := runCLI(t, "-i", uml, "-F", "scxml"); err != nil || !strings.Contains(stderr, "SCXML has no deferred events") {
+	if _, stderr, err := runCLI(t, "-i", umlSCXML, "-F", "scxml"); err != nil || !strings.Contains(stderr, "fsm: warning: state \"stop\": SCXML has no terminate") {
 		t.Errorf("emitter warnings not reported: %v\n%s", err, stderr)
+	}
+	if _, stderr, err := runCLI(t, "-i", uml, "-F", "scxml"); err == nil || !strings.Contains(err.Error(), "SCXML has no deferred events") || !strings.Contains(stderr, "SCXML has no terminate") {
+		t.Errorf("emitter errors not reported after its warnings: %v\n%s", err, stderr)
+	}
+	if out, stderr, err := runCLI(t, "-i", uml, "-t", "sml"); err == nil || !strings.Contains(err.Error(), "Boost.SML has no do activities") || out != "" || !strings.Contains(stderr, "fsm: warning:") {
+		t.Errorf("template errors not reported after its warnings: %v\n%s", err, stderr)
 	}
 	if _, stderr, err := runCLI(t, "-i", example); err != nil || stderr != "" {
 		t.Errorf("a plain document must not warn: %v\n%s", err, stderr)

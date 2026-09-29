@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/beevik/etree"
@@ -14,9 +15,10 @@ import (
 // Emitter writes the model out as SCXML. What SCXML expresses natively is
 // written natively (the connector pseudo-states as transient states, time
 // triggers as a delayed <send> cancelled on exit, submachines and do
-// activities as <invoke>); the rest is recorded in the tpuml extension
-// namespace and reported as a warning, since an SCXML engine will not honour
-// it. Each action, a name, is a <script> holding it, and each do activity an
+// activities as <invoke>, a local transition as type="internal"); what SCXML
+// runs differently is an error, and the notes, stereotypes, invariants and
+// kinds it has no element for are recorded in the tpuml extension namespace.
+// Each action, a name, is a <script> holding it, and each do activity an
 // <invoke> whose src is its name.
 type Emitter struct{}
 
@@ -34,6 +36,12 @@ func (Emitter) Emit(sm *model.StateMachine) ([]byte, model.Warnings, error) {
 	if err := e.leftovers(); err != nil {
 		return nil, nil, err
 	}
+	if len(sm.InitialActions) > 0 {
+		e.fail("the machine's initial transition: SCXML has no <initial> element on <scxml>, so its actions %s cannot run", strings.Join(sm.InitialActions, ", "))
+	}
+	if err := errors.Join(e.errs...); err != nil {
+		return nil, e.warn, err
+	}
 
 	// Attributes are written in creation order; the walk above may have used
 	// the extension namespace, which is declared only when that happened.
@@ -44,9 +52,6 @@ func (Emitter) Emit(sm *model.StateMachine) ([]byte, model.Warnings, error) {
 	root.CreateAttr("version", "1.0")
 	setAttr(root, "name", sm.Name)
 	setAttr(root, "initial", sm.Initial)
-	if len(sm.InitialActions) > 0 {
-		e.warn.Addf("the machine's initial transition: SCXML has no <initial> element on <scxml>; its actions %s are not written", strings.Join(sm.InitialActions, ", "))
-	}
 
 	canonical(doc)
 	doc.Indent(2)
@@ -82,6 +87,13 @@ type emitter struct {
 	emitted map[string]bool
 	usesExt bool
 	warn    model.Warnings
+	errs    []error
+}
+
+// fail records what SCXML cannot do the way the model means it; Emit then
+// fails with every such error.
+func (e *emitter) fail(format string, args ...any) {
+	e.errs = append(e.errs, fmt.Errorf(format, args...))
 }
 
 // children writes every direct child of parent (and their descendants) under el.
@@ -106,8 +118,7 @@ func (e *emitter) children(el *etree.Element, parent string) error {
 		e.ext(child, "stereotype", s.Stereotype)
 		e.ext(child, "invariant", s.Invariant)
 		if len(s.Defer) > 0 {
-			e.ext(child, "defer", strings.Join(s.Defer, " "))
-			e.warn.Addf("state %q: SCXML has no deferred events; written as tpuml:defer, which engines ignore", s.Name)
+			e.fail("state %q: SCXML has no deferred events", s.Name)
 		}
 		e.note(child, s.Note)
 		e.aboutNotes(child, s)
@@ -149,9 +160,10 @@ func (e *emitter) children(el *etree.Element, parent string) error {
 			switch {
 			case t.IsInternal():
 				tr.CreateAttr("type", "internal")
+			case t.IsLocal() && nestedIn(e.sm, s, t.Targets):
+				tr.CreateAttr("type", "internal") // SCXML's name for a local transition
 			case t.IsLocal():
-				e.ext(tr, "kind", string(model.Local))
-				e.warn.Addf("transition %s -> %s: SCXML has no local transitions; written as an external one tagged tpuml:kind=\"local\"", t.Source, strings.Join(t.Targets, " "))
+				e.fail("transition %s -> %s: SCXML keeps a transition inside its source only when the source is compound and every target lies inside it", t.Source, strings.Join(t.Targets, " "))
 			}
 			e.note(tr, t.Note)
 			executable(tr, t.Actions)
@@ -187,7 +199,7 @@ func (e *emitter) completion(s *model.State) string {
 	case s.IsParallel() || (s.IsNormal() && len(e.sm.Children(s.Name)) > 0):
 		return "done.state." + s.Name
 	case len(s.Do) > 0:
-		e.warn.Addf("state %q: SCXML takes its completion transition without waiting for the do activity to end", s.Name)
+		e.fail("state %q: SCXML would take its completion transition without waiting for the do activity to end", s.Name)
 	}
 	return ""
 }
@@ -196,15 +208,28 @@ func (e *emitter) completion(s *model.State) string {
 // wait for its done.invoke event.
 func invokeID(s *model.State) string { return s.Name + ".submachine" }
 
-// reference warns about an entry or exit point of a submachine state, which
-// is left out: an invoked SCXML machine starts in its own initial state and
-// reports only when it is done.
+// reference fails on an entry or exit point of a submachine state: an
+// invoked SCXML machine starts in its own initial state and reports only when
+// it is done.
 func (e *emitter) reference(s *model.State) {
 	if s.Kind == model.EntryPoint {
-		e.warn.Addf("state %q: SCXML cannot enter an invoked machine through its entry point; transitions to it enter %q instead", s.Name, s.Parent)
+		e.fail("state %q: SCXML cannot enter an invoked machine through its entry point", s.Name)
 		return
 	}
-	e.warn.Addf("state %q: SCXML cannot leave an invoked machine through its exit point; the transitions leaving it are not written", s.Name)
+	e.fail("state %q: SCXML cannot leave an invoked machine through its exit point", s.Name)
+}
+
+// nestedIn reports whether every target lies inside the compound state s.
+func nestedIn(sm *model.StateMachine, s *model.State, targets []string) bool {
+	if len(targets) == 0 {
+		return false
+	}
+	for _, tg := range targets {
+		if !slices.Contains(sm.Ancestors(tg), s.Name) {
+			return false
+		}
+	}
+	return true
 }
 
 // targets returns the transition's targets, with each entry point of a
@@ -248,16 +273,20 @@ func scxmlTransitions(s *model.State, transitions []*model.Transition) []*model.
 	return append(out, otherwise...)
 }
 
-// pseudo tags the kinds SCXML has no element for and warns where the SCXML
+// pseudo tags the kinds SCXML has no element for, and fails where the SCXML
 // stand-in does not behave like the UML original.
 func (e *emitter) pseudo(el *etree.Element, s *model.State) {
 	switch s.Kind {
 	case model.Choice, model.Junction, model.Fork, model.EntryPoint, model.ExitPoint:
 		// A transient state entered and left in the same step: same behaviour.
 	case model.Join:
-		e.warn.Addf("state %q: SCXML cannot join regions; the first region to reach it leaves the parallel state", s.Name)
+		e.fail("state %q: SCXML cannot join regions; the first region to reach it would leave the parallel state", s.Name)
 	case model.Terminate:
-		e.warn.Addf("state %q: SCXML has no terminate; written as a <final> state, which runs exit actions", s.Name)
+		if s.Parent != "" || len(s.OnExit) > 0 {
+			e.fail("state %q: SCXML has no terminate, and a <final> state that is not at the top level, or that has exit actions, does not end the machine the same way", s.Name)
+		} else {
+			e.warn.Addf("state %q: SCXML has no terminate; written as a <final> state at the top level, which ends the machine", s.Name)
+		}
 	default:
 		return
 	}

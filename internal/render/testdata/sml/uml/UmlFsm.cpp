@@ -22,7 +22,6 @@ struct l {};
 struct r {};
 struct back {};
 struct leave {};
-struct again {};
 struct note {};
 }  // namespace event
 
@@ -113,7 +112,6 @@ struct outer {
         const auto greet = [](UmlFsmActions& actions) { actions.greet(); };
         return sml::make_transition_table(
             *"outer.initial"_s / greet = "inner"_s,
-            "inner"_s + sml::event<event::again> = "inner"_s,
             // Not drawn.
             "inner"_s + sml::event<event::note> / [] {}
         );
@@ -142,8 +140,6 @@ struct machine {
             // Starts the clock.
             "work"_s + sml::on_entry<sml::_> / (startClock, [](::timers& t) { t.start(::timers::work_after_5s, std::chrono::seconds{5}); }, [](::timers& t, const UmlFsmActions& actions) { t.start(::timers::work_after_retryDelay, actions.retryDelay()); }),
             "work"_s + sml::on_exit<sml::_> / ([](::timers& t) { t.cancel(::timers::work_after_5s); }, [](::timers& t) { t.cancel(::timers::work_after_retryDelay); }),
-            // do / runJob
-            // Runs in a worker.
             // Kept until the job ends.
             "work"_s + sml::event<event::pause> / sml::defer,
             "work"_s + sml::event<event::resume> / sml::defer,
@@ -161,6 +157,7 @@ struct machine {
             // Says goodbye.
             sml::state<outer> + sml::on_exit<sml::_> / sayBye,
             sml::state<outer> = sml::X,
+            sml::state<outer> + sml::event<event::leave> = "sub"_s,
             sml::state<::internal::terminated> + sml::on_entry<sml::_> / [](::status& s) { s.terminated = true; },
             "work"_s + sml::event<::internal::stop> = sml::state<::internal::stopped>,
             sml::state<both> + sml::event<::internal::stop> = sml::state<::internal::stopped>,
@@ -347,12 +344,6 @@ void UmlFsm::back() {
 
 void UmlFsm::leave() {
     if (machine_->process(event::leave{})) {
-        report();
-    }
-}
-
-void UmlFsm::again() {
-    if (machine_->process(event::again{})) {
         report();
     }
 }

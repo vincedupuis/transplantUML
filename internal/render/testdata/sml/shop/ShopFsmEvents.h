@@ -7,7 +7,6 @@ public:
     virtual ~ShopFsmEvents() = default;
 
     virtual void buy() = 0;
-    virtual void quickBuy() = 0;
     virtual void fraud() = 0;
     virtual void help() = 0;
     virtual void emergency() = 0;
@@ -15,10 +14,8 @@ public:
     virtual void approved() = 0;
     virtual void cash() = 0;
     virtual void card() = 0;
-    virtual void abort() = 0;
     virtual void packed() = 0;
     virtual void sent() = 0;
-    virtual void reopen() = 0;
     virtual void back() = 0;
     virtual void refund() = 0;
     virtual void complain() = 0;

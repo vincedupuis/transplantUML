@@ -1,0 +1,71 @@
+# example/shop.fsm without what Boost.SML cannot run: the entry and exit
+# points of a state, the deep history, the fork's effect and the abort that
+# leaves checkout from inside it. The history makes every entry to checkout
+# resume it, so each goes through H.
+
+fsm shop {
+  entry point reorder / loadBasket goto checkout.H
+  initial state browsing {
+    on buy goto checkout.H
+    on fraud goto terminate
+    on help goto helpdesk
+    on emergency goto urgent
+  }
+  submachine helpdesk : support {
+    entry / openChat
+    entry point urgent
+    exit point escalated / page goto checkout.H
+    goto browsing
+  }
+  state checkout <<secure>> {
+    | Back to the step the customer left. |
+    H
+    initial state address { on next / computeTotal goto route }
+    choice route {
+      [large] goto review
+      [else] goto paying
+    }
+    state review {
+      on approved goto paying
+      initial choice depth {
+        [regular] goto quick
+        [else] goto thorough
+      }
+      state quick {}
+      state thorough {}
+    }
+    state paying {
+      on cash goto paid
+      on card goto paid
+    }
+    junction paid / receipt goto split
+  }
+  fork split {
+    goto packing
+    goto invoicing
+  }
+  parallel state shipping {
+    region warehouse {
+      initial state packing { on packed goto packed }
+      state packed { goto merge }
+    }
+    region accounting {
+      initial state invoicing { on sent goto sent }
+      state sent { [paidInFull] goto merge }
+    }
+  }
+  join merge / close goto done
+  state done {
+    on back goto checkout.H
+    on refund goto refunded
+    on complain goto aftersales
+    goto final
+  }
+  submachine aftersales : support {
+    goto done
+  }
+  | Money returned. |
+  final state refunded
+  | Fraud closes the shop. |
+  terminate state
+}

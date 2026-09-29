@@ -26,6 +26,8 @@
 //	Initials table              -> []Initial  (the states it starts in, with the scope of each)
 //	ForkTarget fork             -> string     (the state its transitions enter together)
 //	JoinOwner join              -> string     (the parallel state its sources lie in, or "")
+//	DefaultEntry outer inner    -> bool       (entering outer without a target reaches inner)
+//	AlwaysActive inner outer    -> bool       (inner is active whenever outer is)
 //	Lift transition             -> *Lift      (where it is written, or nil when it is not)
 //
 // and the helpers:
@@ -35,16 +37,19 @@
 //	surround p s q              -> p+s+q, or "" when s is empty
 //	joinNonEmpty sep s...       -> s joined by sep, skipping empty strings
 //	warn format args...         -> "" (records a warning for the user, printf-style)
+//	error format args...        -> "" (records an error, printf-style; Render then fails)
 //	file name                   -> a mark: the text after it, up to the next mark, is the file name
 //
-// A template calls warn when it cannot draw something the model holds, so the
-// user learns what the output leaves out; Render returns the warnings. A
+// A template calls error when the output cannot behave as the model does, and
+// warn when it does so through a workaround, since the format has no exact
+// counterpart; Render returns the warnings, and fails with every error. A
 // template that writes several files starts each with file; Files splits the
 // output at those marks.
 package render
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -57,11 +62,16 @@ import (
 func Render(sm *model.StateMachine, tmplSrc string) (string, model.Warnings, error) {
 	tmpl := template.New("fsm")
 	var warnings model.Warnings
+	var errs []error
 
 	tbl := tables{sm}
 	funcs := template.FuncMap{
 		"warn": func(format string, args ...any) string {
 			warnings.Addf(format, args...)
+			return ""
+		},
+		"error": func(format string, args ...any) string {
+			errs = append(errs, fmt.Errorf(format, args...))
 			return ""
 		},
 		"include": func(name string, data any) (string, error) {
@@ -118,6 +128,8 @@ func Render(sm *model.StateMachine, tmplSrc string) (string, model.Warnings, err
 		"Initials":            tbl.Initials,
 		"ForkTarget":          tbl.ForkTarget,
 		"JoinOwner":           tbl.JoinOwner,
+		"DefaultEntry":        tbl.DefaultEntry,
+		"AlwaysActive":        tbl.AlwaysActive,
 		"Lift":                tbl.Lift,
 	}
 	tmpl.Funcs(sprig.FuncMap()).Funcs(funcs)
@@ -128,6 +140,9 @@ func Render(sm *model.StateMachine, tmplSrc string) (string, model.Warnings, err
 	var out bytes.Buffer
 	if err := tmpl.Execute(&out, sm); err != nil {
 		return "", nil, fmt.Errorf("executing template: %w", err)
+	}
+	if err := errors.Join(errs...); err != nil {
+		return "", warnings, err
 	}
 	return out.String(), warnings, nil
 }

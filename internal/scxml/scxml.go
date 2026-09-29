@@ -25,7 +25,8 @@
 // (ExtNamespace), which the W3C schema permits on every element and which
 // SCXML engines ignore: the tpuml:kind attribute names any model.StateKind
 // (choice, junction, fork, join, entry-point, exit-point, terminate, or
-// normal to suppress the idiom detection) or, on a transition, local;
+// normal to suppress the idiom detection) or, on a transition, local (the
+// same as SCXML's type="internal" with targets nested in the source);
 // tpuml:defer lists deferred events; tpuml:invariant and tpuml:stereotype
 // annotate a state; and a <tpuml:note> child holds a note, which on a state
 // may say with about="entry|exit|do|invariant|defer" (and event="…" for
@@ -36,6 +37,7 @@ package scxml
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/beevik/etree"
@@ -74,9 +76,10 @@ func (Parser) Parse(src []byte) (*model.StateMachine, model.Warnings, error) {
 	p.sm.Variables = p.datamodel(root)
 	p.sm.Note = note(root)
 	p.walk(root, "")
+	localTransitions(p.sm)
 	for _, c := range root.ChildElements() {
 		if _, ok := stateKinds[c.Tag]; !ok && !known(c, "datamodel") {
-			p.warn.Addf("<%s> at the top level is not supported and was dropped", c.Tag)
+			p.unsupported(c, "at the top level")
 		}
 	}
 	if err := errors.Join(p.errs...); err != nil {
@@ -93,6 +96,18 @@ type parser struct {
 
 func (p *parser) fail(format string, args ...any) {
 	p.errs = append(p.errs, fmt.Errorf(format, args...))
+}
+
+// unsupported reports an element the model has no place for. An SCXML
+// element would change what the machine does, so it is an error. An element
+// of another namespace, which SCXML engines ignore, is dropped with a warning,
+// in case it was meant to be an extension element.
+func (p *parser) unsupported(el *etree.Element, where string) {
+	if uri := el.NamespaceURI(); uri == "" || uri == namespace {
+		p.fail("<%s> %s is not supported", el.Tag, where)
+		return
+	}
+	p.warn.Addf("<%s:%s> %s belongs to %q, which SCXML engines ignore; it was dropped", el.Space, el.Tag, where, el.NamespaceURI())
 }
 
 var stateKinds = map[string]model.StateKind{
@@ -189,7 +204,7 @@ func (p *parser) state(el *etree.Element, parent string) {
 		if _, ok := stateKinds[c.Tag]; ok || known(c, "onentry", "onexit", "transition", "initial", "datamodel", "invoke") {
 			continue
 		}
-		p.warn.Addf("state %q: <%s> is not supported and was dropped", st.Name, c.Tag)
+		p.unsupported(c, fmt.Sprintf("in state %q", st.Name))
 	}
 
 	p.sm.States = append(p.sm.States, st)
@@ -429,7 +444,7 @@ func (p *parser) aboutNotes(st *model.State, el *etree.Element) {
 		case "defer":
 			ev := c.SelectAttrValue("event", "")
 			if ev == "" {
-				p.warn.Addf("state %q: a note about a deferred event names no event and was dropped", st.Name)
+				p.fail("state %q: a note about a deferred event names no event", st.Name)
 				continue
 			}
 			if st.DeferNotes == nil {
@@ -437,7 +452,7 @@ func (p *parser) aboutNotes(st *model.State, el *etree.Element) {
 			}
 			st.DeferNotes[ev] = text
 		default:
-			p.warn.Addf("state %q: a note about %q is not supported and was dropped", st.Name, about.Value)
+			p.fail("state %q: a note about %q is not supported; it is about entry, exit, do, invariant or defer", st.Name, about.Value)
 		}
 	}
 }
@@ -460,6 +475,24 @@ func noteText(el *etree.Element) string {
 		lines = append(lines, strings.TrimSpace(line))
 	}
 	return strings.Join(lines, "\n")
+}
+
+// localTransitions reads SCXML's type="internal" on a transition with a
+// target: UML's local transition when the source is compound and every target
+// lies inside it, an external one otherwise, as SCXML runs it. Without a
+// target it is UML's internal transition.
+func localTransitions(sm *model.StateMachine) {
+	for _, t := range sm.Transitions {
+		if !t.IsInternal() || len(t.Targets) == 0 {
+			continue
+		}
+		t.Kind = model.Local
+		for _, tg := range t.Targets {
+			if !slices.Contains(sm.Ancestors(tg), t.Source) {
+				t.Kind = model.External
+			}
+		}
+	}
 }
 
 // known reports whether el is one of the named SCXML elements or a tpuml

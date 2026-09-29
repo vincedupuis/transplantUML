@@ -21,7 +21,7 @@ func emit(t *testing.T, sm *model.StateMachine) []byte {
 // SCXML -> model -> SCXML -> model must be lossless. The two documents are not
 // byte-identical (executable content comes back as <script>), but the models are.
 func TestEmitRoundTrip(t *testing.T) {
-	for _, path := range []string{"../../example/coffee-machine.scxml", "testdata/edge.scxml", "testdata/uml.scxml"} {
+	for _, path := range []string{"../../example/coffee-machine.scxml", "testdata/edge.scxml", "testdata/uml-scxml.scxml"} {
 		want := parseFile(t, path)
 		out := emit(t, want)
 		got, _, err := Parser{}.Parse(out)
@@ -37,7 +37,7 @@ func TestEmitRoundTrip(t *testing.T) {
 // Regenerate with:
 // go run ./cmd/fsm -i internal/scxml/testdata/<name>.scxml -F scxml -o internal/scxml/testdata/<name>.emitted.scxml
 func TestEmitGolden(t *testing.T) {
-	for _, name := range []string{"edge", "uml"} {
+	for _, name := range []string{"edge", "uml-scxml"} {
 		want, err := os.ReadFile("testdata/" + name + ".emitted.scxml")
 		if err != nil {
 			t.Fatal(err)
@@ -48,17 +48,16 @@ func TestEmitGolden(t *testing.T) {
 	}
 }
 
-// Every model feature SCXML can only approximate must be named in a warning.
+// Where SCXML runs the model through a stand-in that behaves the same, a
+// warning says so. uml-scxml.scxml is uml.scxml without what SCXML cannot run
+// (TestEmitErrors).
 func TestEmitWarnings(t *testing.T) {
-	_, warnings, err := Emitter{}.Emit(parseFile(t, "testdata/uml.scxml"))
+	_, warnings, err := Emitter{}.Emit(parseFile(t, "testdata/uml-scxml.scxml"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := []string{
-		`state "sync": SCXML cannot join regions; the first region to reach it leaves the parallel state`,
-		`state "work": SCXML has no deferred events; written as tpuml:defer, which engines ignore`,
-		`transition inner -> inner: SCXML has no local transitions; written as an external one tagged tpuml:kind="local"`,
-		`state "stop": SCXML has no terminate; written as a <final> state, which runs exit actions`,
+		`state "stop": SCXML has no terminate; written as a <final> state at the top level, which ends the machine`,
 	}
 	if !reflect.DeepEqual([]string(warnings), want) {
 		t.Errorf("warnings =\n%s\nwant\n%s", strings.Join(warnings, "\n"), strings.Join(want, "\n"))
@@ -77,56 +76,33 @@ func TestEmitWarnings(t *testing.T) {
 	}
 }
 
-// An invoked SCXML machine has no entry or exit points to use, so a submachine
-// state's references are left out: entering one enters the submachine state,
-// and what leaves one is dropped.
-func TestEmitReferences(t *testing.T) {
+// A local transition is SCXML's type="internal" with a target, which keeps
+// the source active when it is compound and every target lies inside it.
+func TestEmitLocal(t *testing.T) {
 	sm := &model.StateMachine{
-		Initial: "a",
+		Initial: "c",
 		States: []*model.State{
-			{Name: "a", Kind: model.Normal},
-			{Name: "s", Kind: model.Normal, Submachine: "help"},
-			{Name: "in", Parent: "s", Kind: model.EntryPoint},
-			{Name: "out", Parent: "s", Kind: model.ExitPoint},
+			{Name: "c", Kind: model.Normal, Initial: "c1", OnEntry: []string{"hello"}},
+			{Name: "c1", Parent: "c", Kind: model.Normal},
+			{Name: "c2", Parent: "c", Kind: model.Normal},
 		},
-		Transitions: []*model.Transition{
-			{Source: "a", Targets: []string{"in"}, Event: "e"},
-			{Source: "out", Targets: []string{"a"}},
-		},
+		Transitions: []*model.Transition{{Source: "c", Targets: []string{"c2"}, Event: "e", Kind: model.Local}},
 	}
-	out, warnings, err := Emitter{}.Emit(sm)
+	out := emit(t, sm)
+	if !strings.Contains(string(out), `<transition event="e" target="c2" type="internal"/>`) {
+		t.Errorf("local transition not written as type=internal:\n%s", out)
+	}
+	got, _, err := Parser{}.Parse(out)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(out), `<transition event="e" target="s"/>`) || strings.Contains(string(out), `"in"`) || strings.Contains(string(out), `"out"`) {
-		t.Errorf("references not left out:\n%s", out)
-	}
-	want := []string{
-		`state "in": SCXML cannot enter an invoked machine through its entry point; transitions to it enter "s" instead`,
-		`state "out": SCXML cannot leave an invoked machine through its exit point; the transitions leaving it are not written`,
-	}
-	if !reflect.DeepEqual([]string(warnings), want) {
-		t.Errorf("warnings =\n%s\nwant\n%s", strings.Join(warnings, "\n"), strings.Join(want, "\n"))
-	}
-}
-
-// <scxml> takes no <initial> element, so the machine's initial transition
-// cannot carry actions.
-func TestEmitMachineInitialActions(t *testing.T) {
-	sm := &model.StateMachine{Initial: "a", InitialActions: []string{"boot"}, States: []*model.State{{Name: "a", Kind: model.Normal}}}
-	_, warnings, err := Emitter{}.Emit(sm)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []string{`the machine's initial transition: SCXML has no <initial> element on <scxml>; its actions boot are not written`}
-	if !reflect.DeepEqual([]string(warnings), want) {
-		t.Errorf("warnings = %q, want %q", warnings, want)
+	if !reflect.DeepEqual(got, sm) {
+		t.Errorf("round trip differs:\n%s", out)
 	}
 }
 
 // A completion transition waits for the done event of what the state runs: a
-// submachine, a region's final state. A simple state completes at once, which
-// is wrong only while a do activity is running.
+// submachine, a region's final state. A simple state completes at once.
 func TestEmitCompletion(t *testing.T) {
 	sm := &model.StateMachine{
 		Initial: "c",
@@ -134,13 +110,11 @@ func TestEmitCompletion(t *testing.T) {
 			{Name: "c", Kind: model.Normal, Initial: "c1"},
 			{Name: "c1", Parent: "c", Kind: model.Normal},
 			{Name: "s", Kind: model.Normal, Submachine: "help"},
-			{Name: "d", Kind: model.Normal, Do: []string{"invoke(job.py)"}},
 			{Name: "a", Kind: model.Normal},
 		},
 		Transitions: []*model.Transition{
 			{Source: "c", Targets: []string{"s"}},
-			{Source: "s", Targets: []string{"d"}},
-			{Source: "d", Targets: []string{"a"}},
+			{Source: "s", Targets: []string{"a"}},
 			{Source: "a", Targets: []string{"c"}},
 		},
 	}
@@ -151,17 +125,15 @@ func TestEmitCompletion(t *testing.T) {
 	for _, want := range []string{
 		`<transition event="done.state.c" target="s"/>`,
 		`<invoke id="s.submachine" src="help"/>`,
-		`<transition event="done.invoke.s.submachine" target="d"/>`,
-		`<transition target="a"/>`,
+		`<transition event="done.invoke.s.submachine" target="a"/>`,
 		`<transition target="c"/>`,
 	} {
 		if !strings.Contains(string(out), want) {
 			t.Errorf("missing %s in:\n%s", want, out)
 		}
 	}
-	want := []string{`state "d": SCXML takes its completion transition without waiting for the do activity to end`}
-	if !reflect.DeepEqual([]string(warnings), want) {
-		t.Errorf("warnings = %q, want %q", warnings, want)
+	if len(warnings) != 0 {
+		t.Errorf("warnings = %q", warnings)
 	}
 }
 
@@ -170,8 +142,8 @@ func TestEmitDeclaresExtensionOnlyWhenUsed(t *testing.T) {
 	if out := emit(t, parseFile(t, "testdata/edge.scxml")); strings.Contains(string(out), "xmlns:tpuml") {
 		t.Errorf("edge.scxml needs no extension, but got:\n%s", out)
 	}
-	if out := emit(t, parseFile(t, "testdata/uml.scxml")); !strings.Contains(string(out), `xmlns:tpuml="`+ExtNamespace+`"`) {
-		t.Errorf("uml.scxml uses the extension, but got:\n%s", out)
+	if out := emit(t, parseFile(t, "testdata/uml-scxml.scxml")); !strings.Contains(string(out), `xmlns:tpuml="`+ExtNamespace+`"`) {
+		t.Errorf("uml-scxml.scxml uses the extension, but got:\n%s", out)
 	}
 }
 
@@ -254,6 +226,73 @@ func TestEmitForkAndElse(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("emitted SCXML is missing\n%s\n%s", want, out)
 		}
+	}
+}
+
+// What SCXML cannot run the way the model means it is an error, and Emit
+// fails with all of them.
+func TestEmitBehaviourErrors(t *testing.T) {
+	cases := map[string]struct {
+		sm   *model.StateMachine
+		want []string
+	}{
+		"uml.scxml": {parseFile(t, "testdata/uml.scxml"), []string{
+			`state "sync": SCXML cannot join regions; the first region to reach it would leave the parallel state`,
+			`state "work": SCXML has no deferred events`,
+		}},
+		// An invoked SCXML machine starts in its own initial state and
+		// reports only when it is done.
+		"references": {&model.StateMachine{
+			Name: "m", Initial: "a",
+			States: []*model.State{
+				{Name: "a", Kind: model.Normal},
+				{Name: "s", Kind: model.Normal, Submachine: "help"},
+				{Name: "in", Parent: "s", Kind: model.EntryPoint},
+				{Name: "out", Parent: "s", Kind: model.ExitPoint},
+			},
+			Transitions: []*model.Transition{
+				{Source: "a", Targets: []string{"in"}, Event: "e"},
+				{Source: "out", Targets: []string{"a"}},
+			},
+		}, []string{
+			`state "in": SCXML cannot enter an invoked machine through its entry point`,
+			`state "out": SCXML cannot leave an invoked machine through its exit point`,
+		}},
+		// <scxml> takes no <initial> element; a simple state completes at
+		// once, even while its do activity runs; a <final> inside a state or
+		// with exit actions ends no machine the way a terminate does; a
+		// local transition to its own source leaves it.
+		"stand-ins": {&model.StateMachine{
+			Name: "m", Initial: "c", InitialActions: []string{"boot"},
+			States: []*model.State{
+				{Name: "c", Kind: model.Normal, Initial: "d"},
+				{Name: "d", Parent: "c", Kind: model.Normal, Do: []string{"spin"}},
+				{Name: "t", Parent: "c", Kind: model.Terminate},
+			},
+			Transitions: []*model.Transition{
+				{Source: "d", Targets: []string{"t"}},
+				{Source: "c", Targets: []string{"c"}, Event: "e", Kind: model.Local},
+			},
+		}, []string{
+			`transition c -> c: SCXML keeps a transition inside its source only when the source is compound and every target lies inside it`,
+			`state "d": SCXML would take its completion transition without waiting for the do activity to end`,
+			`state "t": SCXML has no terminate, and a <final> state that is not at the top level, or that has exit actions, does not end the machine the same way`,
+			`the machine's initial transition: SCXML has no <initial> element on <scxml>, so its actions boot cannot run`,
+		}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			if err := c.sm.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			out, _, err := Emitter{}.Emit(c.sm)
+			if err == nil {
+				t.Fatalf("emitted without an error:\n%s", out)
+			}
+			if got := strings.Split(err.Error(), "\n"); !reflect.DeepEqual(got, c.want) {
+				t.Errorf("errors =\n%s\nwant\n%s", err, strings.Join(c.want, "\n"))
+			}
+		})
 	}
 }
 

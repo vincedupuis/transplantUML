@@ -22,8 +22,8 @@ public:
 
 // The state machine "uml".
 //
-// Every UML concept the model holds,
-// in one document.
+// uml.scxml without what Boost.SML cannot run:
+// do activities, local transitions and exit points of a state.
 class UmlFsm : public UmlFsmEvents {
 public:
     // Where enterFsm starts the machine: its initial state.
@@ -58,7 +58,6 @@ public:
     void r() override;
     void back() override;
     void leave() override;
-    void again() override;
     void note() override;
 
 private:

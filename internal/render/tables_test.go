@@ -91,6 +91,34 @@ func TestTables(t *testing.T) {
 	}
 }
 
+// Entering a state without naming a substate reaches its initial states, in
+// every region of a parallel state, unless a history resumes elsewhere. A
+// region is active exactly when its parallel state is.
+func TestDefaultEntryAndAlwaysActive(t *testing.T) {
+	x := tables{tablesSample()}
+	for _, c := range []struct {
+		outer, inner string
+		want         bool
+	}{
+		{"p", "a1", true}, {"p", "r2", true}, {"p", "a2", false}, {"p", "p", true},
+		{"c", "c1", false}, {"idle", "a1", false},
+	} {
+		if got := x.DefaultEntry(c.outer, c.inner); got != c.want {
+			t.Errorf("DefaultEntry(%q, %q) = %v", c.outer, c.inner, got)
+		}
+	}
+	for _, c := range []struct {
+		inner, outer string
+		want         bool
+	}{
+		{"r1", "p", true}, {"r2", "p", true}, {"p", "p", true}, {"a1", "p", false}, {"c1", "c", false},
+	} {
+		if got := x.AlwaysActive(c.inner, c.outer); got != c.want {
+			t.Errorf("AlwaysActive(%q, %q) = %v", c.inner, c.outer, got)
+		}
+	}
+}
+
 // The machine's own points are written, as are the points a submachine state
 // references, which stand for that state; a state's own points are not.
 func TestLiftPoints(t *testing.T) {

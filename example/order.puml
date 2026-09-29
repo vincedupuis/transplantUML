@@ -17,6 +17,7 @@ paid : entry / confirmOrder
 state shipped <<end>>
 state rejected <<end>>
 state killed <<end>>
+note right of killed : terminate, drawn as a final state
 new --> check: submit
 check --> rejected: [ isEmpty ]
 check --> review: [ isLarge ]

@@ -1,7 +1,7 @@
 <scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:tpuml="https://github.com/vincedupuis/transplantUML"
        version="1.0" name="uml" initial="check">
-  <tpuml:note>Every UML concept the model holds,
-in one document.</tpuml:note>
+  <tpuml:note>uml.scxml without what Boost.SML cannot run:
+do activities, local transitions and exit points of a state.</tpuml:note>
   <datamodel>
     <data id="retries" expr="0"/>
     <data id="config" src="config.json"/>
@@ -30,7 +30,6 @@ in one document.</tpuml:note>
     <tpuml:note>Runs the job.</tpuml:note>
     <!-- Notes on what a state lists say what they are about. -->
     <tpuml:note about="entry">Starts the clock.</tpuml:note>
-    <tpuml:note about="do">Runs in a worker.</tpuml:note>
     <tpuml:note about="invariant">Never negative.</tpuml:note>
     <tpuml:note about="defer" event="pause">Kept until the job ends.</tpuml:note>
     <datamodel>
@@ -45,7 +44,6 @@ in one document.</tpuml:note>
       <cancel sendid="workTimer"/>
       <cancel sendid="retryTimer"/>
     </onexit>
-    <invoke type="http://example.com/worker" src="runJob"/>
     <transition event="tick" target="check">
       <tpuml:note>Timed out.</tpuml:note>
       <script>countRetry</script>
@@ -72,11 +70,9 @@ in one document.</tpuml:note>
     <tpuml:note about="exit">Says goodbye.</tpuml:note>
     <onexit><script>sayBye</script></onexit>
     <transition event="done.state.outer" target="done"/>
-    <transition event="again" target="inner" type="internal"/>
+    <transition event="leave" target="sub"/>
     <state id="in" tpuml:kind="entry-point"><transition target="inner"/></state>
-    <state id="out" tpuml:kind="exit-point"><transition target="sub"/></state>
     <state id="inner">
-      <transition event="leave" target="out"/>
       <transition event="note" type="internal"><tpuml:note>Not drawn.</tpuml:note></transition>
     </state>
   </state>

@@ -1,7 +1,7 @@
 <scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:tpuml="https://github.com/vincedupuis/transplantUML"
        version="1.0" name="uml" initial="check">
-  <tpuml:note>Every UML concept the model holds,
-in one document.</tpuml:note>
+  <tpuml:note>uml.scxml without what SCXML cannot run:
+join and deferred events.</tpuml:note>
   <datamodel>
     <data id="retries" expr="0"/>
     <data id="config" src="config.json"/>
@@ -22,17 +22,13 @@ in one document.</tpuml:note>
   <state id="merge" tpuml:kind="junction">
     <transition target="work"/>
   </state>
-  <state id="sync" tpuml:kind="join">
-    <transition target="done"/>
-  </state>
 
-  <state id="work" tpuml:stereotype="worker" tpuml:defer="pause resume" tpuml:invariant="counting and not (stalled or aborted)">
+  <state id="work" tpuml:stereotype="worker" tpuml:invariant="counting and not (stalled or aborted)">
     <tpuml:note>Runs the job.</tpuml:note>
     <!-- Notes on what a state lists say what they are about. -->
     <tpuml:note about="entry">Starts the clock.</tpuml:note>
     <tpuml:note about="do">Runs in a worker.</tpuml:note>
     <tpuml:note about="invariant">Never negative.</tpuml:note>
-    <tpuml:note about="defer" event="pause">Kept until the job ends.</tpuml:note>
     <datamodel>
       <data id="progress" expr="0"/>
     </datamodel>
@@ -57,8 +53,8 @@ in one document.</tpuml:note>
   </state>
 
   <parallel id="both">
-    <state id="left"><transition event="l" target="sync"/></state>
-    <state id="right"><transition event="r" target="sync"/></state>
+    <state id="left"><transition event="l" target="done"/></state>
+    <state id="right"><transition event="r" target="done"/></state>
   </parallel>
 
   <state id="sub">

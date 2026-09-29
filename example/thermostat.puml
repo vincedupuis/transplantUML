@@ -31,6 +31,7 @@ on : exit / displayOff
 on : schedule / defer
 on : [ aboveMinimum ]
 state fault <<end>>
+note right of fault : terminate, drawn as a final state
 off --> on: power
 on --> off: power
 on --> fault: sensorError

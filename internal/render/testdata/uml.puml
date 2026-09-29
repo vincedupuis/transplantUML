@@ -11,6 +11,7 @@ endlegend
 [*] --> check
 state check <<choice>>
 state split <<fork>>
+note right of split : not drawn: --> right
 state merge <<start>>
 state sync <<join>>
 state "«worker»\nwork" as work <<worker>>
@@ -31,6 +32,7 @@ state both {
     state left
     --
     state right
+    note right of right : not drawn: --> sync: r
 }
 state "sub: child" as sub
 state outer {
@@ -38,14 +40,15 @@ state outer {
     state in <<entryPoint>>
     state out <<exitPoint>>
     state inner
+    note right of inner : note: Not drawn.
     in --> inner
     inner --> out: leave
-    inner --> inner: again
     inner : note
 }
 outer : exit / sayBye
 note right of outer : exit: Says goodbye.
 state stop <<end>>
+note right of stop : terminate, drawn as a final state
 state done <<end>>
 state failed <<end>>
 check --> failed: [ tooManyRetries ]
@@ -63,5 +66,6 @@ left --> sync: l
 sub --> merge: back
 sub --> done
 outer --> done
+outer --> inner: again\n«local»
 out --> sub
 @enduml

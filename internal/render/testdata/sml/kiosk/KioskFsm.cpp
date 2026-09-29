@@ -15,13 +15,11 @@ namespace event {
 struct touch {};
 struct abandon {};
 struct resume {};
-struct back {};
 struct add {};
 struct remove {};
 struct checkout {};
-struct approved {};
 struct declined {};
-struct cancel {};
+struct approved {};
 struct card {};
 struct ack {};
 }  // namespace event
@@ -86,13 +84,14 @@ struct paying {
     auto operator()() const {
         using namespace sml::literals;
         const auto retries = [](const KioskFsmActions& actions) { return actions.retries(); };
+        const auto receipt = [](KioskFsmActions& actions) { actions.receipt(); };
         const auto warn = [](KioskFsmActions& actions) { actions.warn(); };
         return sml::make_transition_table(
             *"authorizing"_s + sml::on_entry<sml::_> / [](::timers& t, const KioskFsmActions& actions) { t.start(::timers::authorizing_after_authTimeout, actions.authTimeout()); },
             "authorizing"_s + sml::on_exit<sml::_> / [](::timers& t) { t.cancel(::timers::authorizing_after_authTimeout); },
-            // do / spin
             // Until the bank answers.
             "authorizing"_s + sml::event<event::touch> / sml::defer,
+            "authorizing"_s + sml::event<event::approved> / receipt = sml::X,
             "authorizing"_s + sml::event<::internal::authorizing_after_authTimeout> [retries] / warn = "again"_s,
             "again"_s + sml::event<event::card> = "authorizing"_s
         );
@@ -112,7 +111,6 @@ struct ordering {
         const auto addLine = [](KioskFsmActions& actions) { actions.addLine(); };
         const auto dropLine = [](KioskFsmActions& actions) { actions.dropLine(); };
         const auto lockBasket = [](KioskFsmActions& actions) { actions.lockBasket(); };
-        const auto warn = [](KioskFsmActions& actions) { actions.warn(); };
         return sml::make_transition_table(
             "browsing"_s(sml::H) + sml::event<event::add> [inStock && (card || cash)] / addLine,
             "browsing"_s + sml::event<event::remove> / dropLine = "browsing"_s,
@@ -121,9 +119,8 @@ struct ordering {
             // The basket is locked from here on.
             // invariant: basket and not (card and cash)
             sml::state<paying> + sml::on_entry<sml::_> / lockBasket,
-            sml::state<paying> + sml::event<event::declined> [retries] / warn = sml::state<paying>,
             sml::state<paying> + sml::event<event::declined> [!retries] = "browsing"_s,
-            sml::state<paying> + sml::event<event::cancel> = "browsing"_s
+            sml::state<paying> = sml::X
         );
     }
 };
@@ -138,7 +135,6 @@ struct machine {
         const auto newBasket = [](KioskFsmActions& actions) { actions.newBasket(); };
         const auto clearBasket = [](KioskFsmActions& actions) { actions.clearBasket(); };
         const auto unlock = [](KioskFsmActions& actions) { actions.unlock(); };
-        const auto receipt = [](KioskFsmActions& actions) { actions.receipt(); };
         const auto print = [](KioskFsmActions& actions) { actions.print(); };
         return sml::make_transition_table(
             *sml::state<::internal::stopped> + sml::event<::internal::enter> / boot = "idle"_s,
@@ -150,8 +146,7 @@ struct machine {
             // Nobody touched the screen.
             sml::state<ordering> + sml::event<::internal::ordering_after_90s> = "idle"_s,
             sml::state<ordering> + sml::event<event::resume> = sml::state<ordering>,
-            sml::state<ordering> + sml::event<event::back> = sml::state<ordering>,
-            sml::state<ordering> + sml::event<event::approved> / receipt = "done"_s,
+            sml::state<ordering> = "done"_s,
             "done"_s + sml::on_entry<sml::_> / print,
             "done"_s + sml::event<event::ack> = sml::X,
             "idle"_s + sml::event<::internal::stop> = sml::state<::internal::stopped>,
@@ -240,11 +235,6 @@ void KioskFsm::resume() {
     report();
 }
 
-void KioskFsm::back() {
-    machine_->sm.process_event(event::back{});
-    report();
-}
-
 void KioskFsm::add() {
     machine_->sm.process_event(event::add{});
     report();
@@ -260,18 +250,13 @@ void KioskFsm::checkout() {
     report();
 }
 
-void KioskFsm::approved() {
-    machine_->sm.process_event(event::approved{});
-    report();
-}
-
 void KioskFsm::declined() {
     machine_->sm.process_event(event::declined{});
     report();
 }
 
-void KioskFsm::cancel() {
-    machine_->sm.process_event(event::cancel{});
+void KioskFsm::approved() {
+    machine_->sm.process_event(event::approved{});
     report();
 }
 

@@ -92,6 +92,42 @@ func (x tables) JoinOwner(join string) string {
 	return ""
 }
 
+// DefaultEntry reports whether entering outer without naming a substate, as a
+// table does, reaches inner: each state on the way down is its parent's
+// initial state or one of a parallel state's regions, and none of those
+// parents, outer included, has a history that would resume elsewhere.
+func (x tables) DefaultEntry(outer, inner string) bool {
+	for n := inner; n != outer; {
+		s := x.sm.State(n)
+		if s == nil || s.Parent == "" {
+			return false
+		}
+		p := x.sm.State(s.Parent)
+		if !p.IsParallel() && p.Initial != n {
+			return false
+		}
+		if len(x.sm.HistoryOf(p.Name)) > 0 {
+			return false
+		}
+		n = p.Name
+	}
+	return true
+}
+
+// AlwaysActive reports whether inner is active whenever outer is: inner is
+// outer, or each state on the way up to outer is a region of a parallel
+// state, which is entered with it.
+func (x tables) AlwaysActive(inner, outer string) bool {
+	for n := inner; n != outer; {
+		s := x.sm.State(n)
+		if s == nil || s.Parent == "" || !x.sm.State(s.Parent).IsParallel() {
+			return false
+		}
+		n = s.Parent
+	}
+	return true
+}
+
 func (x tables) outsideRegion(name string) string {
 	if x.IsRegion(name) {
 		return x.sm.State(name).Parent

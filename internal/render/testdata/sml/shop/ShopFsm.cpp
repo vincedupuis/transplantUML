@@ -13,7 +13,6 @@ namespace sml = boost::sml;
 
 namespace event {
 struct buy {};
-struct quickBuy {};
 struct fraud {};
 struct help {};
 struct emergency {};
@@ -21,10 +20,8 @@ struct next {};
 struct approved {};
 struct cash {};
 struct card {};
-struct abort {};
 struct packed {};
 struct sent {};
-struct reopen {};
 struct back {};
 struct refund {};
 struct complain {};
@@ -115,7 +112,6 @@ struct machine {
             *sml::state<::internal::stopped> + sml::event<::internal::enter> = "browsing"_s,
             sml::state<::internal::stopped> + sml::event<::internal::enter_reorder> / loadBasket = sml::state<checkout>,
             "browsing"_s + sml::event<event::buy> = sml::state<checkout>,
-            "browsing"_s + sml::event<event::quickBuy> = sml::state<checkout>,
             "browsing"_s + sml::event<event::fraud> = sml::state<::internal::terminated>,
             "browsing"_s + sml::event<event::help> = "helpdesk"_s,
             "browsing"_s + sml::event<event::emergency> / [](::submachines& s) { s.helpdesk_entry = SupportFsm::Entry::urgent; } = "helpdesk"_s,
@@ -127,7 +123,6 @@ struct machine {
             // «secure»
             sml::state<checkout> / receipt = sml::state<shipping>,
             sml::state<shipping> / close = "done"_s,
-            "done"_s + sml::event<event::reopen> = sml::state<checkout>,
             "done"_s + sml::event<event::back> = sml::state<checkout>,
             "done"_s + sml::event<event::refund> = sml::X,
             "done"_s + sml::event<event::complain> = "aftersales"_s,
@@ -298,12 +293,6 @@ void ShopFsm::buy() {
     }
 }
 
-void ShopFsm::quickBuy() {
-    if (machine_->process(event::quickBuy{})) {
-        report();
-    }
-}
-
 void ShopFsm::fraud() {
     if (machine_->process(event::fraud{})) {
         report();
@@ -346,12 +335,6 @@ void ShopFsm::card() {
     }
 }
 
-void ShopFsm::abort() {
-    if (machine_->process(event::abort{})) {
-        report();
-    }
-}
-
 void ShopFsm::packed() {
     if (machine_->process(event::packed{})) {
         report();
@@ -360,12 +343,6 @@ void ShopFsm::packed() {
 
 void ShopFsm::sent() {
     if (machine_->process(event::sent{})) {
-        report();
-    }
-}
-
-void ShopFsm::reopen() {
-    if (machine_->process(event::reopen{})) {
         report();
     }
 }

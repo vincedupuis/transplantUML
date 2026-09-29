@@ -107,7 +107,9 @@ func convert(opts options, stdout, stderr io.Writer) error {
 		if err != nil {
 			return err
 		}
-		if out, warnings, err = emitter.Emit(sm); err != nil {
+		out, warnings, err = emitter.Emit(sm)
+		report(stderr, warnings)
+		if err != nil {
 			return err
 		}
 	default:
@@ -116,10 +118,10 @@ func convert(opts options, stdout, stderr io.Writer) error {
 			return err
 		}
 		text, w, err := render.Render(sm, tmpl)
+		report(stderr, w)
 		if err != nil {
 			return err
 		}
-		report(stderr, w)
 		files, err := render.Files(text)
 		if err != nil {
 			return err
@@ -127,9 +129,8 @@ func convert(opts options, stdout, stderr io.Writer) error {
 		if files != nil {
 			return writeFiles(opts.output, files, stderr)
 		}
-		out, warnings = []byte(text), nil
+		out = []byte(text)
 	}
-	report(stderr, warnings)
 
 	if opts.output == "" {
 		_, err = stdout.Write(out)
@@ -176,9 +177,9 @@ func template(name string) (string, error) {
 	return "", fmt.Errorf("reading template: %w (built-in templates: %s)", err, strings.Join(assets.TemplateNames(), ", "))
 }
 
-// report prints the warnings a parser, emitter or template raised: what the
-// input held that the model or the output has no place for. They never fail
-// the conversion.
+// report prints the warnings a parser, emitter or template raised: where the
+// output behaves as the input does only through a workaround. They never fail
+// the conversion; what the output cannot do is an error instead.
 func report(stderr io.Writer, warnings model.Warnings) {
 	for _, w := range warnings {
 		fmt.Fprintln(stderr, "fsm: warning:", w)

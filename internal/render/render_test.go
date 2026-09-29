@@ -94,7 +94,8 @@ func TestPlantUMLGolden(t *testing.T) {
 	}
 }
 
-// The built-in template must say what it cannot draw.
+// The built-in template must say what it cannot draw, and draw a note saying
+// it instead.
 func TestPlantUMLWarnings(t *testing.T) {
 	src, err := os.ReadFile("../scxml/testdata/uml.scxml")
 	if err != nil {
@@ -109,18 +110,19 @@ func TestPlantUMLWarnings(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
-		`transition inner -> inner: PlantUML has no local transitions; drawn as an external one`,
-		`transition inner (note): PlantUML cannot attach a note to an internal transition`,
-		`state "stop": PlantUML has no terminate symbol; drawn as a final state`,
-		`transition split -> right: PlantUML cannot draw arrows across the boundary of a parallel region other than the first`,
-		`transition right -> sync: PlantUML cannot draw arrows across the boundary of a parallel region other than the first`,
+		`transition inner (note): PlantUML cannot attach a note to an internal transition; it joins the note on "inner"`,
+		`state "stop": PlantUML has no terminate symbol; drawn as a final state, which its note calls a terminate`,
+		`transition split -> right: PlantUML cannot draw arrows across the boundary of a parallel region other than the first; a note on "split" says it`,
+		`transition right -> sync: PlantUML cannot draw arrows across the boundary of a parallel region other than the first; a note on "right" says it`,
+		`transition outer -> inner: PlantUML has no local transitions; drawn as an external one marked «local»`,
 	}
 	if !reflect.DeepEqual([]string(warnings), want) {
 		t.Errorf("warnings =\n%s\nwant\n%s", strings.Join(warnings, "\n"), strings.Join(want, "\n"))
 	}
 }
 
-// A compound region's own transitions have no PlantUML equivalent.
+// A compound region's own transitions have no PlantUML equivalent; the
+// parallel state's note gives them.
 func TestPlantUMLRegionTransitions(t *testing.T) {
 	sm := &model.StateMachine{
 		States: []*model.State{
@@ -135,6 +137,9 @@ func TestPlantUMLRegionTransitions(t *testing.T) {
 	}
 	if strings.Contains(out, "r -->") {
 		t.Errorf("region transition must not be drawn:\n%s", out)
+	}
+	if !strings.Contains(out, "\nnote right of p : region r: --> x: e\n") {
+		t.Errorf("region transition not in the note on p:\n%s", out)
 	}
 	if len(warnings) != 1 || !strings.Contains(warnings[0], `region "r"`) {
 		t.Errorf("warnings = %q", warnings)
@@ -184,9 +189,10 @@ func TestPlantUMLApproximations(t *testing.T) {
 		"\nstate \"my-comp\" as my_comp {\n",
 		"\n    state h <<history>>\n    note right of h : remembers\n",
 		"\n    h --> in\n    note on link : default\n",
-		"\nstate c <<choice>>\n",
+		"\nstate c <<choice>>\nnote right of c : «mine»\n",
 		"\nstate done <<end>>\nnote right of done\n    entry / bye\n    over\nend note\n",
-		"\nstate p {\n    state r1\n    --\n    state q {\n        state q1\n        --\n        state q2\n    }\n}\n",
+		"\nstate p {\n    state r1\n    --\n    state q {\n        state q1\n        --\n        state q2\n    }\n}\nnote right of p : region r: region\n",
+		"\nnote right of a_b : not drawn: --> r: into\n",
 		"\na_b --> my_comp: go\\n[ ready\\nand set ]\n",
 	} {
 		if !strings.Contains(out, want) {
@@ -194,9 +200,9 @@ func TestPlantUMLApproximations(t *testing.T) {
 		}
 	}
 	wantWarnings := []string{
-		`state "c": PlantUML allows one stereotype per state; «mine» is not drawn`,
-		`region "r": PlantUML regions are anonymous; its behaviours, stereotype and note are not drawn`,
-		`region "r": PlantUML regions are anonymous; the transition a.b -> r into it is not drawn`,
+		`state "c": PlantUML allows one stereotype per state; «mine» goes into its note`,
+		`region "r": PlantUML regions are anonymous; its behaviours, stereotype and note join the note on "p"`,
+		`region "r": PlantUML regions are anonymous; the transition a.b -> r into it is not drawn, and a note on "a.b" says it`,
 	}
 	if !reflect.DeepEqual([]string(warnings), wantWarnings) {
 		t.Errorf("warnings =\n%s\nwant\n%s", strings.Join(warnings, "\n"), strings.Join(wantWarnings, "\n"))
@@ -224,6 +230,18 @@ func TestHelpers(t *testing.T) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 	if !reflect.DeepEqual([]string(warnings), []string{"no cheese here"}) {
+		t.Errorf("warnings = %q", warnings)
+	}
+}
+
+// error records what the output cannot do; Render fails with all of them
+// and still returns the warnings.
+func TestErrorHelper(t *testing.T) {
+	out, warnings, err := Render(&model.StateMachine{}, `{{ warn "close" }}{{ error "no %s" "cheese" }}text{{ error "no wine" }}`)
+	if err == nil || err.Error() != "no cheese\nno wine" || out != "" {
+		t.Errorf("out = %q, err = %v", out, err)
+	}
+	if !reflect.DeepEqual([]string(warnings), []string{"close"}) {
 		t.Errorf("warnings = %q", warnings)
 	}
 }

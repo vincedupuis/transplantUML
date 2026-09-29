@@ -18,13 +18,14 @@ import (
 var fsmParser fsm.Parser
 
 // smlGoldens maps the documents whose Boost.SML rendering is checked in to the
-// folder holding its files. Regenerate one with:
+// folder holding its files. kiosk, shop and uml are the examples and uml.scxml
+// without what Boost.SML cannot run (TestSMLErrors). Regenerate one with:
 // go run ./cmd/fsm -i <input> -t sml -o internal/render/testdata/sml/<name>
 var smlGoldens = map[string]string{
-	"../../example/kiosk.fsm":     "testdata/sml/kiosk",
-	"../../example/shop.fsm":      "testdata/sml/shop",
-	"../../example/support.fsm":   "testdata/sml/support",
-	"../scxml/testdata/uml.scxml": "testdata/sml/uml",
+	"testdata/sml/kiosk.fsm":    "testdata/sml/kiosk",
+	"testdata/sml/shop.fsm":     "testdata/sml/shop",
+	"../../example/support.fsm": "testdata/sml/support",
+	"testdata/sml/uml.scxml":    "testdata/sml/uml",
 }
 
 // smlFiles renders sm with the SML template and splits the output into its
@@ -96,52 +97,142 @@ func TestSMLFiles(t *testing.T) {
 	}
 }
 
-// The SML template must say what it cannot write.
+// The SML template says where it writes the model through a workaround that
+// behaves the same.
 func TestSMLWarnings(t *testing.T) {
-	_, warnings := smlFilesOf(t, "../scxml/testdata/uml.scxml")
+	_, warnings := smlFilesOf(t, "testdata/sml/uml.scxml")
 	want := []string{
-		`state "in": Boost.SML has no entry points; transitions to it enter "outer" at its initial state, and its own transitions are not written`,
-		`state "out": Boost.SML has no exit points; the transitions to and from it are not written`,
-		`transition inner -> inner: Boost.SML has no local transitions; written as an external one`,
-		`state "split": Boost.SML has no fork; transitions to it enter "both", whose regions start in their initial states, and its own transitions are not written`,
+		`state "in": Boost.SML has no entry points; transitions to it enter "outer", which starts in the state the entry point leads to`,
+		`state "split": Boost.SML has no fork; transitions to it enter "both", whose regions start in the states it forks to`,
 		`state "sync": Boost.SML has no join; transitions to it end their region (X), and its outgoing transition is taken once every region of "both" has ended`,
-		`state "work": Boost.SML has no do activities; runJob is written as a comment`,
 	}
 	if !reflect.DeepEqual([]string(warnings), want) {
 		t.Errorf("warnings =\n%s\nwant\n%s", strings.Join(warnings, "\n"), strings.Join(want, "\n"))
 	}
 }
 
-// The machine's own points are written, save what cannot reach or leave them:
-// a transition to its entry point, which only enterFsm enters, and one from
-// its exit point, where the machine ends. An event named like a method that
-// starts or stops the machine makes the files fail to compile.
-func TestSMLMachinePointWarnings(t *testing.T) {
-	sm := &model.StateMachine{
-		Name: "m", Initial: "a",
-		States: []*model.State{
-			{Name: "a", Kind: model.Normal},
-			{Name: "in", Kind: model.EntryPoint},
-			{Name: "out", Kind: model.ExitPoint},
+// What Boost.SML cannot run the way the model means it is an error, and
+// rendering fails with all of them.
+func TestSMLErrors(t *testing.T) {
+	documents := map[string][]string{
+		"../scxml/testdata/uml.scxml": {
+			`state "out": Boost.SML has no exit points`,
+			`state "work": Boost.SML has no do activities, so runJob cannot run`,
+			`transition outer -> inner: Boost.SML has no local transitions`,
 		},
-		Transitions: []*model.Transition{
-			{Source: "in", Targets: []string{"a"}},
-			{Source: "a", Targets: []string{"in"}, Event: "enterFsm"},
-			{Source: "a", Targets: []string{"out"}, Event: "leave"},
-			{Source: "out", Targets: []string{"a"}},
+		"../scxml/testdata/edge.scxml": {
+			`transition a -> a b: a Boost.SML transition has one target`,
+		},
+		"../../example/kiosk.fsm": {
+			`state "authorizing": Boost.SML has no do activities, so spin cannot run`,
+			`transition paying -> again: Boost.SML has no transitions into a composite state, and entering "paying" would not reach "again"`,
+			`transition authorizing -> browsing: Boost.SML has no transitions from inside a composite state; as a transition of "paying" it would fire from any of its states`,
+			`state "ordering.H": Boost.SML resumes a history in its region's initial state the first time, not through the default transition to browsing`,
+			`transition idle -> browsing: Boost.SML has no transitions into a composite state, and entering "ordering" would not reach "browsing"`,
+			`transition ordering -> browsing: Boost.SML has no transitions into a composite state, and entering "ordering" would not reach "browsing"`,
+			`transition ordering -> browsing: Boost.SML has no local transitions`,
+			`transition paying -> done: Boost.SML has no transitions from inside a composite state; as a transition of "ordering" it would fire from any of its states`,
+		},
+		"../../example/shop.fsm": {
+			`state "express": Boost.SML has no entry points; entering "checkout" would not reach the state the entry point leads to, or would drop its guard or actions`,
+			`state "cancelled": Boost.SML has no exit points`,
+			`state "checkout.H-deep": Boost.SML has only shallow history, and "checkout" holds nested states a deep history would resume`,
+			`transition reorder -> checkout: "checkout" has a history, which Boost.SML would resume instead of entering it at its initial state`,
+			`transition browsing -> checkout: "checkout" has a history, which Boost.SML would resume instead of entering it at its initial state`,
+			`transition escalated -> checkout: "checkout" has a history, which Boost.SML would resume instead of entering it at its initial state`,
+			`state "split": Boost.SML has no fork; entering "shipping" would not start its regions in the states the fork leads to, or would drop the fork's actions`,
 		},
 	}
-	if err := sm.Validate(); err != nil {
-		t.Fatal(err)
+	for path, want := range documents {
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			smlErrors(t, parseFile(t, path), want)
+		})
 	}
-	_, warnings := smlFiles(t, sm)
-	want := []string{
-		`event "enterFsm": its method enterFsm clashes with the one that starts or stops the machine; the files do not compile`,
-		`state "in": the machine is entered at its entry point by enterFsm; the transitions to it are not written`,
-		`state "out": the machine ends at its exit point; the transitions from it are not written`,
+
+	models := map[string]struct {
+		sm   *model.StateMachine
+		want []string
+	}{
+		// The machine's own entry point is reached only by enterFsm, and it
+		// ends at its exit point. An event named like a method that starts or
+		// stops the machine, or a named delay like a guard, would not compile.
+		"points and names": {&model.StateMachine{
+			Name: "m", Initial: "a",
+			States: []*model.State{
+				{Name: "a", Kind: model.Normal},
+				{Name: "in", Kind: model.EntryPoint},
+				{Name: "out", Kind: model.ExitPoint},
+			},
+			Transitions: []*model.Transition{
+				{Source: "in", Targets: []string{"a"}},
+				{Source: "a", Targets: []string{"in"}, Event: "enterFsm"},
+				{Source: "a", Targets: []string{"out"}, Event: "leave"},
+				{Source: "out", Targets: []string{"a"}},
+				{Source: "a", Targets: []string{"a"}, After: "ok", Cond: "ok"},
+			},
+		}, []string{
+			`event "enterFsm": its method enterFsm clashes with the one that starts or stops the machine; the files would not compile`,
+			`state "in": the machine is entered at its entry point only by enterFsm, so a transition cannot reach it`,
+			`state "out": the machine ends at its exit point, so no transition can leave it`,
+			`delay "ok": its method ok clashes with a guard or action of that name; the files would not compile`,
+		}},
+		// A region has no behaviour of its own, X none either, and a
+		// completion can be lifted out of one composite state only.
+		"regions, finals and depth": {&model.StateMachine{
+			Name: "m", Initial: "p",
+			States: []*model.State{
+				{Name: "p", Kind: model.Parallel},
+				{Name: "r", Parent: "p", Kind: model.Normal, Initial: "c", OnEntry: []string{"wake"}},
+				{Name: "c", Parent: "r", Kind: model.Normal, Initial: "d"},
+				{Name: "d", Parent: "c", Kind: model.Normal, Initial: "e"},
+				{Name: "e", Parent: "d", Kind: model.Normal},
+				{Name: "end", Kind: model.Final, OnEntry: []string{"bye"}},
+			},
+			Transitions: []*model.Transition{
+				{Source: "e", Targets: []string{"end"}},
+			},
+		}, []string{
+			`region "r": Boost.SML regions are anonymous, so they have no behaviours or deferred events`,
+			`transition e -> end: Boost.SML has no transitions from inside a composite state, and "e" lies too deep inside "p" to complete it`,
+			`state "end": Boost.SML's final state X has no entry or exit behaviour`,
+		}},
+		// A join needs its incoming transitions to leave the regions of one
+		// orthogonal state.
+		"join without owner": {&model.StateMachine{
+			Name: "m", Initial: "a",
+			States: []*model.State{
+				{Name: "a", Kind: model.Normal},
+				{Name: "b", Kind: model.Normal},
+				{Name: "j", Kind: model.Join},
+			},
+			Transitions: []*model.Transition{
+				{Source: "a", Targets: []string{"j"}, Event: "x"},
+				{Source: "b", Targets: []string{"j"}, Event: "y"},
+				{Source: "j", Targets: []string{"a"}},
+			},
+		}, []string{
+			`state "j": Boost.SML has no join, and its incoming transitions do not all come from one orthogonal state`,
+		}},
 	}
-	if !reflect.DeepEqual([]string(warnings), want) {
-		t.Errorf("warnings =\n%s\nwant\n%s", strings.Join(warnings, "\n"), strings.Join(want, "\n"))
+	for name, c := range models {
+		t.Run(name, func(t *testing.T) {
+			if err := c.sm.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			smlErrors(t, c.sm, c.want)
+		})
+	}
+}
+
+// smlErrors checks that rendering sm with the SML template fails with want.
+func smlErrors(t *testing.T, sm *model.StateMachine, want []string) {
+	t.Helper()
+	out, _, err := Render(sm, assets.SML)
+	if err == nil {
+		t.Fatalf("rendered without an error:\n%s", out)
+	}
+	if got := strings.Split(err.Error(), "\n"); !reflect.DeepEqual(got, want) {
+		t.Errorf("errors =\n%s\nwant\n%s", err, strings.Join(want, "\n"))
 	}
 }
 
@@ -444,12 +535,11 @@ func smlWrite(t *testing.T, dir string, files []File, main string) []string {
 // The goldens only prove the output has not changed. This compiles every
 // document's rendering together with a program that implements its actions
 // and sends it its events, so that SML itself checks the tables, with a
-// stand-in for each machine a submachine state runs. Warnings count as
-// failures.
+// stand-in for each machine a submachine state runs.
 func TestSMLCompiles(t *testing.T) {
 	cxx, include := smlToolchain(t)
 	rendered := map[string][]File{}
-	for input := range goldens(t) {
+	for input := range smlGoldens {
 		files, _ := smlFilesOf(t, input)
 		rendered[filepath.Base(input)] = append(files, smlStandIns(t, parseFile(t, input))...)
 	}
@@ -726,8 +816,8 @@ enter, start, fire 30s: start 30000 start 1000 cancel 1000 ding
 
 // A delay becomes a std::chrono duration, in seconds when it is whole ones. A
 // named delay is read from the actions. A timer on a region that holds states
-// starts with its orthogonal state. What has to be rounded, or clashes with a
-// guard, is said.
+// starts with its orthogonal state, and its transitions become the orthogonal
+// state's. What has to be rounded is said.
 func TestSMLDelays(t *testing.T) {
 	sm := &model.StateMachine{
 		Name: "d", Initial: "a",
@@ -743,7 +833,7 @@ func TestSMLDelays(t *testing.T) {
 			{Source: "a", Targets: []string{"p"}, After: "2.0s"},
 			{Source: "a", Targets: []string{"p"}, After: "250ms"},
 			{Source: "a", Targets: []string{"p"}, After: "1.2345s"},
-			{Source: "a", Targets: []string{"p"}, After: "ok", Cond: "ok"},
+			{Source: "a", Targets: []string{"p"}, After: "ok", Cond: "ready"},
 			{Source: "r1", Targets: []string{"a"}, After: "3s"},
 		},
 	}
@@ -753,8 +843,7 @@ func TestSMLDelays(t *testing.T) {
 	files, warnings := smlFiles(t, sm)
 	wantWarnings := []string{
 		`transition a -> p: the delay 1.2345s is rounded down to whole milliseconds`,
-		`transition r1 -> a: Boost.SML has no transitions from inside a composite state; written as a transition of "p"`,
-		`delay "ok": its method ok clashes with a guard or action of that name; the files do not compile`,
+		`transition r1 -> a: Boost.SML has no transitions from a region; written as a transition of "p", which is active exactly when "r1" is`,
 	}
 	if !reflect.DeepEqual([]string(warnings), wantWarnings) {
 		t.Errorf("warnings =\n%s\nwant\n%s", strings.Join(warnings, "\n"), strings.Join(wantWarnings, "\n"))

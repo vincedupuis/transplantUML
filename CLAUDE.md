@@ -13,9 +13,13 @@ no file has it: `assets/puml.gotmpl` (`puml`, used when `-t` is omitted) produce
 the `file` function; `render.Files` splits the output at those marks and `-o` then names a folder.
 
 The user keeps one source document and generates outputs from it; round-tripping is *not* a goal. The goal is to
-cover as much of UML as possible on the input side and, on the output side, to write what the format can express
-and **warn** (never silently drop) about the rest. Parsers, emitters and `render.Render` all return
-`model.Warnings`; `cmd/fsm` prints them to stderr as `fsm: warning: …`. Guards, actions, do activities,
+cover as much of UML as possible on the input side and, on the output side, to write what the format can express.
+What would break the machine's behaviour in the destination is an **error**, never a warning. A **warning** only
+marks a concept with no 1:1 counterpart that a workaround makes behave the same (PlantUML, a diagram, warns and
+draws a note saying what is meant). Conditional cases are decided per case: SML's fork, a state's entry point, a
+transition into a composite state warn when entering by default reaches the same states (`DefaultEntry`), and fail
+otherwise. Parsers, emitters and `render.Render` all return `model.Warnings` and fail with every error they found
+(`errors.Join`); `cmd/fsm` prints the warnings to stderr as `fsm: warning: …`, then the error. Guards, actions, do activities,
 invariants and named delays hold names only (`model.IsName`, `model.IsCondition`: names with `not`/`and`/`or`/
 parentheses, `model.IsDelay`: a duration or a name), which generated code calls as functions; anything else is an
 error from `Validate`, never a warning.
@@ -42,7 +46,8 @@ make generate                       # download the ANTLR jar into bin/ and regen
 Golden files for the PlantUML template live in `internal/render/testdata/*.puml`; regenerate one with
 `go run ./cmd/fsm -i <input> -o internal/render/testdata/<name>.puml` after checking the diff is intended. Those for
 the SML template are folders, `internal/render/testdata/sml/<name>/` (listed in `smlGoldens`), regenerated with
-`-t sml -o internal/render/testdata/sml/<name>`.
+`-t sml -o internal/render/testdata/sml/<name>` from the input beside the folder (`kiosk.fsm`, `shop.fsm`,
+`uml.scxml`: the examples and `uml.scxml` without what Boost.SML cannot run) or `example/support.fsm`.
 
 ## Architecture
 
@@ -76,13 +81,17 @@ warnings.
   `tpuml:stereotype`, `<tpuml:note>` (on a state, `about="entry|exit|do|invariant|defer"` says what it
   describes). Three idioms are recognised without markup: transient states as choice/fork (`connectorKind`),
   `<send delay>`+`<cancel>` as a time trigger (`timers`), and `done.state`/`done.invoke` as the completion event
-  (`completes`); the emitter writes completion transitions back on those events. Anything else unknown under a state or the root raises a
-  parser warning. `Emitter` (`emit.go`) rebuilds the tree from `Parent` links, writes
+  (`completes`); the emitter writes completion transitions back on those events. `type="internal"` with a target
+  is a local transition when every target lies inside the source, external otherwise (`localTransitions`). An
+  unknown SCXML element under a state or the root is a parser error (`unsupported`); one of another namespace,
+  which engines ignore, a warning. `Emitter` (`emit.go`) rebuilds the tree from `Parent` links, writes
   the initial child as an attribute, writes each action as a `<script>` holding its name and each do activity as
   `<invoke type="tpuml:do" src>`, writes a fork's transitions as one multi-target transition and an
-  `else` branch last with no `cond` (engines take the first enabled transition), declares the extension
-  namespace only when used, and warns for join, terminate, local and defer, and leaves out a
-  submachine state's entry and exit points with a warning. States it cannot reach from the top level are an error.
+  `else` branch last with no `cond` (engines take the first enabled transition), writes a local transition as
+  `type="internal"`, and declares the extension namespace only when used. It warns for a top-level terminate
+  (a `<final>`), and fails (`fail`) on join, defer, a nested terminate, the machine's initial effect, a completion
+  that would not wait for a do activity, and a submachine state's entry and exit points. States it cannot reach
+  from the top level are an error.
 - **`internal/fsm`** — the command's own DSL (`fsm name { state s { on ev [guard] / actions goto target } }`), an
   ANTLR4 grammar in `fsm.g4`. `parser/` is generated from it (`make generate`, Go target with `-visitor
   -no-listener`) and committed so the build needs no Java; never edit it by hand, and regenerate it after any
@@ -113,8 +122,8 @@ warnings.
 - **`internal/jsonsm`** — the model's own JSON shape (struct tags in `model`). Parser uses
   `DisallowUnknownFields`; round-trip equality with the SCXML parser is tested.
 - **`internal/render`** — registers sprig plus project helpers (`include`, `prefix`, `surround`, `joinNonEmpty`,
-  `warn`, `file`) and the model accessors as template functions. `warn` records a warning and returns `""`; `Render`
-  returns the collected warnings. `joinNonEmpty` exists because sprig's `join` has the signature `join sep list`;
+  `warn`, `error`, `file`) and the model accessors as template functions. `warn` and `error` record a warning or an
+  error and return `""`; `Render` returns the collected warnings and fails with every error. `joinNonEmpty` exists because sprig's `join` has the signature `join sep list`;
   don't shadow sprig names.
 - **`assets/puml.gotmpl`** — every emitted line starts with `\n` so nested blocks compose via
   `include ... | trimPrefix "\n" | indent 4`. Each scope (top level, compound body, region) declares its states
@@ -127,8 +136,10 @@ warnings.
   (junction as `<<start>>`, the filled circle); only the initial state is drawn as `[*]`. A user stereotype is
   kept as `<<s>>` and shown as `«s»` in the label since PlantUML does not print it. Parallel regions are the
   *bodies* of the region states separated by `--` (a leaf or orthogonal region is drawn as the state itself; a
-  compound region's own transitions, behaviours and note warn). PlantUML refuses arrows across the boundary of
-  any region but the first (`confined`), so those warn instead. Verified with the PlantUML jar: `-syntax` accepts
+  compound region's own transitions, behaviours and note warn and go into the parallel state's note). PlantUML
+  refuses arrows across the boundary of any region but the first (`confined`), so those warn and the note on their
+  source lists them (`undrawn`); terminate, a pseudostate's stereotype and a note on an internal transition likewise
+  go into a note. Verified with the PlantUML jar: `-syntax` accepts
   unknown stereotypes and silently ignores unsupported constructs, so test new notations by rendering
   (`-tpng`, with `-Playout=smetana` if Graphviz is missing) and looking at the image.
 - **`assets/sml.gotmpl`** — Boost.SML, as `<Name>FsmEvents.h` (an interface, one pure virtual `void` method per
@@ -140,13 +151,14 @@ warnings.
   qualified (`sml::event`, `sml::X`, …) with only `sml::literals` and the guard/action operators imported, because
   `using namespace sml` makes event names like `back` ambiguous. Each compound or orthogonal state is a struct
   (`HasTable`), an orthogonal state's regions are flattened into its table (`TableOf`), and a transition is lifted by
-  `Lift` into the innermost table holding both ends, warning when that moves an end. Those table functions live in
+  `Lift` into the innermost table holding both ends; moving an end warns when the behaviour stays the same (a
+  completion lifted through `X`, a region's transition, `DefaultEntry`, `AlwaysActive`) and is an error otherwise. Those table functions live in
   `internal/render/tables.go`; the template keeps the rendering and every `warn`. Rows are built with sentinels
   (`⟨g:…⟩`, `⟨a:…⟩`, `⟨e:…⟩`, `⟨s:…⟩`) so `body` can declare only the lambdas a table uses and fully qualify the
   event namespace or a struct a lambda would hide. The tables are rendered first and the interfaces derived from the
   lambdas they declare. Behaviour verified by compiling and running generated code against SML: guards on one source
   are tried in table order, an anonymous transition leaving a composite state waits for it to reach `X`, and an
-  orthogonal state completes when every region has. `TestSMLCompiles` compiles every golden input with a stub
+  orthogonal state completes when every region has. `TestSMLCompiles` compiles every SML golden input with a stub
   implementation of the actions and a stand-in for each machine a submachine state runs.
   Every machine waits in `internal::stopped` until `enterFsm(Entry)` (the initial state or one of its entry points)
   and ends in `X` or one of its exit points, which `report` tells the `<Name>FsmListener`; `stopFsm` sends `internal::stop`, which every state of the
@@ -169,14 +181,17 @@ warnings.
 ## Conventions
 
 - README.md documents the model, template functions and CLI flags; update it when any of those change.
-- A concept added to `uml.scxml` also goes into `internal/render/testdata/sml/uml/` and `TestSMLWarnings`.
+- A concept added to `uml.scxml` also goes into the per-output copies when that output can run it:
+  `internal/scxml/testdata/uml-scxml.scxml` (golden `uml-scxml.emitted.scxml`) and
+  `internal/render/testdata/sml/uml.scxml` (golden folder `sml/uml/`). What an output cannot run goes into its
+  error test instead (`TestEmitBehaviourErrors`, `TestSMLErrors`).
 - Test fixtures: `example/coffee-machine.scxml` (simple, flat), `internal/scxml/testdata/edge.scxml`
   (parallel, `<initial>` element, deep history, final, onentry, multi-target) and `internal/scxml/testdata/uml.scxml`
   (every UML concept: connectors, terminate, submachine, do, defer, invariant, variables, time trigger, local and
-  internal transitions, notes, stereotype; also exercises every warning). `internal/scxml/testdata/expressions.scxml`
+  internal transitions, notes, stereotype; also exercises every PlantUML warning). `internal/scxml/testdata/expressions.scxml`
   holds the executable content that is an error (`TestExpressionErrors`). Add new concepts to `uml.scxml` and its
-  goldens (`internal/render/testdata/uml.puml`, `internal/scxml/testdata/uml.emitted.scxml`) and to the warning
-  lists in `TestPlantUMLWarnings`, `TestEmitWarnings` and `TestUMLConcepts`.
+  golden (`internal/render/testdata/uml.puml`), to the per-output copies above, and to the lists in
+  `TestPlantUMLWarnings`, `TestEmitWarnings`, `TestSMLWarnings`, `TestUMLConcepts` and the error tests.
 - `example/` has one document per group of concepts (see the README table) with its rendered `.puml` beside it.
   `goldens()` in `internal/render/render_test.go` globs the directory, so every `example/*.scxml|json` must have
   a matching `.puml` (regenerate with `go run ./cmd/fsm -i example/<name> -o example/<name>.puml`), is checked
