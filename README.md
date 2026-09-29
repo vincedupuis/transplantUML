@@ -34,7 +34,7 @@ Warnings go to stderr and never fail the conversion.
 | Orthogonal state, regions              | `parallel`, children are the regions                  | `<parallel>`                                                         | regions separated by `--`                           | one table, a `*` initial state per region     |
 | Submachine state                       | `Submachine`                                          | `<invoke src>`                                                       | `state "X: ref" as X`                               | runs that machine's generated class           |
 | Initial                                | `Initial` on the machine / the state                  | `initial` attr, `<initial>`                                          | `[*] -->`                                           | `*` on the initial state                      |
-| Effect of the initial transition       | `InitialActions` on the machine / the state           | `<initial><transition>` content; the machine's ✗                     | `[*] --> X : / act`                                 | on `enterFsm`; transient in a state           |
+| Effect of the initial transition       | `InitialActions` on the machine / the state           | `<initial><transition>`; the machine's in a transient state ⚠        | `[*] --> X : / act`                                 | on `enterFsm`; transient in a state           |
 | Final                                  | `final`                                               | `<final>`                                                            | `state X <<end>>`                                   | `sml::X`                                      |
 | Terminate                              | `terminate`                                           | `<final>` at the top level ⚠; else ✗                                 | `state X <<end>>` ⚠                                 | ends the machine, `onTerminated`              |
 | Shallow / deep history                 | `history-shallow`, `history-deep`                     | `<history>`                                                          | `<<history>>`, `<<history*>>`                       | `(sml::H)` on the initial state; ⚠ or ✗       |
@@ -47,7 +47,7 @@ Warnings go to stderr and never fail the conversion.
 | Entry / exit behaviour                 | `OnEntry`, `OnExit`                                   | `<onentry>`, `<onexit>`                                              | `X : entry / …`, `X : exit / …`                     | `+ sml::on_entry<sml::_> / …`                 |
 | Do activity                            | `Do`                                                  | `<invoke type="tpuml:do" src>`                                       | `X : do / …`                                        | ✗                                             |
 | Deferred events                        | `Defer`                                               | ✗                                                                    | `X : ev / defer`                                    | `/ sml::defer`, with `defer_queue`            |
-| State invariant                        | `Invariant`                                           | `tpuml:invariant`                                                    | `X : [ cond ]`                                      | comment                                       |
+| State invariant                        | `Invariant`                                           | `tpuml:invariant`                                                    | `X : [ cond ]`                                      | `invariant<Name>()` checked after each event  |
 | Variables                              | `Variables` on the machine / the state                | `<datamodel>`                                                        | `legend` / `X : name = value`                       | comment; the actions hold them                |
 | Trigger, guard, effect                 | `Event`, `Cond`, `Actions`                            | `event`, `cond`, `<script>` holding a name                           | `A --> B : ev [ g ] / act`                          | event method, guard and action methods        |
 | Time trigger `after(5s)`               | `After`                                               | `<send delay(expr)>` in `<onentry>`, `<cancel>` on exit              | `after(5s)`                                         | a timer through `FsmTimers`                   |
@@ -362,9 +362,11 @@ fsm -i internal/render/testdata/sml/kiosk.fsm -t sml -o gen/
 | `FsmTimers.h`       | `class FsmTimers`, the interface that starts and cancels timers, the same    |
 |                     | for every machine                                                            |
 | `KioskFsmEvents.h`  | `class KioskFsmEvents`, the interface with one method per event              |
-| `KioskFsmActions.h` | `class KioskFsmActions`, the interface with the guards and actions to supply |
+| `KioskFsmActions.h` | `class KioskFsmActions`, the interface with the guards, actions and          |
+|                     | invariants to supply                                                         |
 | `KioskFsm.h`        | `class KioskFsm`, the state machine, which implements `KioskFsmEvents`       |
-|                     | and `class KioskFsmListener`, the interface it tells when it ends            |
+|                     | and `class KioskFsmListener`, the interface it tells when it ends or         |
+|                     | an invariant does not hold                                                   |
 | `KioskFsm.cpp`      | its implementation, the only file that includes SML                          |
 
 That document is `example/kiosk.fsm` without what Boost.SML cannot run, and
@@ -396,10 +398,14 @@ Either one starts the machine again from the beginning if it is already running.
 These names keep them apart from the events' methods; an event named like one of them is an error, since the files
 would not compile.
 
-`setListener` takes a `KioskFsmListener`, which the machine tells when it ends.
+`setListener` takes a `KioskFsmListener`, which the machine tells when it ends, and when an invariant does not hold.
 `onFinished()` is called when it reaches its final state.
 `onTerminated()` is called when it reaches a terminate state, at any depth, once the current event is done.
 `onExitP()` is called when it leaves by its exit point `p`.
+`onInvariantViolated("paying")` is called when the invariant of the active state `paying` does not hold.
+The machine checks it once `enterFsm` or an event is processed, while the state is active.
+Each name of the invariant is a method of the actions interface, named after it: `[basket and not card]` calls
+`invariantBasket()` and `invariantCard()`, each a `bool … const`.
 The machine stops before telling it.
 
 ### Time triggers
@@ -501,7 +507,8 @@ Things to know:
   It warns, and it is an error when its incoming transitions do not all leave the regions of one orthogonal state.
 - A fork enters its orthogonal state, with a warning, when the regions start in the states it leads to and it has
   no effect; otherwise it is an error.
-- Notes, stereotypes and invariants become `//` comments in `KioskFsm.cpp`, the machine's note goes on the class,
+- Notes and stereotypes become `//` comments in `KioskFsm.cpp`, as does each invariant above the rows that check it,
+  the machine's note goes on the class,
   and its variables are listed on the actions interface, whose implementation holds them.
   SML has no do activities, so one is an error, as are a multi-target transition, a local transition, and a
   region's own behaviours.
@@ -556,6 +563,7 @@ namespace `https://github.com/vincedupuis/transplantUML` (any prefix; `tpuml` be
 |------------------------------------------------------------------------------|--------------------------------------|-------------------------------------------|
 | `tpuml:kind="junction\|join\|entry-point\|exit-point\|choice\|fork\|normal"` | `<state>`                            | the pseudo-state kind (a transient state) |
 | `tpuml:kind="terminate"`                                                     | `<final>`                            | a terminate pseudo-state                  |
+| `tpuml:kind="initial"`                                                       | `<state>` the `<scxml>` starts in    | holds the machine's initial transition    |
 | `tpuml:kind="local"`                                                         | `<transition>`                       | a local transition, as `type="internal"`  |
 | `tpuml:defer="e1 e2"`                                                        | `<state>`                            | deferred events                           |
 | `tpuml:invariant="expr"`                                                     | `<state>`                            | state invariant                           |
@@ -573,7 +581,8 @@ for what does not change how an engine runs the machine (kinds, notes, stereotyp
 equivalent, not byte-identical, to the one it came from:
 
 - the initial child is written as an `initial` attribute, or as an `<initial>` element when its transition has an
-  effect; `<scxml>` takes no `<initial>` element, so the machine's own initial effect is an error;
+  effect; `<scxml>` takes no `<initial>` element, so the machine's own initial effect goes in a transient state
+  `tpuml:kind="initial"` that the machine starts in and leaves at once, with a warning;
 - each action becomes a `<script>` holding its name, and each do activity `<invoke type="tpuml:do" src="name"/>`;
 - a time trigger becomes `<send event="after.D" delay="D" id="…">` in `<onentry>`, the matching `<cancel>` in
   `<onexit>`, and a transition on that event;
@@ -585,6 +594,7 @@ equivalent, not byte-identical, to the one it came from:
 - comments and anything the parser dropped are not preserved.
 
 A terminate at the top level is written as a `<final>` state, which ends the machine the same way, with a warning.
+So is the machine's initial effect, written in a transient state.
 What SCXML would run differently is an error: join (the first region to reach it would leave the parallel state),
 a terminate inside a state or with exit actions, deferred events, a completion transition that cannot wait for a do
 activity, and the entry and exit points of a submachine state.
@@ -636,7 +646,7 @@ than a keyword; it takes no guard and no `goto`, because the model holds only th
 
 `invariant [condition]` is the state invariant: a condition that stays true for as long as the state is active.
 It is a promise about the machine's data, not a trigger, so nothing fires when it is false.
-A false invariant is a bug, which generated code can assert.
+A false invariant is a bug, which generated code can report; the Boost.SML output tells its listener.
 The condition is written as a guard is and reaches `Invariant` verbatim.
 A state, a parallel state and a submachine state each hold at most one; join several conditions with `and`.
 

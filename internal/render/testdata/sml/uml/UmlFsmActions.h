@@ -17,10 +17,16 @@ public:
     virtual bool tooManyRetries() const = 0;
 
     // Actions
+    virtual void boot() = 0;
     virtual void countRetry() = 0;
     virtual void greet() = 0;
     virtual void sayBye() = 0;
     virtual void startClock() = 0;
+
+    // Invariants, checked while their state is active
+    virtual bool invariantAborted() const = 0;
+    virtual bool invariantCounting() const = 0;
+    virtual bool invariantStalled() const = 0;
 
     // Delays, read when a timer starts
     virtual std::chrono::milliseconds retryDelay() const = 0;

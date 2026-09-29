@@ -9,7 +9,8 @@
 
 class ChildFsm;
 
-// What the state machine "uml" tells when it ends, as a submachine does.
+// What the state machine "uml" tells when it ends, as a submachine does, and when
+// an invariant does not hold.
 class UmlFsmListener {
 public:
     virtual ~UmlFsmListener() = default;
@@ -18,6 +19,9 @@ public:
     virtual void onFinished() {}
     // It reached a terminate state.
     virtual void onTerminated() {}
+    // The invariant of the active state named state does not hold, after it was
+    // entered or after an event.
+    virtual void onInvariantViolated(const char* /*state*/) {}
 };
 
 // The state machine "uml".
@@ -64,6 +68,8 @@ private:
     void report();
     // Processes the event of a timer that fired.
     void fireTimer(int timer);
+    // Tells the listener about each active state whose invariant does not hold.
+    void checkInvariants();
 
     struct Machine;
     UmlFsmActions& actions_;

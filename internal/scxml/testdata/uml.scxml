@@ -1,11 +1,17 @@
 <scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:tpuml="https://github.com/vincedupuis/transplantUML"
-       version="1.0" name="uml" initial="check">
+       version="1.0" name="uml" initial="start">
   <tpuml:note>Every UML concept the model holds,
 in one document.</tpuml:note>
   <datamodel>
     <data id="retries" expr="0"/>
     <data id="config" src="config.json"/>
   </datamodel>
+
+  <!-- <scxml> takes no <initial> element: the effect of the machine's initial
+       transition sits in a transient state marked as the initial one. -->
+  <state id="start" tpuml:kind="initial">
+    <transition target="check"><script>boot</script></transition>
+  </state>
 
   <!-- A transient state branching on guards is a choice. -->
   <state id="check">

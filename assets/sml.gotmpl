@@ -5,11 +5,11 @@ named after the machine, here "kiosk", and FsmTimers.h:
   FsmTimers.h        the interface starting and cancelling timers, the same
                      for every machine, which the user implements once
   KioskFsmEvents.h   the interface declaring one method per event
-  KioskFsmActions.h  the interface declaring the guards and actions, which the
-                     user of the state machine implements
+  KioskFsmActions.h  the interface declaring the guards, actions and invariants,
+                     which the user of the state machine implements
   KioskFsm.h         the state machine: a class implementing KioskFsmEvents,
                      built from a KioskFsmActions, and KioskFsmListener, the
-                     interface it tells when it ends
+                     interface it tells when it ends or an invariant fails
   KioskFsm.cpp       its implementation, the only file that includes SML
 
 "." at the top level is the *model.StateMachine. Each file starts with a call
@@ -46,6 +46,12 @@ it fires, the machine processes the timer's event, internal::ordering_after_90s.
 A named delay, after(authTimeout), is read from the actions when the timer
 starts.
 
+A state invariant [basket and not card] calls invariantBasket() and
+invariantCard() on the actions. The state's entry behaviour sets its flag in
+the invariants dependency and its exit behaviour clears it; checkInvariants,
+run after enterFsm and after every event, tells the listener
+onInvariantViolated for each flagged state whose invariant is false.
+
 A transition table holds the states of one scope, with a parallel state's
 regions flattened into its own table, one initial state (*) per region. A
 transition is written in the innermost table holding both its ends, after
@@ -67,6 +73,9 @@ the lambdas the tables declared, but first in the output.
 {{- $listener := print $fsm "Listener" -}}
 {{- $defer := false -}}{{- range States }}{{ if .Defer }}{{ $defer = true }}{{ end }}{{ end -}}
 {{- $subs := list -}}{{- range States }}{{ if .Submachine }}{{ $subs = append $subs . }}{{ end }}{{ end -}}
+{{- $invariants := list -}}{{- range States }}{{ if and .Invariant (not (IsRegion .Name)) }}{{ $invariants = append $invariants . }}{{ end }}{{ end -}}
+{{- $checks := list -}}{{- range $invariants }}{{ $checks = concat $checks (include "invariantNames" .Invariant | splitList " ") }}{{ end -}}
+{{- $checks = uniq $checks | sortAlpha -}}
 {{- $terminates := false -}}{{- range States }}{{ if .IsTerminate }}{{ $terminates = true }}{{ end }}{{ end -}}
 {{- /* whether the machine can be terminated: by a terminate state of its own, or by one of a machine it runs */ -}}
 {{- $halts := or $terminates (not (empty $subs)) -}}
@@ -111,6 +120,7 @@ the lambdas the tables declared, but first in the output.
 {{- $process := "machine_->sm.process_event(%s);" -}}
 {{- if $subs }}{{ $process = "machine_->process(%s)" }}{{ end -}}
 {{- if and $subs $reports }}{{ $process = printf "if (%s) {\n        report();\n    }" $process }}{{ else if $subs }}{{ $process = print $process ";" }}{{ else if $reports }}{{ $process = print $process "\n    report();" }}{{ end -}}
+{{- if $invariants }}{{ $process = print $process "\n    checkInvariants();" }}{{ end -}}
 {{- /* a name used as both a guard and an action, in any table, is one method that returns bool and is not const */ -}}
 {{- $calls := regexFindAll "const auto [A-Za-z0-9_]+ = \\[\\]\\((const )?[A-Za-z0-9_]+& actions\\) \\{ (return )?actions\\." $code -1 -}}
 {{- $guards := list -}}{{- $effects := list -}}
@@ -123,6 +133,11 @@ the lambdas the tables declared, but first in the output.
 {{- range $delays -}}
 {{- if or (has . $guards) (has . $effects) -}}
 {{- error "delay %q: its method %s clashes with a guard or action of that name; the files would not compile" . . -}}
+{{- end -}}
+{{- end -}}
+{{- range $checks -}}
+{{- if or (has . $guards) (has . $effects) (has . $delays) -}}
+{{- error "invariant method %s: it clashes with a guard, action or delay of that name; the files would not compile" . -}}
 {{- end -}}
 {{- end -}}
 {{- range $guards -}}
@@ -207,6 +222,13 @@ public:
     virtual void {{ . }}() = 0;
 {{- end -}}
 {{- end -}}
+{{- with $checks }}
+
+    // Invariants, checked while their state is active
+{{- range . }}
+    virtual bool {{ . }}() const = 0;
+{{- end -}}
+{{- end -}}
 {{- with $delays }}
 
     // Delays, read when a timer starts
@@ -231,7 +253,8 @@ class {{ . }};
 {{- end -}}
 {{- end }}
 
-// What the state machine{{ surround " \"" .Name "\"" }} tells when it ends, as a submachine does.
+// What the state machine{{ surround " \"" .Name "\"" }} tells when it ends, as a submachine does{{ if $invariants }}, and when
+// an invariant does not hold{{ end }}.
 class {{ $listener }} {
 public:
     virtual ~{{ $listener }}() = default;
@@ -243,6 +266,11 @@ public:
 {{- range $exits }}
     // It left by its exit point "{{ . }}".
     virtual void onExit{{ include "pascal" . }}() {}
+{{- end }}
+{{- if $invariants }}
+    // The invariant of the active state named state does not hold, after it was
+    // entered or after an event.
+    virtual void onInvariantViolated(const char* /*state*/) {}
 {{- end }}
 };
 
@@ -294,7 +322,11 @@ private:
     // Processes the event of a timer that fired.
     void fireTimer(int timer);
 {{- end }}
-{{- if or $reports $timers }}
+{{- if $invariants }}
+    // Tells the listener about each active state whose invariant does not hold.
+    void checkInvariants();
+{{- end }}
+{{- if or $reports $timers $invariants }}
 {{ end }}
     struct Machine;
     {{ $actions }}& actions_;
@@ -352,6 +384,16 @@ struct {{ . }} {};
 // runs: it ends once the current event is done.
 struct status {
     bool terminated = false;
+};
+{{- end }}
+{{- if $invariants }}
+
+// Whether each state with an invariant is active: its entry behaviour sets its
+// flag and its exit behaviour clears it.
+struct invariants {
+{{- range $invariants }}
+    bool {{ include "sid" .Name }} = false;
+{{- end }}
 };
 {{- end }}
 {{- if $timers }}
@@ -431,13 +473,13 @@ struct {{ $fsm }}::Machine {
         }
 {{- if has (printf "%s_finished" $sid) $internal }}
         void onFinished() override {
-            {{ include "adapterProcess" (dict "event" (printf "internal::%s_finished{}" $sid) "reports" $reports) }}
+            {{ include "adapterProcess" (dict "event" (printf "internal::%s_finished{}" $sid) "reports" $reports "checks" $invariants) }}
         }
 {{- end -}}
 {{- range Children .Name -}}
 {{- if and (eq .Kind "exit-point") (has (printf "%s_exit_%s" $sid (include "cid" .Name)) $internal) }}
         void onExit{{ include "pascal" .Name }}() override {
-            {{ include "adapterProcess" (dict "event" (printf "internal::%s_exit_%s{}" $sid (include "cid" .Name)) "reports" $reports) }}
+            {{ include "adapterProcess" (dict "event" (printf "internal::%s_exit_%s{}" $sid (include "cid" .Name)) "reports" $reports "checks" $invariants) }}
         }
 {{- end -}}
 {{- end }}
@@ -452,7 +494,7 @@ struct {{ $fsm }}::Machine {
 {{- if $timers }}
           timers{service, [fsm = &fsm](::timers::id timer) { fsm->fireTimer(timer); }},
 {{- end }}
-          sm{actions, machines, status{{ if $timers }}, timers{{ end }}} {
+          sm{actions, machines, status{{ if $timers }}, timers{{ end }}{{ if $invariants }}, invariants{{ end }}} {
 {{- range $subs }}
         {{ include "sid" .Name }}.terminateFsm();
         {{ include "sid" .Name }}.setListener(&{{ include "sid" .Name }}_listener);
@@ -493,24 +535,36 @@ struct {{ $fsm }}::Machine {
 {{- if $timers }}
     ::timers timers;
 {{- end }}
+{{- if $invariants }}
+    ::invariants invariants;
+{{- end }}
     sml::sm<machine{{ if $defer }}, sml::defer_queue<std::deque>{{ end }}> sm;
     bool busy = false;
     std::deque<std::function<void()>> queue;
 {{- else if $timers }}
     Machine({{ $fsm }}& fsm, {{ $actions }}& actions, FsmTimers& service)
         : timers{service, [fsm = &fsm](::timers::id timer) { fsm->fireTimer(timer); }},
-          sm{actions{{ if $halts }}, status{{ end }}, timers} {}
+          sm{actions{{ if $halts }}, status{{ end }}, timers{{ if $invariants }}, invariants{{ end }}} {}
 {{- if $halts }}
     ::status status;
 {{- end }}
     ::timers timers;
+{{- if $invariants }}
+    ::invariants invariants;
+{{- end }}
     sml::sm<machine{{ if $defer }}, sml::defer_queue<std::deque>{{ end }}> sm;
 {{- else if $halts }}
-    explicit Machine({{ $actions }}& actions) : sm{actions, status} {}
+    explicit Machine({{ $actions }}& actions) : sm{actions, status{{ if $invariants }}, invariants{{ end }}} {}
     ::status status;
+{{- if $invariants }}
+    ::invariants invariants;
+{{- end }}
     sml::sm<machine{{ if $defer }}, sml::defer_queue<std::deque>{{ end }}> sm;
 {{- else }}
-    explicit Machine({{ $actions }}& actions) : sm{actions} {}
+    explicit Machine({{ $actions }}& actions) : sm{actions{{ if $invariants }}, invariants{{ end }}} {}
+{{- if $invariants }}
+    ::invariants invariants;
+{{- end }}
     sml::sm<machine{{ if $defer }}, sml::defer_queue<std::deque>{{ end }}> sm;
 {{- end }}
 };
@@ -595,8 +649,21 @@ void {{ $fsm }}::fireTimer(int timer) {
     }
 }
 {{- end }}
+{{- if $invariants }}
+
+void {{ $fsm }}::checkInvariants() {
+    if (listener_ == nullptr) {
+        return;
+    }
+{{- range $invariants }}
+    if (machine_->invariants.{{ include "sid" .Name }} && !({{ include "invariantExpr" .Invariant }})) {
+        listener_->onInvariantViolated({{ include "str" .Name | trimSuffix "_s" }});
+    }
+{{- end }}
+}
+{{- end }}
 {{- with include "eventIds" . }}
-{{- if or $subs $ends }}
+{{- if or $subs $ends $invariants }}
 {{- range splitList "\n" . }}
 
 void {{ $fsm }}::{{ . }}() {
@@ -616,8 +683,8 @@ void {{ $fsm }}::{{ . }}() { {{ printf $process (printf "event::%s{}" .) }} }
 {{- range Children .scope -}}
 {{- template "structs" (dict "scope" .Name "actions" $actions) -}}
 {{- if IsRegion .Name -}}
-{{- if or .OnEntry .OnExit .Do .Defer -}}
-{{- error "region %q: Boost.SML regions are anonymous, so they have no behaviours or deferred events" .Name -}}
+{{- if or .OnEntry .OnExit .Do .Defer .Invariant -}}
+{{- error "region %q: Boost.SML regions are anonymous, so they have no behaviours, invariants or deferred events" .Name -}}
 {{- end -}}
 {{- end -}}
 {{- if HasTable .Name }}
@@ -791,6 +858,10 @@ return sml::make_transition_table(
 {{- end -}}
 {{- end -}}
 {{- $start = concat $starts $start -}}{{- $stop = concat $cancels $stop -}}
+{{- if and $s.Invariant (not (IsRegion $s.Name)) -}}
+{{- $start = append $start (printf "[](::invariants& i) { i.%s = true; }" (include "sid" $s.Name)) -}}
+{{- $stop = prepend $stop (printf "[](::invariants& i) { i.%s = false; }" (include "sid" $s.Name)) -}}
+{{- end -}}
 {{- if and $s.IsPseudo (or $s.OnEntry $s.OnExit) -}}
 {{- error "state %q: Boost.SML's final state X has no entry or exit behaviour" $s.Name -}}
 {{- else -}}
@@ -979,7 +1050,7 @@ return sml::make_transition_table(
 
 {{- define "sid" -}}{{- /* . = state name: its struct's name, kept apart from the names the file defines */ -}}
 {{- $id := include "cid" . -}}
-{{- if has $id (list "machine" "sml" "event" "internal" "submachines" "actions" "status" "timers") }}{{ $id }}_state{{ else }}{{ $id }}{{ end -}}
+{{- if has $id (list "machine" "sml" "event" "internal" "submachines" "actions" "status" "timers" "invariants") }}{{ $id }}_state{{ else }}{{ $id }}{{ end -}}
 {{- end -}}
 
 {{- define "eventIds" -}}{{- /* . = anything: every event's struct name, one per line, in order of first use */ -}}
@@ -1007,7 +1078,7 @@ return sml::make_transition_table(
 {{- if eq $id "initial" }}initial_point{{ else }}{{ $id }}{{ end -}}
 {{- end -}}
 
-{{- define "adapterProcess" -}}{{- /* . = dict "event" an internal event "reports" whether the machine reports: a submachine listener's body */ -}}
+{{- define "adapterProcess" -}}{{- /* . = dict "event" an internal event "reports" whether the machine reports "checks" whether it checks invariants: a submachine listener's body */ -}}
 {{- if .reports -}}
 if (fsm.machine_->process({{ .event }})) {
                 fsm.report();
@@ -1015,6 +1086,25 @@ if (fsm.machine_->process({{ .event }})) {
 {{- else -}}
 fsm.machine_->process({{ .event }});
 {{- end -}}
+{{- if .checks }}
+            fsm.checkInvariants();
+{{- end -}}
+{{- end -}}
+
+{{- define "invariantNames" -}}{{- /* . = an invariant: the methods it calls, separated by spaces */ -}}
+{{- $out := list -}}
+{{- range regexFindAll "[A-Za-z_][A-Za-z0-9_]*" . -1 }}{{ if not (has . (list "and" "or" "not")) }}{{ $out = append $out (print "invariant" (upper (substr 0 1 .)) (substr 1 -1 .)) }}{{ end }}{{ end -}}
+{{- join " " $out -}}
+{{- end -}}
+
+{{- define "invariantExpr" -}}{{- /* . = an invariant: the C++ expression calling its methods on actions_ */ -}}
+{{- $expr := regexReplaceAll "[A-Za-z_][A-Za-z0-9_]*" . "⟨i:$0⟩" | replace "⟨i:and⟩" "&&" | replace "⟨i:or⟩" "||" -}}
+{{- $expr = regexReplaceAll "⟨i:not⟩\\s*" $expr "!" -}}
+{{- range regexFindAll "⟨i:[A-Za-z0-9_]+⟩" $expr -1 -}}
+{{- $name := trimSuffix "⟩" (trimPrefix "⟨i:" .) -}}
+{{- $expr = replace . (print "actions_." (print "invariant" (upper (substr 0 1 $name)) (substr 1 -1 $name)) "()") $expr -}}
+{{- end -}}
+{{- $expr -}}
 {{- end -}}
 
 {{- define "timerList" -}}{{- /* . = anything: the timers, one per line as "owner⟪t⟫id⟪t⟫delay", one per source and delay of a time trigger; its owner, which starts it, is the source or, for a region, its orthogonal state */ -}}

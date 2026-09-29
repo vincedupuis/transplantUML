@@ -89,7 +89,8 @@ warnings.
   `<invoke type="tpuml:do" src>`, writes a fork's transitions as one multi-target transition and an
   `else` branch last with no `cond` (engines take the first enabled transition), writes a local transition as
   `type="internal"`, and declares the extension namespace only when used. It warns for a top-level terminate
-  (a `<final>`), and fails (`fail`) on join, defer, a nested terminate, the machine's initial effect, a completion
+  (a `<final>`) and for the machine's initial effect (a transient state `tpuml:kind="initial"` the machine starts in,
+  which the parser folds back into `InitialActions`), and fails (`fail`) on join, defer, a nested terminate, a completion
   that would not wait for a do activity, and a submachine state's entry and exit points. States it cannot reach
   from the top level are an error.
 - **`internal/fsm`** — the command's own DSL (`fsm name { state s { on ev [guard] / actions goto target } }`), an
@@ -177,6 +178,10 @@ warnings.
   `internal::<state>_after_<delay>`. The callback holds a `weak_ptr` to its slot in the `timers` dependency, so a
   late fire, or one after the machine is rebuilt, does nothing. A named delay is a method of the actions
   interface. `TestSMLTimersRun` checks the starts, cancels and stale fires.
+  A state invariant calls `invariant<Name>()` (a `bool … const` on the actions interface) for each of its names. The
+  state's entry and exit behaviours set and clear its flag in the `invariants` dependency, and `checkInvariants`,
+  run after every processed event, tells the listener `onInvariantViolated(state)` for each flagged state whose
+  invariant is false. `TestSMLInvariantsRun` checks when it is told.
 
 ## Conventions
 

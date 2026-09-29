@@ -8,7 +8,7 @@ legend
     retries = 0
     config = src(config.json)
 endlegend
-[*] --> check
+[*] --> check: / boot
 state check <<choice>>
 state split <<fork>>
 note right of split : not drawn: --> right

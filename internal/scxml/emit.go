@@ -30,14 +30,12 @@ func (Emitter) Emit(sm *model.StateMachine) ([]byte, model.Warnings, error) {
 	e := &emitter{sm: sm, emitted: map[string]bool{}}
 	e.datamodel(root, sm.Variables)
 	e.note(root, sm.Note)
+	initial := e.machineInitial(root)
 	if err := e.children(root, ""); err != nil {
 		return nil, nil, err
 	}
 	if err := e.leftovers(); err != nil {
 		return nil, nil, err
-	}
-	if len(sm.InitialActions) > 0 {
-		e.fail("the machine's initial transition: SCXML has no <initial> element on <scxml>, so its actions %s cannot run", strings.Join(sm.InitialActions, ", "))
 	}
 	if err := errors.Join(e.errs...); err != nil {
 		return nil, e.warn, err
@@ -51,7 +49,7 @@ func (Emitter) Emit(sm *model.StateMachine) ([]byte, model.Warnings, error) {
 	}
 	root.CreateAttr("version", "1.0")
 	setAttr(root, "name", sm.Name)
-	setAttr(root, "initial", sm.Initial)
+	setAttr(root, "initial", initial)
 
 	canonical(doc)
 	doc.Indent(2)
@@ -173,6 +171,28 @@ func (e *emitter) children(el *etree.Element, parent string) error {
 		}
 	}
 	return nil
+}
+
+// machineInitial returns the state the machine starts in. <scxml> takes no
+// <initial> element, so an initial transition with an effect leaves a
+// transient state tagged tpuml:kind="initial", which the machine enters and
+// leaves in the same step; the parser reads it back as the effect.
+func (e *emitter) machineInitial(root *etree.Element) string {
+	if len(e.sm.InitialActions) == 0 {
+		return e.sm.Initial
+	}
+	id := "initial"
+	for i := 2; e.sm.State(id) != nil; i++ {
+		id = fmt.Sprintf("initial_%d", i)
+	}
+	st := root.CreateElement("state")
+	st.CreateAttr("id", id)
+	e.ext(st, "kind", initialKind)
+	tr := st.CreateElement("transition")
+	tr.CreateAttr("target", e.sm.Initial)
+	executable(tr, e.sm.InitialActions)
+	e.warn.Addf("the machine's initial transition: <scxml> takes no <initial> element; its effect runs in the transient state %q, which the machine leaves at once", id)
+	return id
 }
 
 // initial writes the child s starts in: as the initial attribute, or as an

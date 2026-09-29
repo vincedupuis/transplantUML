@@ -33,6 +33,12 @@ struct ordering_after_90s {};
 struct authorizing_after_authTimeout {};
 }  // namespace internal
 
+// Whether each state with an invariant is active: its entry behaviour sets its
+// flag and its exit behaviour clears it.
+struct invariants {
+    bool paying = false;
+};
+
 // The timers of the time triggers. A state starts its timers when it is entered
 // and cancels them when it is left. A timer that fires after that, or after the
 // machine was rebuilt, does nothing.
@@ -118,7 +124,8 @@ struct ordering {
             // paying:
             // The basket is locked from here on.
             // invariant: basket and not (card and cash)
-            sml::state<paying> + sml::on_entry<sml::_> / lockBasket,
+            sml::state<paying> + sml::on_entry<sml::_> / (lockBasket, [](::invariants& i) { i.paying = true; }),
+            sml::state<paying> + sml::on_exit<sml::_> / [](::invariants& i) { i.paying = false; },
             sml::state<paying> + sml::event<event::declined> [!retries] = "browsing"_s,
             sml::state<paying> = sml::X
         );
@@ -161,8 +168,9 @@ struct machine {
 struct KioskFsm::Machine {
     Machine(KioskFsm& fsm, KioskFsmActions& actions, FsmTimers& service)
         : timers{service, [fsm = &fsm](::timers::id timer) { fsm->fireTimer(timer); }},
-          sm{actions, timers} {}
+          sm{actions, timers, invariants} {}
     ::timers timers;
+    ::invariants invariants;
     sml::sm<machine, sml::defer_queue<std::deque>> sm;
 };
 
@@ -179,6 +187,7 @@ void KioskFsm::enterFsm(Entry entry) {
     case Entry::initial:
         machine_->sm.process_event(internal::enter{});
         report();
+        checkInvariants();
         break;
     }
 }
@@ -212,60 +221,81 @@ void KioskFsm::fireTimer(int timer) {
     case ::timers::ordering_after_90s:
         machine_->sm.process_event(internal::ordering_after_90s{});
         report();
+        checkInvariants();
         break;
     case ::timers::authorizing_after_authTimeout:
         machine_->sm.process_event(internal::authorizing_after_authTimeout{});
         report();
+        checkInvariants();
         break;
+    }
+}
+
+void KioskFsm::checkInvariants() {
+    if (listener_ == nullptr) {
+        return;
+    }
+    if (machine_->invariants.paying && !(actions_.invariantBasket() && !(actions_.invariantCard() && actions_.invariantCash()))) {
+        listener_->onInvariantViolated("paying");
     }
 }
 
 void KioskFsm::touch() {
     machine_->sm.process_event(event::touch{});
     report();
+    checkInvariants();
 }
 
 void KioskFsm::abandon() {
     machine_->sm.process_event(event::abandon{});
     report();
+    checkInvariants();
 }
 
 void KioskFsm::resume() {
     machine_->sm.process_event(event::resume{});
     report();
+    checkInvariants();
 }
 
 void KioskFsm::add() {
     machine_->sm.process_event(event::add{});
     report();
+    checkInvariants();
 }
 
 void KioskFsm::remove() {
     machine_->sm.process_event(event::remove{});
     report();
+    checkInvariants();
 }
 
 void KioskFsm::checkout() {
     machine_->sm.process_event(event::checkout{});
     report();
+    checkInvariants();
 }
 
 void KioskFsm::declined() {
     machine_->sm.process_event(event::declined{});
     report();
+    checkInvariants();
 }
 
 void KioskFsm::approved() {
     machine_->sm.process_event(event::approved{});
     report();
+    checkInvariants();
 }
 
 void KioskFsm::card() {
     machine_->sm.process_event(event::card{});
     report();
+    checkInvariants();
 }
 
 void KioskFsm::ack() {
     machine_->sm.process_event(event::ack{});
     report();
+    checkInvariants();
 }

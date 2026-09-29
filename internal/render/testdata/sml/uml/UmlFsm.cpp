@@ -42,6 +42,12 @@ struct status {
     bool terminated = false;
 };
 
+// Whether each state with an invariant is active: its entry behaviour sets its
+// flag and its exit behaviour clears it.
+struct invariants {
+    bool work = false;
+};
+
 // The timers of the time triggers. A state starts its timers when it is entered
 // and cancels them when it is left. A timer that fires after that, or after the
 // machine was rebuilt, does nothing.
@@ -123,11 +129,12 @@ struct machine {
         using namespace sml::literals;
         using sml::operator!, sml::operator&&, sml::operator||, sml::operator,;
         const auto tooManyRetries = [](const UmlFsmActions& actions) { return actions.tooManyRetries(); };
+        const auto boot = [](UmlFsmActions& actions) { actions.boot(); };
         const auto startClock = [](UmlFsmActions& actions) { actions.startClock(); };
         const auto countRetry = [](UmlFsmActions& actions) { actions.countRetry(); };
         const auto sayBye = [](UmlFsmActions& actions) { actions.sayBye(); };
         return sml::make_transition_table(
-            *sml::state<::internal::stopped> + sml::event<::internal::enter> = "check"_s,
+            *sml::state<::internal::stopped> + sml::event<::internal::enter> / boot = "check"_s,
             "check"_s [tooManyRetries] = sml::X,
             "check"_s [!tooManyRetries] = "work"_s,
             "merge"_s = "work"_s,
@@ -138,8 +145,8 @@ struct machine {
             // Never negative.
             // variable: progress = 0
             // Starts the clock.
-            "work"_s + sml::on_entry<sml::_> / (startClock, [](::timers& t) { t.start(::timers::work_after_5s, std::chrono::seconds{5}); }, [](::timers& t, const UmlFsmActions& actions) { t.start(::timers::work_after_retryDelay, actions.retryDelay()); }),
-            "work"_s + sml::on_exit<sml::_> / ([](::timers& t) { t.cancel(::timers::work_after_5s); }, [](::timers& t) { t.cancel(::timers::work_after_retryDelay); }),
+            "work"_s + sml::on_entry<sml::_> / (startClock, [](::timers& t) { t.start(::timers::work_after_5s, std::chrono::seconds{5}); }, [](::timers& t, const UmlFsmActions& actions) { t.start(::timers::work_after_retryDelay, actions.retryDelay()); }, [](::invariants& i) { i.work = true; }),
+            "work"_s + sml::on_exit<sml::_> / ([](::invariants& i) { i.work = false; }, [](::timers& t) { t.cancel(::timers::work_after_5s); }, [](::timers& t) { t.cancel(::timers::work_after_retryDelay); }),
             // Kept until the job ends.
             "work"_s + sml::event<event::pause> / sml::defer,
             "work"_s + sml::event<event::resume> / sml::defer,
@@ -183,6 +190,7 @@ struct UmlFsm::Machine {
             if (fsm.machine_->process(internal::sub_finished{})) {
                 fsm.report();
             }
+            fsm.checkInvariants();
         }
         UmlFsm& fsm;
     };
@@ -191,7 +199,7 @@ struct UmlFsm::Machine {
         : machines{.sub = sub},
           sub_listener{fsm},
           timers{service, [fsm = &fsm](::timers::id timer) { fsm->fireTimer(timer); }},
-          sm{actions, machines, status, timers} {
+          sm{actions, machines, status, timers, invariants} {
         sub.terminateFsm();
         sub.setListener(&sub_listener);
     }
@@ -224,6 +232,7 @@ struct UmlFsm::Machine {
     SubListener sub_listener;
     ::status status;
     ::timers timers;
+    ::invariants invariants;
     sml::sm<machine, sml::defer_queue<std::deque>> sm;
     bool busy = false;
     std::deque<std::function<void()>> queue;
@@ -244,6 +253,7 @@ void UmlFsm::enterFsm(Entry entry) {
         if (machine_->process(internal::enter{})) {
             report();
         }
+        checkInvariants();
         break;
     }
 }
@@ -285,12 +295,23 @@ void UmlFsm::fireTimer(int timer) {
         if (machine_->process(internal::work_after_5s{})) {
             report();
         }
+        checkInvariants();
         break;
     case ::timers::work_after_retryDelay:
         if (machine_->process(internal::work_after_retryDelay{})) {
             report();
         }
+        checkInvariants();
         break;
+    }
+}
+
+void UmlFsm::checkInvariants() {
+    if (listener_ == nullptr) {
+        return;
+    }
+    if (machine_->invariants.work && !(actions_.invariantCounting() && !(actions_.invariantStalled() || actions_.invariantAborted()))) {
+        listener_->onInvariantViolated("work");
     }
 }
 
@@ -298,58 +319,68 @@ void UmlFsm::pause() {
     if (machine_->process(event::pause{})) {
         report();
     }
+    checkInvariants();
 }
 
 void UmlFsm::resume() {
     if (machine_->process(event::resume{})) {
         report();
     }
+    checkInvariants();
 }
 
 void UmlFsm::split() {
     if (machine_->process(event::split{})) {
         report();
     }
+    checkInvariants();
 }
 
 void UmlFsm::abort() {
     if (machine_->process(event::abort{})) {
         report();
     }
+    checkInvariants();
 }
 
 void UmlFsm::enter() {
     if (machine_->process(event::enter{})) {
         report();
     }
+    checkInvariants();
 }
 
 void UmlFsm::l() {
     if (machine_->process(event::l{})) {
         report();
     }
+    checkInvariants();
 }
 
 void UmlFsm::r() {
     if (machine_->process(event::r{})) {
         report();
     }
+    checkInvariants();
 }
 
 void UmlFsm::back() {
     if (machine_->process(event::back{})) {
         report();
     }
+    checkInvariants();
 }
 
 void UmlFsm::leave() {
     if (machine_->process(event::leave{})) {
         report();
     }
+    checkInvariants();
 }
 
 void UmlFsm::note() {
     if (machine_->process(event::note{})) {
         report();
     }
+    checkInvariants();
 }

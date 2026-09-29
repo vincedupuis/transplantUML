@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:tpuml="https://github.com/vincedupuis/transplantUML" version="1.0" name="uml" initial="check">
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:tpuml="https://github.com/vincedupuis/transplantUML" version="1.0" name="uml" initial="initial">
   <datamodel>
     <data id="retries" expr="0"/>
     <data id="config" src="config.json"/>
   </datamodel>
   <tpuml:note>uml.scxml without what SCXML cannot run:
 join and deferred events.</tpuml:note>
+  <state id="initial" tpuml:kind="initial">
+    <transition target="check">
+      <script>boot</script>
+    </transition>
+  </state>
   <state id="check" tpuml:kind="choice">
     <transition cond="tooManyRetries" target="failed"/>
     <transition cond="not tooManyRetries" target="work"/>

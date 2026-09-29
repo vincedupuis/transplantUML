@@ -287,6 +287,20 @@ func TestParserUnsupported(t *testing.T) {
 	}
 }
 
+// A tpuml:kind="initial" state holds the machine's initial transition and
+// nothing else, and the machine starts in it.
+func TestMachineInitialErrors(t *testing.T) {
+	for want, body := range map[string]string{
+		"is the one the machine starts in": `initial="a"><state id="i" tpuml:kind="initial"><transition target="a"/></state><state id="a"/>`,
+		"holds only one transition":        `initial="i"><state id="i" tpuml:kind="initial"><transition event="e" target="a"/></state><state id="a"/>`,
+	} {
+		src := `<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:tpuml="https://github.com/vincedupuis/transplantUML" name="m" ` + body + `</scxml>`
+		if _, _, err := (Parser{}).Parse([]byte(src)); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("want an error containing %q, got %v", want, err)
+		}
+	}
+}
+
 // type="internal" with a target keeps the source active only when it is
 // compound and every target lies inside it; otherwise SCXML runs it as an
 // external transition.

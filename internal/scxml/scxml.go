@@ -25,7 +25,9 @@
 // (ExtNamespace), which the W3C schema permits on every element and which
 // SCXML engines ignore: the tpuml:kind attribute names any model.StateKind
 // (choice, junction, fork, join, entry-point, exit-point, terminate, or
-// normal to suppress the idiom detection) or, on a transition, local (the
+// normal to suppress the idiom detection, or initial for the transient state
+// holding the machine's initial transition with an effect) or, on a
+// transition, local (the
 // same as SCXML's type="internal" with targets nested in the source);
 // tpuml:defer lists deferred events; tpuml:invariant and tpuml:stereotype
 // annotate a state; and a <tpuml:note> child holds a note, which on a state
@@ -72,7 +74,8 @@ func (Parser) Parse(src []byte) (*model.StateMachine, model.Warnings, error) {
 		States:      make([]*model.State, 0),
 		Transitions: make([]*model.Transition, 0),
 	}}
-	p.sm.Initial, _ = initialOf(root) // <scxml> takes no <initial> element, so no actions
+	p.sm.Initial, _ = initialOf(root)
+	p.machineInitial(root)
 	p.sm.Variables = p.datamodel(root)
 	p.sm.Note = note(root)
 	p.walk(root, "")
@@ -475,6 +478,34 @@ func noteText(el *etree.Element) string {
 		lines = append(lines, strings.TrimSpace(line))
 	}
 	return strings.Join(lines, "\n")
+}
+
+// initialKind tags the transient state that holds the machine's initial
+// transition when it has an effect, since <scxml> takes no <initial> element.
+const initialKind = "initial"
+
+// machineInitial reads the transient state tpuml:kind="initial" the machine
+// starts in: its one transition, eventless and unguarded, is the machine's
+// initial transition, whose target and actions it takes. The state itself is
+// removed, as it is no state of the model.
+func (p *parser) machineInitial(root *etree.Element) {
+	for _, st := range root.SelectElements("state") {
+		if ext(st, "kind") != initialKind {
+			continue
+		}
+		id := st.SelectAttrValue("id", "")
+		trs := st.SelectElements("transition")
+		switch {
+		case id != p.sm.Initial:
+			p.fail("state %q: a tpuml:kind=\"initial\" state is the one the machine starts in", id)
+		case len(trs) != 1 || len(st.ChildElements()) != 1 || trs[0].SelectAttr("event") != nil || trs[0].SelectAttr("cond") != nil || trs[0].SelectAttrValue("target", "") == "":
+			p.fail("state %q: a tpuml:kind=\"initial\" state holds only one transition, with a target and no event or guard", id)
+		default:
+			p.sm.Initial = trs[0].SelectAttrValue("target", "")
+			p.sm.InitialActions = p.actions(id, "<transition>", trs[0], nil)
+		}
+		root.RemoveChild(st)
+	}
 }
 
 // localTransitions reads SCXML's type="internal" on a transition with a

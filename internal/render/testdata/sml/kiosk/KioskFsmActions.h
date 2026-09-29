@@ -30,6 +30,11 @@ public:
     virtual void wake() = 0;
     virtual void warn() = 0;
 
+    // Invariants, checked while their state is active
+    virtual bool invariantBasket() const = 0;
+    virtual bool invariantCard() const = 0;
+    virtual bool invariantCash() const = 0;
+
     // Delays, read when a timer starts
     virtual std::chrono::milliseconds authTimeout() const = 0;
 };

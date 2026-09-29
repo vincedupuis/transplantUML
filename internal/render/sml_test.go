@@ -155,15 +155,17 @@ func TestSMLErrors(t *testing.T) {
 	}{
 		// The machine's own entry point is reached only by enterFsm, and it
 		// ends at its exit point. An event named like a method that starts or
-		// stops the machine, or a named delay like a guard, would not compile.
+		// stops the machine, a named delay like a guard, or an invariant's
+		// method like a guard would not compile.
 		"points and names": {&model.StateMachine{
 			Name: "m", Initial: "a",
 			States: []*model.State{
-				{Name: "a", Kind: model.Normal},
+				{Name: "a", Kind: model.Normal, Invariant: "open"},
 				{Name: "in", Kind: model.EntryPoint},
 				{Name: "out", Kind: model.ExitPoint},
 			},
 			Transitions: []*model.Transition{
+				{Source: "a", Targets: []string{"a"}, Event: "shut", Cond: "invariantOpen"},
 				{Source: "in", Targets: []string{"a"}},
 				{Source: "a", Targets: []string{"in"}, Event: "enterFsm"},
 				{Source: "a", Targets: []string{"out"}, Event: "leave"},
@@ -175,6 +177,7 @@ func TestSMLErrors(t *testing.T) {
 			`state "in": the machine is entered at its entry point only by enterFsm, so a transition cannot reach it`,
 			`state "out": the machine ends at its exit point, so no transition can leave it`,
 			`delay "ok": its method ok clashes with a guard or action of that name; the files would not compile`,
+			`invariant method invariantOpen: it clashes with a guard, action or delay of that name; the files would not compile`,
 		}},
 		// A region has no behaviour of its own, X none either, and a
 		// completion can be lifted out of one composite state only.
@@ -192,7 +195,7 @@ func TestSMLErrors(t *testing.T) {
 				{Source: "e", Targets: []string{"end"}},
 			},
 		}, []string{
-			`region "r": Boost.SML regions are anonymous, so they have no behaviours or deferred events`,
+			`region "r": Boost.SML regions are anonymous, so they have no behaviours, invariants or deferred events`,
 			`transition e -> end: Boost.SML has no transitions from inside a composite state, and "e" lies too deep inside "p" to complete it`,
 			`state "end": Boost.SML's final state X has no entry or exit behaviour`,
 		}},
@@ -709,6 +712,91 @@ hurry, hangup: open assign terminated
 ask, human:
 crash: open terminated
 ask:
+`
+	if string(out) != want {
+		t.Errorf("the program printed\n%s\nwant\n%s", out, want)
+	}
+}
+
+// door has an invariant on opened, made of two names.
+const door = `fsm door {
+  initial state closed { on open goto opened }
+  state opened {
+    invariant [clear and not locked]
+    on knock / listen
+    on close goto closed
+  }
+}`
+
+// An invariant is checked once its state is entered and after every event
+// while it is active, each of its names calling invariant<Name> on the
+// actions, and the listener hears when it does not hold.
+func TestSMLInvariantsRun(t *testing.T) {
+	cxx, include := smlToolchain(t)
+	sm, _, err := fsmParser.Parse([]byte(door))
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, _ := smlFiles(t, sm)
+	main := `#include "DoorFsm.h"
+
+#include <cstdio>
+
+bool clear = false;
+bool locked = false;
+
+struct Actions : DoorFsmActions {
+  void listen() override { std::printf(" listen"); }
+  bool invariantClear() const override { return clear; }
+  bool invariantLocked() const override { return locked; }
+};
+
+struct Listener : DoorFsmListener {
+  void onInvariantViolated(const char* state) override { std::printf(" violated %s", state); }
+};
+
+int main() {
+  Actions actions;
+  Listener listener;
+  DoorFsm fsm{actions};
+  fsm.setListener(&listener);
+  std::printf("enter:");
+  fsm.enterFsm();
+  std::printf("\nknock while closed:");
+  fsm.knock();
+  std::printf("\nopen, not clear:");
+  fsm.open();
+  clear = true;
+  std::printf("\nknock, clear:");
+  fsm.knock();
+  locked = true;
+  std::printf("\nknock, locked:");
+  fsm.knock();
+  std::printf("\nclose:");
+  fsm.close();
+  std::printf("\nknock while closed:");
+  fsm.knock();
+  std::printf("\n");
+}
+`
+	dir := t.TempDir()
+	sources := smlWrite(t, dir, files, main)
+	program := filepath.Join(dir, "program")
+	args := append([]string{"-std=c++20", "-Wall", "-Wextra", "-Werror", "-I", include, "-o", program}, sources...)
+	if out, err := exec.Command(cxx, args...).CombinedOutput(); err != nil {
+		t.Fatalf("the rendered files do not compile: %v\n%s", err, out)
+	}
+	out, err := exec.Command(program).CombinedOutput()
+	if err != nil {
+		t.Fatalf("the program failed: %v\n%s", err, out)
+	}
+	want := `enter:
+knock while closed:
+open, not clear: violated opened
+knock, clear: listen
+knock, locked: listen violated opened
+close:
+knock while closed:
 `
 	if string(out) != want {
 		t.Errorf("the program printed\n%s\nwant\n%s", out, want)

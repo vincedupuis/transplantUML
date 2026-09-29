@@ -57,6 +57,7 @@ func TestEmitWarnings(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
+		`the machine's initial transition: <scxml> takes no <initial> element; its effect runs in the transient state "initial", which the machine leaves at once`,
 		`state "stop": SCXML has no terminate; written as a <final> state at the top level, which ends the machine`,
 	}
 	if !reflect.DeepEqual([]string(warnings), want) {
@@ -73,6 +74,38 @@ func TestEmitWarnings(t *testing.T) {
 	}
 	if len(warnings) != 0 {
 		t.Errorf("warnings = %q", warnings)
+	}
+}
+
+// <scxml> takes no <initial> element, so the effect of the machine's initial
+// transition goes in a transient state, named so as not to clash.
+func TestEmitMachineInitialEffect(t *testing.T) {
+	sm := &model.StateMachine{
+		Name: "m", Initial: "a", InitialActions: []string{"boot", "log"},
+		States:      []*model.State{{Name: "a", Kind: model.Normal}, {Name: "initial", Kind: model.Normal}},
+		Transitions: []*model.Transition{},
+	}
+	out, warnings, err := Emitter{}.Emit(sm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		` initial="initial_2">`,
+		"<state id=\"initial_2\" tpuml:kind=\"initial\">\n    <transition target=\"a\">\n      <script>boot</script>\n      <script>log</script>\n",
+	} {
+		if !strings.Contains(string(out), want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	if len(warnings) != 1 {
+		t.Errorf("warnings = %q", warnings)
+	}
+	got, _, err := Parser{}.Parse(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, sm) {
+		t.Errorf("round trip differs:\n%s", out)
 	}
 }
 
@@ -258,12 +291,11 @@ func TestEmitBehaviourErrors(t *testing.T) {
 			`state "in": SCXML cannot enter an invoked machine through its entry point`,
 			`state "out": SCXML cannot leave an invoked machine through its exit point`,
 		}},
-		// <scxml> takes no <initial> element; a simple state completes at
-		// once, even while its do activity runs; a <final> inside a state or
+		// A simple state completes at once, even while its do activity runs; a <final> inside a state or
 		// with exit actions ends no machine the way a terminate does; a
 		// local transition to its own source leaves it.
 		"stand-ins": {&model.StateMachine{
-			Name: "m", Initial: "c", InitialActions: []string{"boot"},
+			Name: "m", Initial: "c",
 			States: []*model.State{
 				{Name: "c", Kind: model.Normal, Initial: "d"},
 				{Name: "d", Parent: "c", Kind: model.Normal, Do: []string{"spin"}},
@@ -277,7 +309,6 @@ func TestEmitBehaviourErrors(t *testing.T) {
 			`transition c -> c: SCXML keeps a transition inside its source only when the source is compound and every target lies inside it`,
 			`state "d": SCXML would take its completion transition without waiting for the do activity to end`,
 			`state "t": SCXML has no terminate, and a <final> state that is not at the top level, or that has exit actions, does not end the machine the same way`,
-			`the machine's initial transition: SCXML has no <initial> element on <scxml>, so its actions boot cannot run`,
 		}},
 	}
 	for name, c := range cases {
