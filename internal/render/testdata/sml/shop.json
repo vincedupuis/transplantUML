@@ -1,0 +1,355 @@
+{
+  "name": "shop",
+  "initial": "browsing",
+  "states": [
+    {
+      "name": "reorder",
+      "kind": "entry-point"
+    },
+    {
+      "name": "browsing",
+      "kind": "normal"
+    },
+    {
+      "name": "helpdesk",
+      "kind": "normal",
+      "onEntry": [
+        "openChat"
+      ],
+      "submachine": "support"
+    },
+    {
+      "name": "urgent",
+      "parent": "helpdesk",
+      "kind": "entry-point"
+    },
+    {
+      "name": "escalated",
+      "parent": "helpdesk",
+      "kind": "exit-point"
+    },
+    {
+      "name": "checkout",
+      "kind": "normal",
+      "initial": "address",
+      "stereotype": "secure"
+    },
+    {
+      "name": "checkout.H",
+      "parent": "checkout",
+      "kind": "history-shallow",
+      "note": "Back to the step the customer left."
+    },
+    {
+      "name": "address",
+      "parent": "checkout",
+      "kind": "normal"
+    },
+    {
+      "name": "route",
+      "parent": "checkout",
+      "kind": "choice"
+    },
+    {
+      "name": "review",
+      "parent": "checkout",
+      "kind": "normal",
+      "initial": "depth"
+    },
+    {
+      "name": "depth",
+      "parent": "review",
+      "kind": "choice"
+    },
+    {
+      "name": "quick",
+      "parent": "review",
+      "kind": "normal"
+    },
+    {
+      "name": "thorough",
+      "parent": "review",
+      "kind": "normal"
+    },
+    {
+      "name": "paying",
+      "parent": "checkout",
+      "kind": "normal"
+    },
+    {
+      "name": "paid",
+      "parent": "checkout",
+      "kind": "junction"
+    },
+    {
+      "name": "split",
+      "kind": "fork"
+    },
+    {
+      "name": "shipping",
+      "kind": "parallel"
+    },
+    {
+      "name": "warehouse",
+      "parent": "shipping",
+      "kind": "normal",
+      "initial": "packing"
+    },
+    {
+      "name": "packing",
+      "parent": "warehouse",
+      "kind": "normal"
+    },
+    {
+      "name": "packed",
+      "parent": "warehouse",
+      "kind": "normal"
+    },
+    {
+      "name": "accounting",
+      "parent": "shipping",
+      "kind": "normal",
+      "initial": "invoicing"
+    },
+    {
+      "name": "invoicing",
+      "parent": "accounting",
+      "kind": "normal"
+    },
+    {
+      "name": "sent",
+      "parent": "accounting",
+      "kind": "normal"
+    },
+    {
+      "name": "merge",
+      "kind": "join"
+    },
+    {
+      "name": "done",
+      "kind": "normal"
+    },
+    {
+      "name": "aftersales",
+      "kind": "normal",
+      "submachine": "support"
+    },
+    {
+      "name": "refunded",
+      "kind": "final",
+      "note": "Money returned."
+    },
+    {
+      "name": "terminate",
+      "kind": "terminate",
+      "note": "Fraud closes the shop."
+    },
+    {
+      "name": "final",
+      "kind": "final"
+    }
+  ],
+  "transitions": [
+    {
+      "source": "reorder",
+      "targets": [
+        "checkout.H"
+      ],
+      "actions": [
+        "loadBasket"
+      ]
+    },
+    {
+      "source": "browsing",
+      "targets": [
+        "checkout.H"
+      ],
+      "event": "buy"
+    },
+    {
+      "source": "browsing",
+      "targets": [
+        "terminate"
+      ],
+      "event": "fraud"
+    },
+    {
+      "source": "browsing",
+      "targets": [
+        "helpdesk"
+      ],
+      "event": "help"
+    },
+    {
+      "source": "browsing",
+      "targets": [
+        "urgent"
+      ],
+      "event": "emergency"
+    },
+    {
+      "source": "helpdesk",
+      "targets": [
+        "browsing"
+      ]
+    },
+    {
+      "source": "escalated",
+      "targets": [
+        "checkout.H"
+      ],
+      "actions": [
+        "page"
+      ]
+    },
+    {
+      "source": "address",
+      "targets": [
+        "route"
+      ],
+      "event": "next",
+      "actions": [
+        "computeTotal"
+      ]
+    },
+    {
+      "source": "route",
+      "targets": [
+        "review"
+      ],
+      "cond": "large"
+    },
+    {
+      "source": "route",
+      "targets": [
+        "paying"
+      ],
+      "cond": "else"
+    },
+    {
+      "source": "review",
+      "targets": [
+        "paying"
+      ],
+      "event": "approved"
+    },
+    {
+      "source": "depth",
+      "targets": [
+        "quick"
+      ],
+      "cond": "regular"
+    },
+    {
+      "source": "depth",
+      "targets": [
+        "thorough"
+      ],
+      "cond": "else"
+    },
+    {
+      "source": "paying",
+      "targets": [
+        "paid"
+      ],
+      "event": "cash"
+    },
+    {
+      "source": "paying",
+      "targets": [
+        "paid"
+      ],
+      "event": "card"
+    },
+    {
+      "source": "paid",
+      "targets": [
+        "split"
+      ],
+      "actions": [
+        "receipt"
+      ]
+    },
+    {
+      "source": "split",
+      "targets": [
+        "packing"
+      ]
+    },
+    {
+      "source": "split",
+      "targets": [
+        "invoicing"
+      ]
+    },
+    {
+      "source": "packing",
+      "targets": [
+        "packed"
+      ],
+      "event": "packed"
+    },
+    {
+      "source": "packed",
+      "targets": [
+        "merge"
+      ]
+    },
+    {
+      "source": "invoicing",
+      "targets": [
+        "sent"
+      ],
+      "event": "sent"
+    },
+    {
+      "source": "sent",
+      "targets": [
+        "merge"
+      ],
+      "cond": "paidInFull"
+    },
+    {
+      "source": "merge",
+      "targets": [
+        "done"
+      ],
+      "actions": [
+        "close"
+      ]
+    },
+    {
+      "source": "done",
+      "targets": [
+        "checkout.H"
+      ],
+      "event": "back"
+    },
+    {
+      "source": "done",
+      "targets": [
+        "refunded"
+      ],
+      "event": "refund"
+    },
+    {
+      "source": "done",
+      "targets": [
+        "aftersales"
+      ],
+      "event": "complain"
+    },
+    {
+      "source": "done",
+      "targets": [
+        "final"
+      ]
+    },
+    {
+      "source": "aftersales",
+      "targets": [
+        "done"
+      ]
+    }
+  ]
+}

@@ -19,8 +19,7 @@ Warnings go to stderr and never fail the conversion.
   kind (external, local, internal), multi-target and targetless; notes and stereotypes.
 - **Any text output** through the Go templating engine plus the [sprig](https://masterminds.github.io/sprig/) function
   library, with two built-in templates: PlantUML, and C++ for [Boost.SML](https://github.com/boost-ext/sml).
-- **Formats**: `scxml` and `json` are each accepted as input (`-f`) and produced as output (`-F`); `fsm`,
-  the command's own compact language, is input only.
+- **Formats**: `scxml` and `json` are each accepted as input (`-f`) and produced as output (`-F`).
 - **Nothing dropped silently**: input the model has no place for is an error, and so is a model feature an output
   cannot run; an output that runs one through a workaround warns.
 - **Validation**: dangling targets, unknown parents, duplicate ids, and similar mistakes are reported before anything
@@ -97,10 +96,7 @@ cd transplantUML
 make build          # produces ./bin/fsm, or: go build ./cmd/fsm
 ```
 
-The Makefile also has `run` (`make run ARGS="-i example/coffee-machine.scxml"`), `test`, `fmt`, `vet`, `clean` and
-`generate`, which downloads the ANTLR tool and regenerates the parser of the `fsm` language
-([`internal/fsm/fsm.g4`](internal/fsm/fsm.g4)) from its grammar; the generated code is committed, so a plain build
-needs only Go.
+The Makefile also has `run` (`make run ARGS="-i example/coffee-machine.scxml"`), `test`, `fmt`, `vet` and `clean`.
 
 ### Tests
 
@@ -129,7 +125,7 @@ fsm -i input [-f format] [-t template | -F format] [-o output]
 | Flag                    | Meaning                                                                                               |
 |-------------------------|-------------------------------------------------------------------------------------------------------|
 | `-i`, `--input`         | Input file (required).                                                                                |
-| `-f`, `--input-format`  | Input format: `scxml`, `json`, `fsm`. Default: inferred from the extension (`.scxml`/`.xml`, `.json`, `.fsm`). |
+| `-f`, `--input-format`  | Input format: `scxml`, `json`. Default: inferred from the extension (`.scxml`/`.xml`, `.json`).       |
 | `-t`, `--template`      | Go template file to render with, or a built-in one: `puml` (the default), `sml`. A file wins.         |
 | `-F`, `--output-format` | Write a document format instead of running a template: `scxml`, `json`. Mutually exclusive with `-t`. |
 | `-o`, `--output`        | Output file, or the folder for a template that writes several files (`sml`). Default: stdout.         |
@@ -157,8 +153,8 @@ fsm: state "work": SCXML has no deferred events
 # SCXML -> PlantUML with the built-in template
 fsm -i example/coffee-machine.scxml -o coffee.puml
 
-# fsm -> C++ state machine on Boost.SML, five files in gen/
-fsm -i example/support.fsm -t sml -o gen/
+# JSON -> C++ state machine on Boost.SML, five files in gen/
+fsm -i example/support.json -t sml -o gen/
 
 # SCXML -> your own template
 fsm -i example/coffee-machine.scxml -t my-template.gotmpl -o coffee.md
@@ -187,9 +183,9 @@ it next to it (`<name>.puml`, kept up to date by the tests):
 | [`media-player.scxml`](example/media-player.scxml)       | compound state, deep history, entry/exit points, deferred events, invariant, local and internal transitions           |
 | [`washing-machine.scxml`](example/washing-machine.scxml) | orthogonal regions, fork and join — and the warnings PlantUML's region limitation produces                            |
 | [`thermostat.json`](example/thermostat.json)             | the same concepts written directly in the model's JSON shape                                                          |
-| [`kiosk.fsm`](example/kiosk.fsm)                         | the `fsm` language: nesting, behaviours, deferred events, invariants, guards, time triggers, transition kinds, notes  |
-| [`shop.fsm`](example/shop.fsm)                           | the `fsm` language's state kinds (parallel, submachine, all pseudostates, history, named finals) and stereotypes      |
-| [`support.fsm`](example/support.fsm)                     | the machine `shop.fsm` runs in its submachine states: an entry point, an exit point of the machine, a final state     |
+| [`kiosk.json`](example/kiosk.json)                       | nesting, behaviours, deferred events, invariants, guards, time triggers, transition kinds, notes                      |
+| [`shop.json`](example/shop.json)                         | every state kind (parallel, submachine, all pseudostates, history, named finals) and stereotypes                      |
+| [`support.json`](example/support.json)                   | the machine `shop.json` runs in its submachine states: an entry point, an exit point of the machine, a final state    |
 
 Run any of them with `fsm -i example/<name>` and compare with the `.puml` beside it; add `-F scxml` or `-F json`
 to see the other formats.
@@ -354,7 +350,7 @@ It draws everything in the coverage table above. Things to know:
 It writes four files named after the machine, and `FsmTimers.h`, into the folder `-o` names:
 
 ```bash
-fsm -i internal/render/testdata/sml/kiosk.fsm -t sml -o gen/
+fsm -i internal/render/testdata/sml/kiosk.json -t sml -o gen/
 ```
 
 | File                | Holds                                                                        |
@@ -369,7 +365,7 @@ fsm -i internal/render/testdata/sml/kiosk.fsm -t sml -o gen/
 |                     | an invariant does not hold                                                   |
 | `KioskFsm.cpp`      | its implementation, the only file that includes SML                          |
 
-That document is `example/kiosk.fsm` without what Boost.SML cannot run, and
+That document is `example/kiosk.json` without what Boost.SML cannot run, and
 [`internal/render/testdata/sml/kiosk`](internal/render/testdata/sml/kiosk) holds what the template makes of it.
 The application implements the actions and sends the events:
 
@@ -444,7 +440,7 @@ Support support;                                    // implements SupportFsmActi
 Shop shop;                                          // implements ShopFsmActions
 SupportFsm helpdesk{support};
 SupportFsm aftersales{support};
-ShopFsm fsm{shop, helpdesk, aftersales};            // shop.fsm's helpdesk and aftersales
+ShopFsm fsm{shop, helpdesk, aftersales};            // shop.json's helpdesk and aftersales
 fsm.enterFsm();
 
 fsm.help();            // enters helpdesk, which starts its SupportFsm
@@ -464,7 +460,7 @@ helpdesk.human();      // the submachine's events go to its instance
   The outer machine then queues what it reports and handles it once the current event is done.
 - `ShopFsm.h` only declares `class SupportFsm;`.
   `ShopFsm.cpp` includes `SupportFsm.h`, so the build needs both machines' files.
-- `shop.fsm` is generated without reading `support.fsm`.
+- `shop.json` is generated without reading `support.json`.
   An entry or exit point that `support` does not declare shows up as a compile error.
 
 Things to know:
@@ -598,280 +594,3 @@ So is the machine's initial effect, written in a transient state.
 What SCXML would run differently is an error: join (the first region to reach it would leave the parallel state),
 a terminate inside a state or with exit actions, deferred events, a completion transition that cannot wait for a do
 activity, and the entry and exit points of a submachine state.
-
-## The fsm language
-
-The command's own input format, a compact alternative to writing SCXML by hand. The grammar is
-[`internal/fsm/fsm.g4`](internal/fsm/fsm.g4); [`example/kiosk.fsm`](example/kiosk.fsm) and
-[`example/shop.fsm`](example/shop.fsm) between them use every construct.
-[`docs/uml-coverage.md`](docs/uml-coverage.md) compares the language with UML state machines, concept by concept,
-with an example of each. [`docs/fsm-syntax.md`](docs/fsm-syntax.md) is a syntax synopsis of every construct.
-
-```
-fsm kiosk {
-    initial state idle {
-        entry / dim
-        on touch / wake goto browsing
-    }
-    state ordering {
-        exit / clearBasket, unlock
-        initial state browsing {
-            on add [inStock and (card or cash)] / addLine
-            on checkout [basket] goto paying
-        }
-        state paying {
-            invariant [basket]
-            do / spin
-            on touch / defer
-            on approved / receipt goto done
-        }
-        on resume goto H
-        after(90s) goto idle
-        after(authTimeout) goto idle
-    }
-    state done { on ack goto final }
-}
-```
-
-States and the clauses that concern them may be interleaved, so a transition can sit next to the children it
-affects. A transition is `on <event> [guard] / action, action goto <target>`, where the guard and the actions are
-optional but at least one of the actions and the `goto` must be present. Leaving out the trigger, as in
-`[guard] / action goto <target>`, makes a completion transition, which fires once the state has finished — its do
-activity is over, or its regions have reached their final states; it needs the `goto`.
-
-The behaviours of a state are written as UML writes them, without `on`: `entry / action, action`, `do / activity`
-and `exit / action, action`, each of which may appear more than once and adds to what came before. A deferred
-event keeps the `on`, as `on pause / defer`, since the name before the `/` is the document's own event rather
-than a keyword; it takes no guard and no `goto`, because the model holds only the event's name.
-
-`invariant [condition]` is the state invariant: a condition that stays true for as long as the state is active.
-It is a promise about the machine's data, not a trigger, so nothing fires when it is false.
-A false invariant is a bug, which generated code can report; the Boost.SML output tells its listener.
-The condition is written as a guard is and reaches `Invariant` verbatim.
-A state, a parallel state and a submachine state each hold at most one; join several conditions with `and`.
-
-A transition takes UML's three kinds:
-
-```
-state player {
-    entry / powerOn
-    exit / powerOff
-    on reset goto player          # external: leaves player and enters it again
-    on stop goto local stopped    # local: stays inside player
-    on volume / adjust            # internal: no goto, no state change
-    initial state stopped { on play goto playing }
-    state playing {}
-}
-```
-
-A `goto` is external, UML's default: the transition leaves its source, so its exit and entry behaviours run, even
-when the target is the source itself or one of its children. `goto local <target>` makes it local: it stays inside
-its source, whose exit and entry behaviours do not run, so its target has to be inside the source — one of its
-states or its history. A clause without a `goto` is internal: it runs its actions and changes no state, as the
-transitions UML lists in a state's compartment do. The model's targetless transition is this one.
-
-`after(<delay>)` in place of `on <event>` makes the clause a time trigger, filling `After`: it fires that long
-after its state is entered, and takes the same guard, actions and `goto`. A delay is either a number and a unit,
-`ms` or `s` — the time value SCXML accepts — as in `after(250ms)` and `after(1.5s)`, or a name, as in
-`after(retryDelay)`, which the generated code calls for the delay the way it calls a guard or an effect. SCXML
-takes the first as `delay` and the second as `delayexpr`.
-
-A guard is a Boolean combination of names: `not`, `and`, `or` and parentheses over identifiers, with `not`
-binding tightest and `or` loosest. An identifier in a guard names a predicate, one after `/` an effect, and the
-generated code calls it — the grammar keeps the bare name because that is the one form every target language can
-render as its own call, be it `inStock()`, `this->inStock()` or `ctx.InStock`. Receivers, arguments, comparisons
-and literals therefore have no syntax. What stands between the brackets reaches `Cond` verbatim, spacing included.
-
-`initial` marks the child its parent starts in, or the machine's starting state at the top level. Declaring two in
-one scope is an error; declaring none is a warning.
-It marks a state, a parallel state or a submachine state, and also a choice or a junction.
-UML lets the initial transition lead to either, which then picks the starting state:
-
-```
-state review {
-  initial choice depth {
-    [regular] goto quick
-    [else] goto thorough
-  }
-  state quick { … }
-  state thorough { … }
-}
-```
-
-The initial transition may also be written on a line of its own, `initial`, optional actions and a `goto`.
-That is UML's initial pseudostate with its one transition, and the only way to give that transition an effect.
-UML allows it no trigger and no guard; a conditional start goes through an initial choice or junction instead.
-The `goto` names a child of the scope that holds the line, possibly declared further down.
-The line counts as the scope's `initial`, so it does not go with a marked child.
-
-```
-fsm kiosk {
-  initial / boot goto idle            # starts in idle, running boot on the way
-  state idle { … }
-}
-```
-
-The other state kinds follow UML's own names. A state is declared with `state`, the pseudostates without it:
-
-```
-parallel state shipping {             # every region is active at once
-  region warehouse { initial state packing { … } }
-  region accounting { initial state invoicing { … } }
-}
-choice route {                        # guards checked on arrival
-  [large] goto review
-  [else] goto paying
-}
-junction paid / receipt goto split    # guards checked before leaving; merges paths
-fork split {                          # enters several regions at once
-  goto packing
-  / notify goto invoicing
-}
-join merge / close goto done          # waits for every region, then leaves
-entry point express / useSavedCard goto paying
-exit point cancelled goto browsing
-submachine helpdesk : support {       # runs the machine called support
-  entry / openChat
-  goto browsing                       # leaves when that machine completes
-}
-```
-
-A parallel state holds regions, its points and its own clauses, and a region holds only states and pseudostates;
-the model keeps each region as an ordinary child state of the parallel one, as SCXML does. A parallel state starts in
-all its regions, so it takes no `initial` child, while each region marks its own. A choice or junction lists its
-branches in braces, each an optional guard — `[else]` being UML's catch-all, which reaches `Cond` as `else` —
-optional actions and a `goto`; a single branch may go on the declaring line instead, without braces. A fork lists its lines the same way without guards, one transition each, and a join, an entry point and
-an exit point are a single line. Entry and exit points go in a state, a parallel state or the machine itself: an
-entry point leads into its state past the initial child, an exit point out of it. Every pseudostate may be declared
-wherever a state may, except that a region holds no points.
-
-A submachine state refers to another machine, which is another `fsm` document.
-It is written `submachine helpdesk : support`, UML's `state : machine`.
-The first name becomes the state's name and the second its `Submachine` reference.
-Without `: support`, the state is named after the machine.
-Each submachine state runs its own instance, so a document can use one machine several times under different names.
-Its states come from that machine, so its body holds only behaviours, deferred events, transitions and points.
-The body describes this use of the machine: what belongs to every use goes in the machine's own document.
-It may be marked `initial` and goes wherever a state may.
-
-A point in a submachine body is UML's connection point reference.
-It stands for the entry or exit point of the same name in the machine the submachine refers to.
-An entry point there has no `goto`, since its path continues inside that machine; other states reach it by name.
-An exit point there has its `goto` as usual, taken when that machine leaves through its point.
-The machine itself declares its exit point without a `goto`, since that point leaves the machine.
-
-```
-submachine helpdesk : support {
-  entry point urgent                  # goto urgent enters support there
-  exit point escalated / page goto checkout
-  goto browsing                       # support reached its final state
-}
-```
-
-In the model, an entry or exit point whose parent is a submachine state is such a reference (`IsReference`).
-SCXML cannot enter or leave an invoked machine at a point, so a reference is an error for the SCXML emitter.
-
-A stereotype follows the declared name in UML's notation, as in `state checkout <<secure>> { … }` or
-`choice route <<audited>> { … }`.
-It sorts a state into a category of your own and changes nothing about how the machine behaves.
-Every declaration may carry one, and its name reaches `Stereotype` without the brackets.
-PlantUML draws none on a pseudostate or a region, and warns instead, writing it in a note.
-
-A note is text between bars, written before the directive it describes:
-
-```
-| A self-service kiosk:
-  browse, pay, take the receipt. |
-fsm kiosk {
-  | The basket is locked from here on. |
-  state paying { … }
-  | Nobody touched the screen. |
-  after(90s) goto idle
-}
-```
-
-A note before `fsm` is the machine's, one before a declaration is that state's, and one before a transition, a
-branch or a fork line is that transition's; each reaches `Note`.
-A note before `entry`, `exit` or `do` reaches `EntryNote`, `ExitNote` or `DoNote`, one before an `invariant` reaches
-`InvariantNote`, and one before `on e / defer` reaches `DeferNotes["e"]`.
-A state's `entry` clauses make up its one entry behaviour, as UML has it, so their notes join line by line; the same
-goes for `exit` and `do`.
-It may span lines, and each line loses the indentation that lines it up with the document.
-A backslash escapes the character after it, so `\|` writes a bar and `\\` a backslash.
-A directive takes at most one note.
-
-A `goto` names its target outright. State names are one namespace for the whole machine — the model keys its
-states by name — so nesting never has to be spelled out, and a target may be declared further down the document:
-
-| Target      | Resolves to                                                                     |
-|-------------|---------------------------------------------------------------------------------|
-| `b`         | the state called `b`, wherever it sits                                          |
-| `final`     | the final state of the scope holding the declaring state, created on use        |
-| `terminate` | the terminate pseudostate of that same scope, which ends the whole machine      |
-| `H`, `H*`   | the shallow or deep history of the declaring state, created on use              |
-| `b.H`, `b.H*` | the shallow or deep history of the state called `b`, created on use           |
-| `local b`, `local H`, `local b.H` | the same state, reached by a local transition                          |
-
-The parser creates these states the first time a `goto` or a declaration asks for one,
-named `<scope>.final`, `<scope>.terminate`, `<state>.H` and `<state>.H-deep`. Leaving through an exit point, `final`
-and `terminate` belong to the scope around the point's state. A parallel state has no history of its own, only its
-regions do.
-
-A history state takes its default transition from a line inside the state it belongs to.
-`H` or `H*` starts the line, followed by optional actions and a `goto`:
-
-```
-state player {
-    H / rewind goto intro         # taken while player has no history yet
-    initial state intro { on next goto song }
-    state song {}
-}
-```
-
-It is the same state `goto H` or `goto H*` reaches, and the one transition leaving it.
-UML gives it no trigger and no guard, and its target has to be inside the state.
-A state or a region declares each kind at most once.
-The actions and the `goto` are optional, so `H` alone only declares the history, to give it a note or a stereotype.
-
-A final state and a terminate pseudostate are declared on one line, with or without a name:
-
-```
-state paying {
-  initial state card {
-    on approved goto paid         # the named final state
-    on stop goto final            # the unnamed one of this scope
-    on fraud goto terminate
-  }
-  | Nothing left to pay. |
-  final state <<closed>>          # is paying.final
-  terminate state                 # is paying.terminate
-}
-| Receipt printed. |
-final state paid <<ok>>
-```
-
-A named one is reached by its name, like any state, so a scope may end in several.
-One without a name is the state `goto final` or `goto terminate` reaches in that scope, which the declaration only
-annotates; a scope declares each at most once.
-Both take a note and a stereotype, and nothing else: UML gives a final state no behaviours.
-They go wherever a state may, except directly in a parallel state, and are never `initial`.
-
-A name is a letter or an underscore followed by letters, digits and underscores — no dots or hyphens,
-which is what keeps those names out of a document's reach. A state whose id in another format carries punctuation therefore has to be
-renamed when the machine is written in this language.
-
-The language has no variables, on purpose.
-Declaring data would need types and literals, and those differ from one target language to the next.
-The data lives in the generated code instead, and the document handles it through named actions and predicates:
-`/ initCount` and `/ incrementCount` rather than an assignment, `[tooManyRetries]` rather than a comparison.
-A machine read from another format keeps its `Variables` in the model; only this language cannot declare them.
-
-### Editor support
-
-[`editors/fsm`](editors/fsm) is a VS Code extension that highlights `.fsm` files.
-It also sets `#` as the line comment and pairs braces, brackets and parentheses.
-JetBrains IDEs read the same folder as a TextMate bundle.
-
-- JetBrains: add the `editors/fsm` folder under Settings → Editor → TextMate Bundles.
-- VS Code: link the folder into the extensions directory, then reload the window:
-  `ln -s "$PWD/editors/fsm" ~/.vscode/extensions/fsm`.

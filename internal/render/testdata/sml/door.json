@@ -1,0 +1,39 @@
+{
+  "name": "door",
+  "initial": "closed",
+  "states": [
+    {
+      "name": "closed",
+      "kind": "normal"
+    },
+    {
+      "name": "opened",
+      "kind": "normal",
+      "invariant": "clear and not locked"
+    }
+  ],
+  "transitions": [
+    {
+      "source": "closed",
+      "targets": [
+        "opened"
+      ],
+      "event": "open"
+    },
+    {
+      "source": "opened",
+      "event": "knock",
+      "actions": [
+        "listen"
+      ],
+      "kind": "internal"
+    },
+    {
+      "source": "opened",
+      "targets": [
+        "closed"
+      ],
+      "event": "close"
+    }
+  ]
+}

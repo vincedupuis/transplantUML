@@ -1,0 +1,108 @@
+{
+  "name": "desk",
+  "initial": "idle",
+  "states": [
+    {
+      "name": "idle",
+      "kind": "normal"
+    },
+    {
+      "name": "help",
+      "kind": "normal",
+      "onEntry": [
+        "open"
+      ],
+      "onExit": [
+        "close"
+      ],
+      "submachine": "agent"
+    },
+    {
+      "name": "fast",
+      "parent": "help",
+      "kind": "entry-point"
+    },
+    {
+      "name": "quick",
+      "parent": "help",
+      "kind": "entry-point"
+    },
+    {
+      "name": "broken",
+      "parent": "help",
+      "kind": "entry-point"
+    },
+    {
+      "name": "up",
+      "parent": "help",
+      "kind": "exit-point"
+    },
+    {
+      "name": "top",
+      "kind": "normal"
+    },
+    {
+      "name": "final",
+      "kind": "final"
+    }
+  ],
+  "transitions": [
+    {
+      "source": "idle",
+      "targets": [
+        "help"
+      ],
+      "event": "ask"
+    },
+    {
+      "source": "idle",
+      "targets": [
+        "fast"
+      ],
+      "event": "hurry"
+    },
+    {
+      "source": "idle",
+      "targets": [
+        "quick"
+      ],
+      "event": "rush"
+    },
+    {
+      "source": "idle",
+      "targets": [
+        "broken"
+      ],
+      "event": "crash"
+    },
+    {
+      "source": "help",
+      "targets": [
+        "idle"
+      ],
+      "event": "quit"
+    },
+    {
+      "source": "help",
+      "targets": [
+        "idle"
+      ]
+    },
+    {
+      "source": "up",
+      "targets": [
+        "top"
+      ],
+      "actions": [
+        "page"
+      ]
+    },
+    {
+      "source": "top",
+      "targets": [
+        "final"
+      ],
+      "event": "done"
+    }
+  ]
+}

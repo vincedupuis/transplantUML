@@ -1,0 +1,217 @@
+{
+  "name": "kiosk",
+  "initial": "idle",
+  "initialActions": [
+    "boot"
+  ],
+  "note": "A self-service kiosk:\nbrowse, pay, take the receipt.",
+  "states": [
+    {
+      "name": "idle",
+      "kind": "normal",
+      "onEntry": [
+        "dim"
+      ]
+    },
+    {
+      "name": "ordering",
+      "kind": "normal",
+      "initial": "browsing",
+      "onEntry": [
+        "newBasket"
+      ],
+      "onExit": [
+        "clearBasket",
+        "unlock"
+      ]
+    },
+    {
+      "name": "browsing",
+      "parent": "ordering",
+      "kind": "normal"
+    },
+    {
+      "name": "paying",
+      "parent": "ordering",
+      "kind": "normal",
+      "initial": "authorizing",
+      "onEntry": [
+        "lockBasket"
+      ],
+      "invariant": "basket and not (card and cash)",
+      "note": "The basket is locked from here on."
+    },
+    {
+      "name": "authorizing",
+      "parent": "paying",
+      "kind": "normal",
+      "do": [
+        "spin"
+      ],
+      "defer": [
+        "touch"
+      ],
+      "doNote": "Until the bank answers."
+    },
+    {
+      "name": "again",
+      "parent": "paying",
+      "kind": "normal"
+    },
+    {
+      "name": "ordering.H",
+      "parent": "ordering",
+      "kind": "history-shallow"
+    },
+    {
+      "name": "done",
+      "kind": "normal",
+      "onEntry": [
+        "print"
+      ]
+    },
+    {
+      "name": "final",
+      "kind": "final"
+    }
+  ],
+  "transitions": [
+    {
+      "source": "idle",
+      "targets": [
+        "browsing"
+      ],
+      "event": "touch",
+      "actions": [
+        "wake"
+      ]
+    },
+    {
+      "source": "ordering.H",
+      "targets": [
+        "browsing"
+      ],
+      "actions": [
+        "greet"
+      ]
+    },
+    {
+      "source": "ordering",
+      "targets": [
+        "idle"
+      ],
+      "event": "abandon"
+    },
+    {
+      "source": "ordering",
+      "targets": [
+        "idle"
+      ],
+      "after": "90s",
+      "note": "Nobody touched the screen."
+    },
+    {
+      "source": "ordering",
+      "targets": [
+        "ordering.H"
+      ],
+      "event": "resume"
+    },
+    {
+      "source": "ordering",
+      "targets": [
+        "browsing"
+      ],
+      "event": "back",
+      "kind": "local"
+    },
+    {
+      "source": "browsing",
+      "event": "add",
+      "cond": "inStock and (card or cash)",
+      "actions": [
+        "addLine"
+      ],
+      "kind": "internal"
+    },
+    {
+      "source": "browsing",
+      "targets": [
+        "browsing"
+      ],
+      "event": "remove",
+      "actions": [
+        "dropLine"
+      ]
+    },
+    {
+      "source": "browsing",
+      "targets": [
+        "paying"
+      ],
+      "event": "checkout",
+      "cond": "basket"
+    },
+    {
+      "source": "paying",
+      "targets": [
+        "done"
+      ],
+      "event": "approved",
+      "actions": [
+        "receipt"
+      ]
+    },
+    {
+      "source": "paying",
+      "targets": [
+        "again"
+      ],
+      "event": "declined",
+      "cond": "retries",
+      "actions": [
+        "warn"
+      ]
+    },
+    {
+      "source": "paying",
+      "targets": [
+        "browsing"
+      ],
+      "event": "declined",
+      "cond": "not retries"
+    },
+    {
+      "source": "authorizing",
+      "targets": [
+        "browsing"
+      ],
+      "event": "cancel"
+    },
+    {
+      "source": "authorizing",
+      "targets": [
+        "again"
+      ],
+      "after": "authTimeout",
+      "cond": "retries",
+      "actions": [
+        "warn"
+      ]
+    },
+    {
+      "source": "again",
+      "targets": [
+        "authorizing"
+      ],
+      "event": "card"
+    },
+    {
+      "source": "done",
+      "targets": [
+        "final"
+      ],
+      "event": "ack"
+    }
+  ]
+}

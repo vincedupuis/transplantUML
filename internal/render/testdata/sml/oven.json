@@ -1,0 +1,87 @@
+{
+  "name": "oven",
+  "initial": "idle",
+  "states": [
+    {
+      "name": "idle",
+      "kind": "normal"
+    },
+    {
+      "name": "baking",
+      "kind": "normal",
+      "initial": "low"
+    },
+    {
+      "name": "low",
+      "parent": "baking",
+      "kind": "normal"
+    },
+    {
+      "name": "high",
+      "parent": "baking",
+      "kind": "normal"
+    },
+    {
+      "name": "terminate",
+      "kind": "terminate"
+    }
+  ],
+  "transitions": [
+    {
+      "source": "idle",
+      "targets": [
+        "baking"
+      ],
+      "event": "start"
+    },
+    {
+      "source": "baking",
+      "targets": [
+        "idle"
+      ],
+      "after": "30s",
+      "actions": [
+        "ding"
+      ]
+    },
+    {
+      "source": "baking",
+      "after": "preheat",
+      "actions": [
+        "ready"
+      ],
+      "kind": "internal"
+    },
+    {
+      "source": "baking",
+      "targets": [
+        "idle"
+      ],
+      "event": "open"
+    },
+    {
+      "source": "baking",
+      "targets": [
+        "terminate"
+      ],
+      "event": "burn"
+    },
+    {
+      "source": "low",
+      "targets": [
+        "high"
+      ],
+      "event": "hot"
+    },
+    {
+      "source": "high",
+      "targets": [
+        "low"
+      ],
+      "after": "250ms",
+      "actions": [
+        "beep"
+      ]
+    }
+  ]
+}

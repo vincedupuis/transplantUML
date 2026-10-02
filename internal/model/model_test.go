@@ -250,8 +250,7 @@ func names(states []*State) string {
 	return strings.Join(out, ",")
 }
 
-// A condition is names joined by and, or, not and parentheses, as the fsm
-// grammar has it.
+// A condition is names joined by and, or, not and parentheses.
 func TestIsCondition(t *testing.T) {
 	for _, c := range []string{"a", "not a", "a and b", "a or b and not c", "(a or b) and c", " ( a ) ", "card and not (blocked or expired)", "a_1\nand\tb"} {
 		if !IsCondition(c) {

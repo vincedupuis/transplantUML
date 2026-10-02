@@ -1,0 +1,113 @@
+{
+  "name": "agent",
+  "initial": "bot",
+  "states": [
+    {
+      "name": "fast",
+      "kind": "entry-point"
+    },
+    {
+      "name": "quick",
+      "kind": "entry-point"
+    },
+    {
+      "name": "broken",
+      "kind": "entry-point"
+    },
+    {
+      "name": "up",
+      "kind": "exit-point"
+    },
+    {
+      "name": "bot",
+      "kind": "normal",
+      "onEntry": [
+        "greet"
+      ]
+    },
+    {
+      "name": "person",
+      "kind": "normal",
+      "initial": "talking",
+      "onEntry": [
+        "assign"
+      ],
+      "onExit": [
+        "release"
+      ]
+    },
+    {
+      "name": "talking",
+      "parent": "person",
+      "kind": "normal"
+    },
+    {
+      "name": "final",
+      "kind": "final"
+    },
+    {
+      "name": "terminate",
+      "kind": "terminate"
+    },
+    {
+      "name": "person.terminate",
+      "parent": "person",
+      "kind": "terminate"
+    }
+  ],
+  "transitions": [
+    {
+      "source": "fast",
+      "targets": [
+        "person"
+      ]
+    },
+    {
+      "source": "quick",
+      "targets": [
+        "final"
+      ]
+    },
+    {
+      "source": "broken",
+      "targets": [
+        "terminate"
+      ]
+    },
+    {
+      "source": "bot",
+      "targets": [
+        "person"
+      ],
+      "event": "human"
+    },
+    {
+      "source": "bot",
+      "targets": [
+        "final"
+      ],
+      "event": "solved"
+    },
+    {
+      "source": "person",
+      "targets": [
+        "final"
+      ],
+      "event": "solved"
+    },
+    {
+      "source": "person",
+      "targets": [
+        "up"
+      ],
+      "event": "escalate"
+    },
+    {
+      "source": "talking",
+      "targets": [
+        "person.terminate"
+      ],
+      "event": "hangup"
+    }
+  ]
+}

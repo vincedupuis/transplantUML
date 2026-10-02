@@ -30,13 +30,12 @@ error from `Validate`, never a warning.
 make build                          # produces ./bin/fsm (see the Makefile for run/test/fmt/vet/clean)
 go build ./...
 go build ./cmd/fsm                  # produces ./fsm
-make vet                            # go vet -unreachable=false ./... (the generated ANTLR parser trips that check)
+make vet                            # go vet ./...
 go test ./...
 go test ./internal/scxml -run TestEdgeCases          # one test
 go test ./internal/render -run TestPlantUMLGolden/edge
 make plantuml                       # download the PlantUML jar into bin/ so TestPlantUMLSyntax runs (make test picks it up)
 make sml                            # download the Boost.SML header into bin/ so TestSMLCompiles runs (needs a C++20 compiler)
-make generate                       # download the ANTLR jar into bin/ and regenerate internal/fsm/parser from fsm.g4
 
 # End-to-end
 ./fsm -i example/coffee-machine.scxml                   # PlantUML to stdout
@@ -46,8 +45,8 @@ make generate                       # download the ANTLR jar into bin/ and regen
 Golden files for the PlantUML template live in `internal/render/testdata/*.puml`; regenerate one with
 `go run ./cmd/fsm -i <input> -o internal/render/testdata/<name>.puml` after checking the diff is intended. Those for
 the SML template are folders, `internal/render/testdata/sml/<name>/` (listed in `smlGoldens`), regenerated with
-`-t sml -o internal/render/testdata/sml/<name>` from the input beside the folder (`kiosk.fsm`, `shop.fsm`,
-`uml.scxml`: the examples and `uml.scxml` without what Boost.SML cannot run) or `example/support.fsm`.
+`-t sml -o internal/render/testdata/sml/<name>` from the input beside the folder (`kiosk.json`, `shop.json`,
+`uml.scxml`: the examples and `uml.scxml` without what Boost.SML cannot run) or `example/support.json`.
 
 ## Architecture
 
@@ -93,33 +92,6 @@ warnings.
   which the parser folds back into `InitialActions`), and fails (`fail`) on join, defer, a nested terminate, a completion
   that would not wait for a do activity, and a submachine state's entry and exit points. States it cannot reach
   from the top level are an error.
-- **`internal/fsm`** — the command's own DSL (`fsm name { state s { on ev [guard] / actions goto target } }`), an
-  ANTLR4 grammar in `fsm.g4`. `parser/` is generated from it (`make generate`, Go target with `-visitor
-  -no-listener`) and committed so the build needs no Java; never edit it by hand, and regenerate it after any
-  grammar change. Kinds use UML's names: `state`, `parallel state` holding `region`s, `submachine` (named after
-  the machine it refers to, so its body holds clauses and the entry and exit points it references: a
-  connection point reference, whose entry point has no `goto`), and the pseudostates `choice`/`junction` (branches,
-  `[else]` becomes `Cond` "else"), `fork`, `join`, `entry point`/`exit point`, declared without `state`. A clause
-  with no trigger is a completion transition. `goto` targets are a state name, `final`, `terminate`, or history as
-  `H`/`H*`, alone or after a state name (`s.H*`); a line `H <<s>> / actions goto target` inside a state or region
-  annotates that history and optionally gives it its default transition, and `final state [name]` / `terminate
-  state [name]` declare a named final or terminate or, without a name, annotate the one `goto final` / `goto
-  terminate` reaches in that scope; `goto local <target>`
-  makes a local transition, whose target must be inside the source, and a clause without `goto` is internal; one name
-  reaches any state because the names are one namespace for the whole machine, as they are in the model. A state
-  may be marked `initial` (`initial state s { … }`), as may a choice or a junction since UML lets the
-  initial transition lead to one, naming its parent's starting child or, at the top level, the
-  machine's; a line `initial / actions goto s` says the same and is the only way to give the initial
-  transition an effect (`InitialActions`). `build.go` holds `Parser` and the `builder` that walks the parse tree into the
-  model: `declare` creates every state first, in document order, then `walk` resolves the transitions, because a
-  `goto` may name a state declared further down. The unnamed final, terminate and history states have no name
-  to declare, so `synthesize` creates them on first use, from a `goto` or an unnamed declaration, as
-  `<scope>.final`, `<scope>.terminate`, `<state>.H` and `<state>.H-deep` (an Identifier holds letters, digits and `_` only, so no document can declare those names
-  itself). The builder reports only what the model cannot hold or would misplace — two `initial` children in one
-  scope would collapse into one `State.Initial`, a repeated state name would collapse the builder's own index,
-  the machine has nowhere to put a top-level `on` clause, two unnamed finals, terminates or `H` lines in one scope
-  would fold into one state, and a history or final state made directly inside a
-  parallel state would become a region — and `model.Validate()` does the rest.
 - **`internal/jsonsm`** — the model's own JSON shape (struct tags in `model`). Parser uses
   `DisallowUnknownFields`; round-trip equality with the SCXML parser is tested.
 - **`internal/render`** — registers sprig plus project helpers (`include`, `prefix`, `surround`, `joinNonEmpty`,

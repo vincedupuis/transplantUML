@@ -11,21 +11,18 @@ import (
 	"testing"
 
 	"github.com/vincedupuis/transplantUML/assets"
-	"github.com/vincedupuis/transplantUML/internal/fsm"
 	"github.com/vincedupuis/transplantUML/internal/model"
 )
-
-var fsmParser fsm.Parser
 
 // smlGoldens maps the documents whose Boost.SML rendering is checked in to the
 // folder holding its files. kiosk, shop and uml are the examples and uml.scxml
 // without what Boost.SML cannot run (TestSMLErrors). Regenerate one with:
 // go run ./cmd/fsm -i <input> -t sml -o internal/render/testdata/sml/<name>
 var smlGoldens = map[string]string{
-	"testdata/sml/kiosk.fsm":    "testdata/sml/kiosk",
-	"testdata/sml/shop.fsm":     "testdata/sml/shop",
-	"../../example/support.fsm": "testdata/sml/support",
-	"testdata/sml/uml.scxml":    "testdata/sml/uml",
+	"testdata/sml/kiosk.json":    "testdata/sml/kiosk",
+	"testdata/sml/shop.json":     "testdata/sml/shop",
+	"../../example/support.json": "testdata/sml/support",
+	"testdata/sml/uml.scxml":     "testdata/sml/uml",
 }
 
 // smlFiles renders sm with the SML template and splits the output into its
@@ -123,7 +120,7 @@ func TestSMLErrors(t *testing.T) {
 		"../scxml/testdata/edge.scxml": {
 			`transition a -> a b: a Boost.SML transition has one target`,
 		},
-		"../../example/kiosk.fsm": {
+		"../../example/kiosk.json": {
 			`state "authorizing": Boost.SML has no do activities, so spin cannot run`,
 			`transition paying -> again: Boost.SML has no transitions into a composite state, and entering "paying" would not reach "again"`,
 			`transition authorizing -> browsing: Boost.SML has no transitions from inside a composite state; as a transition of "paying" it would fire from any of its states`,
@@ -133,7 +130,7 @@ func TestSMLErrors(t *testing.T) {
 			`transition ordering -> browsing: Boost.SML has no local transitions`,
 			`transition paying -> done: Boost.SML has no transitions from inside a composite state; as a transition of "ordering" it would fire from any of its states`,
 		},
-		"../../example/shop.fsm": {
+		"../../example/shop.json": {
 			`state "express": Boost.SML has no entry points; entering "checkout" would not reach the state the entry point leads to, or would drop its guard or actions`,
 			`state "cancelled": Boost.SML has no exit points`,
 			`state "checkout.H-deep": Boost.SML has only shallow history, and "checkout" holds nested states a deep history would resume`,
@@ -558,51 +555,13 @@ func TestSMLCompiles(t *testing.T) {
 	}
 }
 
-// desk runs the machine agent in a submachine state, which it enters at the
+// testdata/sml/desk.json runs the machine agent.json in a submachine state, which it enters at the
 // machine's initial state or at one of its entry points, and leaves when the
 // machine completes, when it leaves by its exit point, or on an event of its
 // own. The entry point quick completes agent at once, while desk enters it,
 // and broken terminates it at once. agent also terminates from inside the
 // composite state person, which ends desk too.
-const desk = `fsm desk {
-  initial state idle {
-    on ask goto help
-    on hurry goto fast
-    on rush goto quick
-    on crash goto broken
-  }
-  submachine help : agent {
-    entry / open
-    exit / close
-    entry point fast
-    entry point quick
-    entry point broken
-    exit point up / page goto top
-    on quit goto idle
-    goto idle
-  }
-  state top { on done goto final }
-}`
-
-const agent = `fsm agent {
-  entry point fast goto person
-  entry point quick goto final
-  entry point broken goto terminate
-  exit point up
-  initial state bot {
-    entry / greet
-    on human goto person
-    on solved goto final
-  }
-  state person {
-    entry / assign
-    exit / release
-    on solved goto final
-    on escalate goto up
-    initial state talking { on hangup goto terminate }
-  }
-}`
-
+//
 // A submachine state runs a machine of its own, generated from another
 // document: this links desk and agent and runs them, checking the actions
 // they take in turn. Leaving the submachine state early, or stopping desk,
@@ -612,11 +571,8 @@ const agent = `fsm agent {
 func TestSMLSubmachineRuns(t *testing.T) {
 	cxx, include := smlToolchain(t)
 	var files []File
-	for _, src := range []string{desk, agent} {
-		sm, _, err := fsmParser.Parse([]byte(src))
-		if err != nil {
-			t.Fatal(err)
-		}
+	for _, name := range []string{"desk", "agent"} {
+		sm := parseFile(t, "testdata/sml/"+name+".json")
 		f, _ := smlFiles(t, sm)
 		files = append(files, f...)
 	}
@@ -718,25 +674,13 @@ ask:
 	}
 }
 
-// door has an invariant on opened, made of two names.
-const door = `fsm door {
-  initial state closed { on open goto opened }
-  state opened {
-    invariant [clear and not locked]
-    on knock / listen
-    on close goto closed
-  }
-}`
-
+// testdata/sml/door.json has an invariant on opened, made of two names.
 // An invariant is checked once its state is entered and after every event
 // while it is active, each of its names calling invariant<Name> on the
 // actions, and the listener hears when it does not hold.
 func TestSMLInvariantsRun(t *testing.T) {
 	cxx, include := smlToolchain(t)
-	sm, _, err := fsmParser.Parse([]byte(door))
-	if err != nil {
-		t.Fatal(err)
-	}
+	sm := parseFile(t, "testdata/sml/door.json")
 	files, _ := smlFiles(t, sm)
 	main := `#include "DoorFsm.h"
 
@@ -803,30 +747,15 @@ knock while closed:
 	}
 }
 
-// oven has timers on a composite state, one with a named delay whose
-// transition is internal, one on a nested state, and a terminate.
-const oven = `fsm oven {
-  initial state idle { on start goto baking }
-  state baking {
-    after(30s) / ding goto idle
-    after(preheat) / ready
-    on open goto idle
-    on burn goto terminate
-    initial state low { on hot goto high }
-    state high { after(250ms) / beep goto low }
-  }
-}`
-
+// testdata/sml/oven.json has timers on a composite state, one with a named
+// delay whose transition is internal, one on a nested state, and a terminate.
 // A state starts its timers when it is entered and cancels them when it is
 // left, a timer that fired is not cancelled, and one that fires after its
 // state was left, or after the machine was terminated or stopped, does
 // nothing.
 func TestSMLTimersRun(t *testing.T) {
 	cxx, include := smlToolchain(t)
-	sm, _, err := fsmParser.Parse([]byte(oven))
-	if err != nil {
-		t.Fatal(err)
-	}
+	sm := parseFile(t, "testdata/sml/oven.json")
 	files, _ := smlFiles(t, sm)
 	main := smlStubs(files) + `
 #include <cstdio>

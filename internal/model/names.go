@@ -35,8 +35,8 @@ var conditionTokens = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*|[()]`)
 
 func isOperator(s string) bool { return s == "and" || s == "or" || s == "not" }
 
-// condition parses the tokens of a condition by recursive descent, following
-// the fsm grammar's expression rule.
+// condition parses the tokens of a condition by recursive descent: or binds
+// looser than and, and not applies to one name or parenthesized condition.
 type condition struct {
 	tokens []string
 	pos    int

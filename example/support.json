@@ -1,0 +1,62 @@
+{
+  "name": "support",
+  "initial": "bot",
+  "states": [
+    {
+      "name": "urgent",
+      "kind": "entry-point"
+    },
+    {
+      "name": "escalated",
+      "kind": "exit-point"
+    },
+    {
+      "name": "bot",
+      "kind": "normal"
+    },
+    {
+      "name": "agent",
+      "kind": "normal"
+    },
+    {
+      "name": "final",
+      "kind": "final"
+    }
+  ],
+  "transitions": [
+    {
+      "source": "urgent",
+      "targets": [
+        "agent"
+      ]
+    },
+    {
+      "source": "bot",
+      "targets": [
+        "agent"
+      ],
+      "event": "human"
+    },
+    {
+      "source": "bot",
+      "targets": [
+        "final"
+      ],
+      "event": "solved"
+    },
+    {
+      "source": "agent",
+      "targets": [
+        "final"
+      ],
+      "event": "solved"
+    },
+    {
+      "source": "agent",
+      "targets": [
+        "escalated"
+      ],
+      "event": "escalate"
+    }
+  ]
+}
